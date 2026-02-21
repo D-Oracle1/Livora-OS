@@ -12,10 +12,12 @@ import { PayrollController } from './controllers/payroll.controller';
 import { PolicyController } from './controllers/policy.controller';
 import { SalaryConfigController } from './controllers/salary-config.controller';
 import { NotificationModule } from '../notification/notification.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
     forwardRef(() => NotificationModule),
+    SettingsModule,
   ],
   controllers: [
     AttendanceController,

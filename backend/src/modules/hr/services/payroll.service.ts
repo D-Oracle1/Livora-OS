@@ -2,17 +2,26 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../../database/prisma.service';
 import { GeneratePayrollDto, UpdatePayrollDto, ApprovePayrollDto, PayrollQueryDto } from '../dto/payroll.dto';
 import { PayrollStatus } from '@prisma/client';
+import { SettingsService } from '../../settings/settings.service';
 
 @Injectable()
 export class PayrollService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settingsService: SettingsService,
+  ) {}
 
-  private readonly TAX_RATE = 0.075; // 7.5% PAYE
-  private readonly PENSION_RATE = 0.08; // 8% Pension
+  private readonly DEFAULT_TAX_RATE = 0.075; // fallback 7.5% PAYE
+  private readonly DEFAULT_PENSION_RATE = 0.08; // fallback 8% Pension
 
   async generate(dto: GeneratePayrollDto) {
     const periodStart = new Date(dto.periodStart);
     const periodEnd = new Date(dto.periodEnd);
+
+    // Load payroll settings (pension/tax toggles and rates)
+    const payrollSettings = await this.settingsService.getPayrollSettings();
+    const TAX_RATE = payrollSettings.enableTax ? payrollSettings.taxRate : 0;
+    const PENSION_RATE = payrollSettings.enablePension ? payrollSettings.pensionRate : 0;
 
     // Get staff members to generate payroll for
     const where: any = { isActive: true };
@@ -64,10 +73,10 @@ export class PayrollService {
       const totalOvertime = attendance.reduce((sum, a) => sum + (a.overtime || 0), 0);
       const overtimeAmount = (Number(staff.baseSalary) / 160) * totalOvertime * 1.5; // 1.5x rate for overtime
 
-      // Calculate deductions
+      // Calculate deductions using settings-configured rates
       const grossPay = Number(staff.baseSalary) + overtimeAmount;
-      const tax = grossPay * this.TAX_RATE;
-      const pension = grossPay * this.PENSION_RATE;
+      const tax = grossPay * TAX_RATE;
+      const pension = grossPay * PENSION_RATE;
       const totalDeductions = tax + pension;
       const netPay = grossPay - totalDeductions;
 
@@ -206,9 +215,13 @@ export class PayrollService {
     const totalAllowances = Object.values(allowances).reduce((sum, val) => sum + val, 0);
     const totalOtherDeductions = Object.values(otherDeductions).reduce((sum, val) => sum + val, 0);
 
+    const payrollSettings = await this.settingsService.getPayrollSettings();
+    const TAX_RATE = payrollSettings.enableTax ? payrollSettings.taxRate : 0;
+    const PENSION_RATE = payrollSettings.enablePension ? payrollSettings.pensionRate : 0;
+
     const grossPay = Number(record.baseSalary) + overtime + bonus + totalAllowances;
-    const tax = grossPay * this.TAX_RATE;
-    const pension = grossPay * this.PENSION_RATE;
+    const tax = grossPay * TAX_RATE;
+    const pension = grossPay * PENSION_RATE;
     const totalDeductions = tax + pension + totalOtherDeductions;
     const netPay = grossPay - totalDeductions;
 

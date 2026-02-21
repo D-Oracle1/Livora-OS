@@ -54,4 +54,20 @@ export class SettingsController {
   ) {
     return this.settingsService.updateTaxRates(rates);
   }
+
+  @Get('payroll')
+  @ApiOperation({ summary: 'Get payroll settings (pension, tax toggles and rates)' })
+  async getPayrollSettings() {
+    return this.settingsService.getPayrollSettings();
+  }
+
+  @Put('payroll')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Update payroll settings' })
+  async updatePayrollSettings(
+    @Body(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }))
+    settings: any,
+  ) {
+    return this.settingsService.updatePayrollSettings(settings);
+  }
 }

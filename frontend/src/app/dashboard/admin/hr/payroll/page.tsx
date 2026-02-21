@@ -15,6 +15,7 @@ import {
   Loader2,
   RefreshCw,
   CreditCard,
+  Settings,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +46,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { api, getImageUrl } from '@/lib/api';
 
@@ -157,9 +159,52 @@ export default function AdminPayrollPage() {
   const [periodStart, setPeriodStart] = useState(getDefaultPeriod().start);
   const [periodEnd, setPeriodEnd] = useState(getDefaultPeriod().end);
 
+  // Payroll settings (pension / tax toggles)
+  const [payrollSettings, setPayrollSettings] = useState({
+    enablePension: true,
+    pensionRate: 8,
+    enableTax: true,
+    taxRate: 7.5,
+  });
+  const [settingsSaving, setSettingsSaving] = useState(false);
+
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const [generatePeriodStart, setGeneratePeriodStart] = useState(getDefaultPeriod().start);
   const [generatePeriodEnd, setGeneratePeriodEnd] = useState(getDefaultPeriod().end);
+
+  const fetchPayrollSettings = useCallback(async () => {
+    try {
+      const res: any = await api.get('/settings/payroll');
+      const data = res?.data ?? res;
+      if (data) {
+        setPayrollSettings({
+          enablePension: data.enablePension ?? true,
+          pensionRate: (data.pensionRate ?? 0.08) * 100,
+          enableTax: data.enableTax ?? true,
+          taxRate: (data.taxRate ?? 0.075) * 100,
+        });
+      }
+    } catch {
+      // use defaults
+    }
+  }, []);
+
+  const savePayrollSettings = async () => {
+    setSettingsSaving(true);
+    try {
+      await api.put('/settings/payroll', {
+        enablePension: payrollSettings.enablePension,
+        pensionRate: payrollSettings.pensionRate / 100,
+        enableTax: payrollSettings.enableTax,
+        taxRate: payrollSettings.taxRate / 100,
+      });
+      toast.success('Payroll settings saved');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save settings');
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -205,7 +250,8 @@ export default function AdminPayrollPage() {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchPayrollSettings();
+  }, [fetchData, fetchPayrollSettings]);
 
   const handleGenerate = async () => {
     setActionLoading('generate');
@@ -236,6 +282,37 @@ export default function AdminPayrollPage() {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const downloadPeriodReport = (period: { period: string; records: PayrollRecord[]; totalGross: number; totalDeductions: number; totalNet: number; staffCount: number }) => {
+    const fmt = (n: number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(n);
+    const rows = period.records.map((r) =>
+      `<tr>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${r.staffProfile?.user?.firstName || ''} ${r.staffProfile?.user?.lastName || ''}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${r.staffProfile?.department?.name || '-'}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right">${fmt(toNumber(r.grossPay))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right;color:#dc2626">${fmt(toNumber(r.totalDeductions))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:bold">${fmt(toNumber(r.netPay))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:center">${r.status}</td>
+      </tr>`
+    ).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Payroll Report - ${period.period}</title>
+    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:40px}h1{font-size:20px;color:#1e40af;margin-bottom:4px}.subtitle{color:#666;font-size:12px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#f8fafc;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:#666;border-bottom:2px solid #e5e7eb}th:nth-child(n+3){text-align:right}.summary{display:flex;gap:16px;margin:20px 0}.summary-card{flex:1;background:#f8fafc;border-radius:8px;padding:14px}.summary-card p{font-size:11px;color:#666;margin-bottom:4px}.summary-card .val{font-size:16px;font-weight:bold}@media print{body{padding:20px}}</style>
+    </head><body>
+    <h1>Payroll Report</h1><div class="subtitle">${period.period} &nbsp;·&nbsp; ${period.staffCount} staff</div>
+    <div class="summary">
+      <div class="summary-card"><p>Total Gross</p><div class="val">${fmt(period.totalGross)}</div></div>
+      <div class="summary-card"><p>Total Deductions</p><div class="val" style="color:#dc2626">${fmt(period.totalDeductions)}</div></div>
+      <div class="summary-card"><p>Total Net Pay</p><div class="val" style="color:#1e40af">${fmt(period.totalNet)}</div></div>
+    </div>
+    <table><thead><tr><th>Name</th><th>Department</th><th>Gross</th><th>Deductions</th><th>Net Pay</th><th style="text-align:center">Status</th></tr></thead><tbody>${rows}</tbody></table>
+    </body></html>`;
+    const win = window.open('', '_blank');
+    if (!win) { toast.error('Pop-up blocked — please allow pop-ups'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 500);
   };
 
   const handleMarkPaid = async (record: PayrollRecord) => {
@@ -500,7 +577,7 @@ export default function AdminPayrollPage() {
                             </Button>
                           )}
                           {status === 'PAID' && (
-                            <Button variant="ghost" size="sm" className="gap-1">
+                            <Button variant="ghost" size="sm" className="gap-1" onClick={() => downloadPeriodReport(period)}>
                               <Download className="w-4 h-4" />
                               Download
                             </Button>
@@ -628,6 +705,85 @@ export default function AdminPayrollPage() {
           </Card>
         </motion.div>
       )}
+
+      {/* Payroll Settings */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-primary" />
+              Payroll Deduction Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 sm:grid-cols-2">
+              {/* Tax */}
+              <div className="space-y-3 p-4 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">PAYE Tax</p>
+                    <p className="text-xs text-muted-foreground">Deduct income tax from payroll</p>
+                  </div>
+                  <Switch
+                    checked={payrollSettings.enableTax}
+                    onCheckedChange={(v) => setPayrollSettings((s) => ({ ...s, enableTax: v }))}
+                  />
+                </div>
+                {payrollSettings.enableTax && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tax Rate (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min={0}
+                      max={100}
+                      value={payrollSettings.taxRate}
+                      onChange={(e) => setPayrollSettings((s) => ({ ...s, taxRate: Number(e.target.value) }))}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+              {/* Pension */}
+              <div className="space-y-3 p-4 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Pension</p>
+                    <p className="text-xs text-muted-foreground">Deduct pension contribution</p>
+                  </div>
+                  <Switch
+                    checked={payrollSettings.enablePension}
+                    onCheckedChange={(v) => setPayrollSettings((s) => ({ ...s, enablePension: v }))}
+                  />
+                </div>
+                {payrollSettings.enablePension && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Pension Rate (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min={0}
+                      max={100}
+                      value={payrollSettings.pensionRate}
+                      onChange={(e) => setPayrollSettings((s) => ({ ...s, pensionRate: Number(e.target.value) }))}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button onClick={savePayrollSettings} disabled={settingsSaving} className="gap-2">
+                {settingsSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Settings
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              These settings apply when generating new payroll. Existing records are not affected.
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Generate Payroll Dialog */}
       <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>

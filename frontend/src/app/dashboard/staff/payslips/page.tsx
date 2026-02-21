@@ -89,6 +89,116 @@ const toNumber = (value: number | string): number => {
   return typeof value === 'string' ? parseFloat(value) : value;
 };
 
+const downloadPayslip = (payslip: PayrollRecord) => {
+  const period = formatPeriod(payslip.periodStart, payslip.periodEnd);
+  const gross = toNumber(payslip.grossPay);
+  const net = toNumber(payslip.netPay);
+  const tax = toNumber(payslip.tax);
+  const pension = toNumber(payslip.pension);
+  const base = toNumber(payslip.baseSalary);
+  const overtime = toNumber(payslip.overtime);
+  const bonus = toNumber(payslip.bonus);
+  const totalDeductions = toNumber(payslip.totalDeductions);
+  const currency = payslip.currency || 'NGN';
+
+  const fmt = (n: number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n);
+
+  // Build allowance rows
+  const allowanceRows = payslip.allowances
+    ? Object.entries(payslip.allowances)
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `<tr><td style="padding:6px 0;border-bottom:1px solid #f0f0f0">${k.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</td><td style="text-align:right;color:#16a34a">${fmt(v)}</td></tr>`)
+        .join('')
+    : '';
+
+  const otherDeductionRows = payslip.otherDeductions
+    ? Object.entries(payslip.otherDeductions)
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `<tr><td style="padding:6px 0;border-bottom:1px solid #f0f0f0">${k.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</td><td style="text-align:right;color:#dc2626">-${fmt(v)}</td></tr>`)
+        .join('')
+    : '';
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Payslip - ${period}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #222; padding: 40px; max-width: 700px; margin: 0 auto; }
+    h1 { font-size: 22px; color: #1e40af; margin-bottom: 4px; }
+    .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e40af; padding-bottom: 16px; margin-bottom: 24px; }
+    .badge { display: inline-block; background: #dcfce7; color: #16a34a; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+    .badge.approved { background: #dbeafe; color: #1d4ed8; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th { text-align: left; color: #666; font-size: 11px; text-transform: uppercase; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb; }
+    th:last-child { text-align: right; }
+    td { padding: 8px 0; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    td:last-child { text-align: right; }
+    .total-row td { font-weight: bold; border-top: 2px solid #e5e7eb; border-bottom: none; padding-top: 12px; font-size: 14px; }
+    .net-box { background: #1e40af; color: white; padding: 20px 24px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .net-box p { font-size: 12px; opacity: 0.8; margin-bottom: 4px; }
+    .net-box .amount { font-size: 24px; font-weight: bold; }
+    .net-box .right { text-align: right; font-size: 12px; opacity: 0.9; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>Payslip</h1>
+      <div class="subtitle">${period}</div>
+      <span class="badge ${payslip.status === 'PAID' ? '' : 'approved'}">${payslip.status}</span>
+    </div>
+    <div style="text-align:right;color:#666;font-size:12px;">
+      ${payslip.payDate ? `<div>Pay Date: <strong>${formatDate(payslip.payDate)}</strong></div>` : ''}
+      ${payslip.paidAt ? `<div>Paid At: <strong>${formatDate(payslip.paidAt)}</strong></div>` : ''}
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Earnings</th><th>Amount</th></tr></thead>
+    <tbody>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0">Base Salary</td><td style="text-align:right;color:#16a34a">${fmt(base)}</td></tr>
+      ${overtime > 0 ? `<tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0">Overtime</td><td style="text-align:right;color:#16a34a">${fmt(overtime)}</td></tr>` : ''}
+      ${bonus > 0 ? `<tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0">Bonus</td><td style="text-align:right;color:#16a34a">${fmt(bonus)}</td></tr>` : ''}
+      ${allowanceRows}
+      <tr class="total-row"><td>Total Earnings</td><td style="color:#16a34a">${fmt(gross)}</td></tr>
+    </tbody>
+  </table>
+
+  <table>
+    <thead><tr><th>Deductions</th><th>Amount</th></tr></thead>
+    <tbody>
+      ${tax > 0 ? `<tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0">Tax (PAYE)</td><td style="text-align:right;color:#dc2626">-${fmt(tax)}</td></tr>` : ''}
+      ${pension > 0 ? `<tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0">Pension</td><td style="text-align:right;color:#dc2626">-${fmt(pension)}</td></tr>` : ''}
+      ${otherDeductionRows}
+      <tr class="total-row"><td>Total Deductions</td><td style="color:#dc2626">-${fmt(totalDeductions)}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="net-box">
+    <div>
+      <p>Net Salary</p>
+      <div class="amount">${fmt(net)}</div>
+    </div>
+    <div class="right">
+      <div>Gross: ${fmt(gross)}</div>
+      <div>Deductions: -${fmt(totalDeductions)}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { toast.error('Pop-up blocked — please allow pop-ups to download payslip'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 500);
+};
+
 export default function PayslipsPage() {
   const [loading, setLoading] = useState(true);
   const [payslips, setPayslips] = useState<PayrollRecord[]>([]);
@@ -236,7 +346,7 @@ export default function PayslipsPage() {
                           {latestPayslip.status === 'PAID' ? 'Paid on' : 'Pay date:'} {formatDate(latestPayslip.payDate)}
                         </p>
                       )}
-                      <Button variant="outline" className="gap-2">
+                      <Button variant="outline" className="gap-2" onClick={() => downloadPayslip(latestPayslip)}>
                         <Download className="w-4 h-4" />
                         Download
                       </Button>
@@ -391,7 +501,7 @@ export default function PayslipsPage() {
                         <TableCell>{formatDate(payslip.payDate || payslip.paidAt)}</TableCell>
                         <TableCell>{getStatusBadge(payslip.status)}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" className="gap-1">
+                          <Button variant="ghost" size="sm" className="gap-1" onClick={() => downloadPayslip(payslip)}>
                             <Download className="w-4 h-4" />
                             PDF
                           </Button>

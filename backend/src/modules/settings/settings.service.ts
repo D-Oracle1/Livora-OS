@@ -85,4 +85,40 @@ export class SettingsService {
 
     return DEFAULT_TAX_RATES.incomeTax;
   }
+
+  async getPayrollSettings(): Promise<{
+    enablePension: boolean;
+    pensionRate: number;
+    enableTax: boolean;
+    taxRate: number;
+  }> {
+    const [enablePension, pensionRate, enableTax, taxRate] = await Promise.all([
+      this.getSetting('payroll_enablePension'),
+      this.getSetting('payroll_pensionRate'),
+      this.getSetting('payroll_enableTax'),
+      this.getSetting('payroll_taxRate'),
+    ]);
+
+    return {
+      enablePension: enablePension !== null ? Boolean(enablePension) : true,
+      pensionRate: pensionRate !== null ? Number(pensionRate) : 0.08,
+      enableTax: enableTax !== null ? Boolean(enableTax) : true,
+      taxRate: taxRate !== null ? Number(taxRate) : 0.075,
+    };
+  }
+
+  async updatePayrollSettings(settings: {
+    enablePension?: boolean;
+    pensionRate?: number;
+    enableTax?: boolean;
+    taxRate?: number;
+  }): Promise<{ enablePension: boolean; pensionRate: number; enableTax: boolean; taxRate: number }> {
+    const updates: Promise<void>[] = [];
+    if (settings.enablePension !== undefined) updates.push(this.upsertSetting('payroll_enablePension', settings.enablePension));
+    if (settings.pensionRate !== undefined) updates.push(this.upsertSetting('payroll_pensionRate', settings.pensionRate));
+    if (settings.enableTax !== undefined) updates.push(this.upsertSetting('payroll_enableTax', settings.enableTax));
+    if (settings.taxRate !== undefined) updates.push(this.upsertSetting('payroll_taxRate', settings.taxRate));
+    await Promise.all(updates);
+    return this.getPayrollSettings();
+  }
 }
