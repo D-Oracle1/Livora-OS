@@ -211,7 +211,7 @@ export default function RealtorPayrollPage() {
   const totalCommissions = commissions.length;
   const totalPaid = commissions.filter((c) => c.status === 'PAID').reduce((s, c) => s + toNumber(c.amount), 0);
   const totalPending = commissions.filter((c) => c.status === 'PENDING').reduce((s, c) => s + toNumber(c.amount), 0);
-  const uniqueRealtors = new Set(commissions.map((c) => c.realtor?.user?.firstName + c.realtor?.user?.lastName)).size;
+  const uniqueRealtors = new Set(commissions.map((c) => `${c.realtor?.user?.firstName ?? ''}${c.realtor?.user?.lastName ?? ''}`)).size;
 
   const filteredPeriods = searchQuery
     ? periods.map((p) => ({
