@@ -111,8 +111,10 @@ export class PayrollService {
   }
 
   async findAll(query: PayrollQueryDto) {
-    const { page = 1, limit = 20, staffProfileId, departmentId, status, periodStart, periodEnd } = query;
-    const skip = (page - 1) * limit;
+    const { staffProfileId, departmentId, status, periodStart, periodEnd } = query;
+    const pageNum = Math.max(1, parseInt(String(query.page ?? 1), 10) || 1);
+    const limitNum = Math.max(1, parseInt(String(query.limit ?? 20), 10) || 20);
+    const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
 
@@ -126,7 +128,7 @@ export class PayrollService {
       this.prisma.payrollRecord.findMany({
         where,
         skip,
-        take: limit,
+        take: limitNum,
         orderBy: { periodEnd: 'desc' },
         include: {
           staffProfile: {
@@ -147,10 +149,10 @@ export class PayrollService {
     return {
       data: records,
       meta: {
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limitNum),
       },
     };
   }

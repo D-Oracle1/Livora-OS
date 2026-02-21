@@ -2,12 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CommissionStatus, LoyaltyTier } from '@prisma/client';
 import { SettingsService } from '../settings/settings.service';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class CommissionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settingsService: SettingsService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   // Fallback commission rates by tier
@@ -163,13 +165,22 @@ export class CommissionService {
   }) {
     const commission = await this.prisma.commission.findUnique({
       where: { id },
-      select: { id: true },
+      select: {
+        id: true,
+        amount: true,
+        realtor: {
+          select: {
+            user: { select: { id: true } },
+          },
+        },
+      },
     });
     if (!commission) throw new NotFoundException('Commission not found');
 
+    let updated: any;
     try {
       // Attempt full update including payment metadata columns
-      return await this.prisma.commission.update({
+      updated = await this.prisma.commission.update({
         where: { id },
         data: {
           status: CommissionStatus.PAID,
@@ -181,7 +192,7 @@ export class CommissionService {
       });
     } catch {
       // Fallback: payment columns may not exist in older tenant DBs — update only safe fields
-      return this.prisma.commission.update({
+      updated = await this.prisma.commission.update({
         where: { id },
         data: {
           status: CommissionStatus.PAID,
@@ -189,6 +200,25 @@ export class CommissionService {
         },
       });
     }
+
+    // Notify the realtor that their commission has been paid
+    const realtorUserId = commission.realtor?.user?.id;
+    if (realtorUserId) {
+      try {
+        await this.notificationService.create({
+          userId: realtorUserId,
+          type: 'COMMISSION',
+          title: 'Commission Paid',
+          message: `Your commission of ₦${Number(commission.amount).toLocaleString()} has been paid to your account.`,
+          priority: 'HIGH',
+          link: '/dashboard/realtor/commission',
+        });
+      } catch {
+        // Notification is best-effort — don't fail the payment update
+      }
+    }
+
+    return updated;
   }
 
   async getRealtorCommissions(realtorId: string, query: {

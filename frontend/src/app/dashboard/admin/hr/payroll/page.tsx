@@ -188,8 +188,8 @@ export default function AdminPayrollPage() {
       }
 
       if (deptRes.status === 'fulfilled') {
-        const data = deptRes.value?.data || deptRes.value || [];
-        setDepartments(Array.isArray(data) ? data : []);
+        const raw = deptRes.value?.data?.data ?? deptRes.value?.data ?? deptRes.value ?? [];
+        setDepartments(Array.isArray(raw) ? raw : []);
       }
 
       if (summaryRes.status === 'fulfilled') {
