@@ -182,11 +182,18 @@ export default function AdminHrPage() {
       color: 'bg-purple-500',
     },
     {
-      title: 'Payroll',
+      title: 'Staff Payroll',
       description: 'Process payroll, manage deductions, and generate payslips',
       href: '/dashboard/admin/hr/payroll',
       icon: Wallet,
       color: 'bg-blue-500',
+    },
+    {
+      title: 'Realtor Commission Payroll',
+      description: 'Manage and process realtor commission payments by period',
+      href: '/dashboard/admin/hr/realtor-payroll',
+      icon: Wallet,
+      color: 'bg-emerald-500',
     },
     {
       title: 'Policies & Penalties',

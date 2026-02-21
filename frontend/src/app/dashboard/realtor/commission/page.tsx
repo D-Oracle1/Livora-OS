@@ -31,14 +31,9 @@ export default function RealtorCommissionPage() {
   const [commissions, setCommissions] = useState<any[]>([]);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptData | null>(null);
-  const [commissionRates, setCommissionRates] = useState<Record<string, number>>({
-    BRONZE: 3.0,
-    SILVER: 3.5,
-    GOLD: 4.0,
-    PLATINUM: 5.0,
-  });
-  const [taxRate, setTaxRate] = useState(7.5);
-  const [myTier, setMyTier] = useState('BRONZE');
+  const [commissionRates, setCommissionRates] = useState<Record<string, number>>({});
+  const [taxRate, setTaxRate] = useState<number | null>(null);
+  const [myTier, setMyTier] = useState<string | null>(null);
 
   const fetchCommissions = useCallback(async () => {
     try {
@@ -143,8 +138,8 @@ export default function RealtorCommissionPage() {
       taxDeducted,
       netEarnings,
       pendingPayment,
-      tier: myTier,
-      rate: commissionRates[myTier] ?? 4.0,
+      tier: myTier ?? 'BRONZE',
+      rate: myTier ? (commissionRates[myTier] ?? 0) : 0,
     };
   }, [filteredCommissions, commissionRates, myTier]);
 
@@ -202,7 +197,7 @@ export default function RealtorCommissionPage() {
       ],
       subtotal: item.commission,
       fees: [
-        { label: `Tax Deduction (${taxRate}%)`, amount: -item.tax },
+        { label: `Tax Deduction${taxRate !== null ? ` (${taxRate}%)` : ''}`, amount: -item.tax },
       ],
       total: item.net,
       status: item.status === 'PAID' ? 'paid' : 'pending',
@@ -309,7 +304,7 @@ export default function RealtorCommissionPage() {
                   <span className="font-semibold">{formatCurrency(earningsBreakdown.grossCommission)}</span>
                 </div>
                 <div className="flex items-center justify-between text-red-600">
-                  <span>Tax Deducted ({taxRate}%)</span>
+                  <span>Tax Deducted{taxRate !== null ? ` (${taxRate}%)` : ''}</span>
                   <span className="font-semibold">-{formatCurrency(earningsBreakdown.taxDeducted)}</span>
                 </div>
                 <div className="border-t pt-4 flex items-center justify-between">

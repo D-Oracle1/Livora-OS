@@ -39,11 +39,11 @@ import { useBranding, getCompanyName } from '@/hooks/use-branding';
 
 type TimePeriod = 'month' | 'quarter' | 'year' | 'all';
 
-const defaultTierRates = [
-  { tier: 'PLATINUM', rate: 5.0, realtors: 12, minSales: 40 },
-  { tier: 'GOLD', rate: 4.0, realtors: 45, minSales: 25 },
-  { tier: 'SILVER', rate: 3.5, realtors: 78, minSales: 10 },
-  { tier: 'BRONZE', rate: 3.0, realtors: 110, minSales: 0 },
+const TIER_META = [
+  { tier: 'PLATINUM', realtors: 0, minSales: 40 },
+  { tier: 'GOLD', realtors: 0, minSales: 25 },
+  { tier: 'SILVER', realtors: 0, minSales: 10 },
+  { tier: 'BRONZE', realtors: 0, minSales: 0 },
 ];
 
 export default function CommissionPage() {
@@ -53,8 +53,9 @@ export default function CommissionPage() {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
   const [showRateSettings, setShowRateSettings] = useState(false);
-  const [tierRates, setTierRates] = useState(defaultTierRates);
-  const [editingRates, setEditingRates] = useState(defaultTierRates);
+  const [ratesLoaded, setRatesLoaded] = useState(false);
+  const [tierRates, setTierRates] = useState(TIER_META.map(t => ({ ...t, rate: 0 })));
+  const [editingRates, setEditingRates] = useState(TIER_META.map(t => ({ ...t, rate: 0 })));
   const [commissions, setCommissions] = useState<any[]>([]);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -68,18 +69,18 @@ export default function CommissionPage() {
   const fetchCommissionRates = useCallback(async () => {
     try {
       const response = await api.get<any>('/settings/commission-rates');
-      const rates = response.data;
+      const rates = response?.data ?? response;
       // rates is like { BRONZE: 0.03, SILVER: 0.035, GOLD: 0.04, PLATINUM: 0.05 }
-      setTierRates(prev => prev.map(tier => ({
-        ...tier,
-        rate: rates[tier.tier] !== undefined ? rates[tier.tier] * 100 : tier.rate,
-      })));
-      setEditingRates(prev => prev.map(tier => ({
-        ...tier,
-        rate: rates[tier.tier] !== undefined ? rates[tier.tier] * 100 : tier.rate,
-      })));
+      const updated = TIER_META.map(meta => ({
+        ...meta,
+        rate: rates[meta.tier] !== undefined ? Number(rates[meta.tier]) * 100 : 0,
+      }));
+      setTierRates(updated);
+      setEditingRates(updated);
     } catch {
-      // API unavailable, keep default tier rates
+      // API unavailable — show zeros until data loads
+    } finally {
+      setRatesLoaded(true);
     }
   }, []);
 

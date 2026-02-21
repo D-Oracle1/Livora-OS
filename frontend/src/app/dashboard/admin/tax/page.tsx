@@ -110,7 +110,7 @@ export default function TaxPage() {
     saveTimeoutRef.current = setTimeout(async () => {
       setIsSaving(true);
       try {
-        await api.put('/settings/tax-rates', { vat: value / 100 });
+        await api.put('/settings/tax-rates', { vat: value / 100, incomeTax: value / 100 });
         toast.success('VAT rate updated');
       } catch {
         toast.error('Failed to update VAT rate');

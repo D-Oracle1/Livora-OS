@@ -3,12 +3,14 @@ import { PrismaService } from '../../../database/prisma.service';
 import { GeneratePayrollDto, UpdatePayrollDto, ApprovePayrollDto, PayrollQueryDto } from '../dto/payroll.dto';
 import { PayrollStatus } from '@prisma/client';
 import { SettingsService } from '../../settings/settings.service';
+import { NotificationService } from '../../notification/notification.service';
 
 @Injectable()
 export class PayrollService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settingsService: SettingsService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   private readonly DEFAULT_TAX_RATE = 0.075; // fallback 7.5% PAYE
@@ -292,6 +294,13 @@ export class PayrollService {
   async markAsPaid(id: string) {
     const record = await this.prisma.payrollRecord.findUnique({
       where: { id },
+      include: {
+        staffProfile: {
+          include: {
+            user: { select: { id: true, firstName: true } },
+          },
+        },
+      },
     });
 
     if (!record) {
@@ -302,13 +311,33 @@ export class PayrollService {
       throw new BadRequestException('Payroll must be approved before marking as paid');
     }
 
-    return this.prisma.payrollRecord.update({
+    const updated = await this.prisma.payrollRecord.update({
       where: { id },
       data: {
         status: PayrollStatus.PAID,
         paidAt: new Date(),
       },
     });
+
+    // Notify the staff member that their salary has been paid
+    const staffUserId = record.staffProfile?.user?.id;
+    if (staffUserId) {
+      try {
+        const period = new Date(record.periodEnd).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        await this.notificationService.create({
+          userId: staffUserId,
+          type: 'GENERAL',
+          title: 'Salary Paid',
+          message: `Your salary of ${record.currency} ${Number(record.netPay).toLocaleString()} for ${period} has been paid to your account.`,
+          priority: 'HIGH',
+          link: '/dashboard/staff/payslips',
+        });
+      } catch {
+        // Notification is best-effort — don't fail the payment update
+      }
+    }
+
+    return updated;
   }
 
   async getMyPayslips(userId: string) {
