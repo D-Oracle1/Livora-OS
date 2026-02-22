@@ -10,6 +10,8 @@ import { TenantPrismaService } from '../../database/tenant-prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { v4 as uuidv4 } from 'uuid';
+import { del } from '@vercel/blob';
+import { Client as PgClient } from 'pg';
 
 @Injectable()
 export class CompanyService {
@@ -611,6 +613,109 @@ export class CompanyService {
     const buffer = await workbook.xlsx.writeBuffer();
     const filename = `${company.slug}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
     return { buffer: buffer as Buffer, filename };
+  }
+
+  /**
+   * Permanently delete a company: wipe all tenant data, delete Vercel Blob files,
+   * and remove the company record from the master DB.
+   */
+  async purgeTenant(id: string): Promise<{ message: string; deletedBlobs: number }> {
+    const company = await this.masterPrisma.company.findUnique({
+      where: { id },
+      select: { id: true, name: true, slug: true, databaseUrl: true },
+    });
+    if (!company) throw new NotFoundException('Company not found');
+
+    // 1. Collect all Vercel Blob URLs from the tenant DB before truncation
+    const blobUrls: string[] = [];
+    try {
+      const tenantClient = await this.tenantPrisma.getClient(id);
+      const users = await tenantClient.user.findMany({
+        where: { avatar: { not: null } },
+        select: { avatar: true },
+      });
+      blobUrls.push(...users.map((u) => u.avatar!).filter(Boolean));
+
+      const props = await (tenantClient as any).property
+        .findMany({ select: { images: true } })
+        .catch(() => []);
+      for (const p of props) {
+        if (Array.isArray(p.images)) {
+          blobUrls.push(
+            ...p.images.filter((u: any) => typeof u === 'string' && u.startsWith('https://')),
+          );
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(`Blob collection skipped for ${id}: ${e.message}`);
+    }
+
+    // 2. Delete blobs
+    let deletedBlobs = 0;
+    for (const url of blobUrls) {
+      try {
+        await del(url);
+        deletedBlobs++;
+      } catch { /* ignore individual failures */ }
+    }
+
+    // 3. Truncate all tenant tables via raw pg connection (CASCADE handles FK order)
+    try {
+      let connStr = company.databaseUrl;
+      try {
+        const u = new URL(company.databaseUrl);
+        // Supabase: switch transaction pooler → session pooler for DDL
+        if (u.hostname.includes('pooler.supabase.com') && u.port === '6543') {
+          u.port = '5432';
+        }
+        const params = new URLSearchParams(u.search);
+        params.delete('pgbouncer');
+        params.delete('connection_limit');
+        u.search = params.toString();
+        connStr = u.toString();
+      } catch { /* use original */ }
+
+      const pgClient = new PgClient({ connectionString: connStr });
+      await pgClient.connect();
+      try {
+        const res = await pgClient.query<{ tablename: string }>(
+          `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,
+        );
+        const tables = res.rows.map((r) => `"${r.tablename}"`).join(', ');
+        if (tables) {
+          await pgClient.query(`TRUNCATE TABLE ${tables} RESTART IDENTITY CASCADE`);
+        }
+      } finally {
+        await pgClient.end();
+      }
+    } catch (e: any) {
+      this.logger.warn(`Tenant table truncation failed for ${id}: ${e.message}`);
+    }
+
+    // 4. Remove company from master DB and evict the cached tenant client
+    await this.masterPrisma.company.delete({ where: { id } });
+    await this.tenantPrisma.disconnectTenant(id).catch(() => {});
+
+    this.logger.log(`Tenant purged: ${company.name} (${company.slug}). Blobs deleted: ${deletedBlobs}`);
+    return { message: `Company "${company.name}" has been permanently deleted`, deletedBlobs };
+  }
+
+  /**
+   * Permanently delete multiple companies in sequence.
+   */
+  async bulkPurgeTenants(ids: string[]): Promise<{ message: string; deleted: number; errors: number }> {
+    let deleted = 0;
+    let errors = 0;
+    for (const id of ids) {
+      try {
+        await this.purgeTenant(id);
+        deleted++;
+      } catch (e: any) {
+        this.logger.error(`Failed to purge tenant ${id}: ${e.message}`);
+        errors++;
+      }
+    }
+    return { message: `Purge complete: ${deleted} deleted, ${errors} failed`, deleted, errors };
   }
 
   private generateInviteCode(): string {

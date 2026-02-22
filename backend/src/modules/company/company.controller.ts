@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -18,7 +19,7 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
-import { IsEnum, IsString, IsOptional, IsInt, Min, Matches } from 'class-validator';
+import { IsEnum, IsString, IsOptional, IsInt, Min, Matches, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CompanyService } from './company.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
@@ -66,6 +67,13 @@ class RegisterExistingDbDto {
   @IsInt()
   @Min(1)
   maxUsers?: number;
+}
+
+class BulkPurgeDto {
+  @ApiProperty({ type: [String], description: 'Array of company IDs to permanently delete' })
+  @IsArray()
+  @IsString({ each: true })
+  ids: string[];
 }
 
 @ApiTags('Companies')
@@ -220,6 +228,26 @@ export class CompanyController {
   @ApiResponse({ status: 200, description: 'Tenant schema migrated' })
   async reprovision(@Param('id') id: string) {
     return this.companyService.reprovisionTenant(id);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Permanently delete a company and purge all tenant data + files' })
+  @ApiResponse({ status: 200, description: 'Company deleted' })
+  async purgeCompany(@Param('id') id: string) {
+    return this.companyService.purgeTenant(id);
+  }
+
+  @Post('bulk-purge')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Permanently delete multiple companies and all their tenant data' })
+  @ApiResponse({ status: 200, description: 'Bulk purge result' })
+  async bulkPurge(@Body() dto: BulkPurgeDto) {
+    return this.companyService.bulkPurgeTenants(dto.ids);
   }
 
   @Get(':id/export')

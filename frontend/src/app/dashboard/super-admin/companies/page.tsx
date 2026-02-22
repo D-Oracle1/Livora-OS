@@ -21,6 +21,8 @@ import {
   Pencil,
   Save,
   Download,
+  Trash2,
+  CheckSquare,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -91,6 +93,11 @@ export default function CompaniesPage() {
   const [reprovisioning, setReprovisioning] = useState(false);
   const [exportingCompany, setExportingCompany] = useState<string | null>(null);
   const [verifyingDNS, setVerifyingDNS] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteCompany, setConfirmDeleteCompany] = useState<Company | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const frontendDomain = typeof window !== 'undefined' ? window.location.hostname : '';
   const [editLogoUploading, setEditLogoUploading] = useState(false);
   const [editData, setEditData] = useState({
@@ -386,6 +393,46 @@ export default function CompaniesPage() {
     }
   };
 
+  const toggleSelectId = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDeleteCompany = async (company: Company) => {
+    setConfirmDeleteCompany(null);
+    setDeletingId(company.id);
+    try {
+      await api.delete(`/companies/${company.id}`);
+      toast.success(`"${company.name}" deleted permanently`);
+      setSelectedIds((prev) => { const n = new Set(prev); n.delete(company.id); return n; });
+      fetchCompanies();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete company');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setConfirmBulkDelete(false);
+    setBulkDeleting(true);
+    try {
+      const res = await api.post<any>('/companies/bulk-purge', { ids: Array.from(selectedIds) });
+      const result = res?.data || res;
+      toast.success(result?.message || `${selectedIds.size} companies deleted`);
+      setSelectedIds(new Set());
+      fetchCompanies();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete companies');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const handleAssignRole = async (userId: string, newRole: string) => {
     if (!showDetail) return;
     setAssigningRole(userId);
@@ -427,6 +474,17 @@ export default function CompaniesPage() {
         <Button variant="outline" size="icon" onClick={fetchCompanies} title="Refresh">
           <RefreshCw className="w-4 h-4" />
         </Button>
+        {companies.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedIds(selectedIds.size === companies.length ? new Set() : new Set(companies.map((c) => c.id)))}
+            title="Select / deselect all visible companies"
+          >
+            <CheckSquare className="w-4 h-4 mr-1.5" />
+            {selectedIds.size === companies.length && companies.length > 0 ? 'Deselect All' : 'Select All'}
+          </Button>
+        )}
         <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           <button
             onClick={() => setViewMode('list')}
@@ -444,6 +502,29 @@ export default function CompaniesPage() {
           </button>
         </div>
       </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <span className="text-sm font-medium text-red-700 dark:text-red-400 flex-1">
+            {selectedIds.size} {selectedIds.size === 1 ? 'company' : 'companies'} selected
+          </span>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setConfirmBulkDelete(true)}
+            disabled={bulkDeleting}
+          >
+            {bulkDeleting
+              ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
+            Delete Selected
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {/* Companies List */}
       {loading ? (
@@ -464,10 +545,16 @@ export default function CompaniesPage() {
       ) : viewMode === 'list' ? (
         <div className="grid gap-3">
           {companies.map((company) => (
-            <Card key={company.id} className="hover:shadow-md transition-shadow">
+            <Card key={company.id} className={`hover:shadow-md transition-shadow ${selectedIds.has(company.id) ? 'ring-2 ring-red-400 dark:ring-red-600' : ''}`}>
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(company.id)}
+                      onChange={() => toggleSelectId(company.id)}
+                      className="w-4 h-4 rounded border-gray-300 accent-red-500 cursor-pointer shrink-0"
+                    />
                     {company.logo ? (
                       <img src={company.logo} alt="" className="w-10 h-10 rounded-lg object-contain" />
                     ) : (
@@ -520,6 +607,9 @@ export default function CompaniesPage() {
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleExportTenant(company)} title="Export tenant data" disabled={exportingCompany === company.id}>
                         {exportingCompany === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                       </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => setConfirmDeleteCompany(company)} title="Delete company" disabled={deletingId === company.id}>
+                        {deletingId === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -531,11 +621,17 @@ export default function CompaniesPage() {
         /* Grid view */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {companies.map((company) => (
-            <Card key={company.id} className="hover:shadow-md transition-shadow group">
+            <Card key={company.id} className={`hover:shadow-md transition-shadow group ${selectedIds.has(company.id) ? 'ring-2 ring-red-400 dark:ring-red-600' : ''}`}>
               <CardContent className="p-5">
                 {/* Logo + status */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(company.id)}
+                      onChange={() => toggleSelectId(company.id)}
+                      className="w-4 h-4 rounded border-gray-300 accent-red-500 cursor-pointer shrink-0 mt-1"
+                    />
                     {company.logo ? (
                       <img src={company.logo} alt="" className="w-12 h-12 rounded-xl object-contain border" />
                     ) : (
@@ -590,6 +686,9 @@ export default function CompaniesPage() {
                   </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleExportTenant(company)} title="Export tenant data" disabled={exportingCompany === company.id}>
                     {exportingCompany === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => setConfirmDeleteCompany(company)} title="Delete company" disabled={deletingId === company.id}>
+                    {deletingId === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   </Button>
                 </div>
               </CardContent>
@@ -861,6 +960,64 @@ export default function CompaniesPage() {
                   </div>
                 </form>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Individual delete confirmation */}
+      {confirmDeleteCompany && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-6 pb-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Delete &quot;{confirmDeleteCompany.name}&quot;?</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    This will permanently delete all users, properties, and uploaded files for this company.
+                    This action <strong>cannot be undone</strong>.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={() => setConfirmDeleteCompany(null)}>Cancel</Button>
+                <Button variant="destructive" onClick={() => handleDeleteCompany(confirmDeleteCompany)} disabled={!!deletingId}>
+                  {deletingId && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Delete Permanently
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Bulk delete confirmation */}
+      {confirmBulkDelete && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-6 pb-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Delete {selectedIds.size} {selectedIds.size === 1 ? 'company' : 'companies'}?</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    This will permanently delete <strong>{selectedIds.size}</strong> selected {selectedIds.size === 1 ? 'company' : 'companies'} along with all their users, properties, and uploaded files.
+                    This action <strong>cannot be undone</strong>.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={() => setConfirmBulkDelete(false)}>Cancel</Button>
+                <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
+                  {bulkDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Delete {selectedIds.size} {selectedIds.size === 1 ? 'Company' : 'Companies'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
