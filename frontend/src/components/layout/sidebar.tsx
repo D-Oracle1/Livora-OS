@@ -11,12 +11,12 @@ import {
   Home,
   DollarSign,
   Award,
-  TrendingUp,
   MessageSquare,
   Bell,
   Settings,
   LogOut,
   ChevronLeft,
+  ChevronDown,
   BarChart3,
   FileText,
   Calculator,
@@ -40,71 +40,50 @@ import {
   Share2,
   Newspaper,
   Bookmark,
+  Shield,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getImageUrl } from '@/lib/api';
+import { getImageUrl, api } from '@/lib/api';
 import { getUser, clearAuth } from '@/lib/auth-storage';
 import { useBranding, getShortName } from '@/hooks/use-branding';
+import { usePlatformBranding, getPlatformName } from '@/hooks/use-platform-branding';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface SidebarProps {
-  role: 'admin' | 'realtor' | 'client' | 'staff' | 'super-admin' | 'general-overseer';
+  role: 'admin' | 'realtor' | 'client' | 'staff' | 'super-admin' | 'general-overseer' | 'hr';
   isOpen?: boolean;
   onClose?: () => void;
   collapsed?: boolean;
   onCollapsedChange?: (v: boolean) => void;
 }
 
+interface NavItem {
+  name: string;
+  href: string;
+  icon: any;
+  /** Module key used to filter based on department allowedModules. Omit for always-visible items (Dashboard, Settings). */
+  moduleKey?: string;
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
 // ---------------------------------------------------------------------------
-// Navigation config (unchanged)
+// Flat navigation (realtor, client, staff, super-admin)
 // ---------------------------------------------------------------------------
 
-const navigationConfig: Record<string, { name: string; href: string; icon: any }[]> = {
+const navigationConfig: Record<string, NavItem[]> = {
   'super-admin': [
     { name: 'Dashboard', href: '/dashboard/super-admin', icon: LayoutDashboard },
     { name: 'Companies', href: '/dashboard/super-admin/companies', icon: Building },
     { name: 'Analytics', href: '/dashboard/super-admin/analytics', icon: BarChart3 },
-  ],
-  'general-overseer': [
-    { name: 'Dashboard', href: '/dashboard/general-overseer', icon: LayoutDashboard },
-    { name: 'Users', href: '/dashboard/general-overseer/users', icon: Users },
-    { name: 'Realtors', href: '/dashboard/general-overseer/realtors', icon: Users },
-    { name: 'Clients', href: '/dashboard/general-overseer/clients', icon: Briefcase },
-    { name: 'Properties', href: '/dashboard/general-overseer/properties', icon: Home },
-    { name: 'Staff', href: '/dashboard/general-overseer/staff', icon: UserCog },
-    { name: 'Leave Approvals', href: '/dashboard/general-overseer/leave', icon: CalendarDays },
-    { name: 'HR', href: '/dashboard/general-overseer/hr', icon: ClipboardList },
-    { name: 'Analytics', href: '/dashboard/general-overseer/analytics', icon: BarChart3 },
-    { name: 'Audit Logs', href: '/dashboard/general-overseer/audit', icon: FileText },
-    { name: 'Chat', href: '/dashboard/general-overseer/chat', icon: MessageSquare },
-    { name: 'Notifications', href: '/dashboard/general-overseer/notifications', icon: Bell },
-  ],
-  admin: [
-    { name: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-    { name: 'Realtors', href: '/dashboard/admin/realtors', icon: Users },
-    { name: 'Clients', href: '/dashboard/admin/clients', icon: Briefcase },
-    { name: 'Properties', href: '/dashboard/admin/properties', icon: Home },
-    { name: 'Sales', href: '/dashboard/admin/sales', icon: DollarSign },
-    { name: 'Commission', href: '/dashboard/admin/commission', icon: Calculator },
-    { name: 'Tax Reports', href: '/dashboard/admin/tax', icon: FileText },
-    { name: 'Rankings', href: '/dashboard/admin/rankings', icon: Crown },
-    { name: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3 },
-    { name: 'Staff', href: '/dashboard/admin/staff', icon: UserCog },
-    { name: 'Departments', href: '/dashboard/admin/departments', icon: Building },
-    { name: 'HR', href: '/dashboard/admin/hr', icon: ClipboardList },
-    { name: 'CMS', href: '/dashboard/admin/cms', icon: FileEdit },
-    { name: 'Gallery', href: '/dashboard/admin/gallery', icon: ImageIcon },
-    { name: 'Audit Logs', href: '/dashboard/admin/audit', icon: FileText },
-    { name: 'Channels', href: '/dashboard/admin/channels', icon: Hash },
-    { name: 'Chat', href: '/dashboard/admin/chat', icon: MessageSquare },
-    { name: 'Support Chats', href: '/dashboard/admin/support', icon: Headphones },
-    { name: 'Referral Tracking', href: '/dashboard/admin/referrals', icon: Share2 },
-    { name: 'Newsletter', href: '/dashboard/admin/newsletter', icon: Mail },
-    { name: 'Engagement', href: '/dashboard/admin/engagement', icon: Newspaper },
-    { name: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell },
+    { name: 'Support Inbox', href: '/dashboard/super-admin/support', icon: Headphones },
+    { name: 'Notifications', href: '/dashboard/super-admin/notifications', icon: Bell },
   ],
   realtor: [
     { name: 'Dashboard', href: '/dashboard/realtor', icon: LayoutDashboard },
@@ -129,20 +108,133 @@ const navigationConfig: Record<string, { name: string; href: string; icon: any }
     { name: 'Chat', href: '/dashboard/client/chat', icon: MessageSquare },
     { name: 'Notifications', href: '/dashboard/client/notifications', icon: Bell },
   ],
+  hr: [
+    { name: 'Dashboard', href: '/dashboard/hr', icon: LayoutDashboard },
+    { name: 'Attendance', href: '/dashboard/hr/attendance', icon: Clock, moduleKey: 'attendance' },
+    { name: 'Leave Management', href: '/dashboard/hr/leave', icon: CalendarDays, moduleKey: 'leave' },
+    { name: 'Performance Reviews', href: '/dashboard/hr/performance', icon: Star, moduleKey: 'performance' },
+    { name: 'Staff Payroll', href: '/dashboard/hr/payroll', icon: Wallet, moduleKey: 'staff_payroll' },
+    { name: 'Realtor Payroll', href: '/dashboard/hr/realtor-payroll', icon: Wallet, moduleKey: 'realtor_payroll' },
+    { name: 'Policies & Penalties', href: '/dashboard/hr/policies', icon: ClipboardList, moduleKey: 'policies' },
+    { name: 'Salary Config', href: '/dashboard/hr/salary-config', icon: Settings, moduleKey: 'salary_config' },
+    { name: 'Task Management', href: '/dashboard/hr/tasks', icon: CheckSquare, moduleKey: 'tasks' },
+    { name: 'Notifications', href: '/dashboard/hr/notifications', icon: Bell, moduleKey: 'notifications' },
+  ],
   staff: [
     { name: 'Dashboard', href: '/dashboard/staff', icon: LayoutDashboard },
-    { name: 'My Tasks', href: '/dashboard/staff/tasks', icon: CheckSquare },
-    { name: 'Attendance', href: '/dashboard/staff/attendance', icon: Clock },
-    { name: 'Leave', href: '/dashboard/staff/leave', icon: CalendarDays },
-    { name: 'Team', href: '/dashboard/staff/team', icon: Users },
-    { name: 'Channels', href: '/dashboard/staff/channels', icon: Hash },
-    { name: 'Files', href: '/dashboard/staff/files', icon: FolderOpen },
-    { name: 'Reviews', href: '/dashboard/staff/reviews', icon: Star },
-    { name: 'Payslips', href: '/dashboard/staff/payslips', icon: Wallet },
-    { name: 'My Referrals', href: '/dashboard/staff/referrals', icon: Share2 },
-    { name: 'Feed', href: '/dashboard/staff/feed', icon: Newspaper },
-    { name: 'Chat', href: '/dashboard/staff/chat', icon: MessageSquare },
-    { name: 'Notifications', href: '/dashboard/staff/notifications', icon: Bell },
+    { name: 'My Tasks', href: '/dashboard/staff/tasks', icon: CheckSquare, moduleKey: 'tasks' },
+    { name: 'Attendance', href: '/dashboard/staff/attendance', icon: Clock, moduleKey: 'attendance' },
+    { name: 'Leave', href: '/dashboard/staff/leave', icon: CalendarDays, moduleKey: 'leave' },
+    { name: 'Team', href: '/dashboard/staff/team', icon: Users, moduleKey: 'team' },
+    { name: 'Channels', href: '/dashboard/staff/channels', icon: Hash, moduleKey: 'channels' },
+    { name: 'Files', href: '/dashboard/staff/files', icon: FolderOpen, moduleKey: 'files' },
+    { name: 'Reviews', href: '/dashboard/staff/reviews', icon: Star, moduleKey: 'performance' },
+    { name: 'Payslips', href: '/dashboard/staff/payslips', icon: Wallet, moduleKey: 'staff_payroll' },
+    { name: 'My Referrals', href: '/dashboard/staff/referrals', icon: Share2, moduleKey: 'referrals' },
+    { name: 'Feed', href: '/dashboard/staff/feed', icon: Newspaper, moduleKey: 'engagement' },
+    { name: 'Chat', href: '/dashboard/staff/chat', icon: MessageSquare, moduleKey: 'chat' },
+    { name: 'Notifications', href: '/dashboard/staff/notifications', icon: Bell, moduleKey: 'notifications' },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Grouped (sectioned) navigation — admin & general-overseer only
+// ---------------------------------------------------------------------------
+
+const groupedNavigationConfig: Record<string, NavSection[]> = {
+  admin: [
+    {
+      label: 'Overview',
+      items: [
+        { name: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
+        { name: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3, moduleKey: 'analytics' },
+      ],
+    },
+    {
+      label: 'People',
+      items: [
+        { name: 'Realtors', href: '/dashboard/admin/realtors', icon: Users, moduleKey: 'realtors' },
+        { name: 'Clients', href: '/dashboard/admin/clients', icon: Briefcase, moduleKey: 'clients' },
+        { name: 'Staff', href: '/dashboard/admin/staff', icon: UserCog, moduleKey: 'staff' },
+        { name: 'Departments', href: '/dashboard/admin/departments', icon: Building, moduleKey: 'departments' },
+      ],
+    },
+    {
+      label: 'Sales & Finance',
+      items: [
+        { name: 'Properties', href: '/dashboard/admin/properties', icon: Home, moduleKey: 'properties' },
+        { name: 'Sales', href: '/dashboard/admin/sales', icon: DollarSign, moduleKey: 'sales' },
+        { name: 'Commission', href: '/dashboard/admin/commission', icon: Calculator, moduleKey: 'commission' },
+        { name: 'Tax Reports', href: '/dashboard/admin/tax', icon: FileText, moduleKey: 'tax' },
+        { name: 'Rankings', href: '/dashboard/admin/rankings', icon: Crown, moduleKey: 'rankings' },
+      ],
+    },
+    {
+      label: 'HR',
+      items: [
+        { name: 'HR Hub', href: '/dashboard/admin/hr', icon: ClipboardList, moduleKey: 'hr_hub' },
+        { name: 'Roles & Permissions', href: '/dashboard/admin/roles', icon: Shield, moduleKey: 'roles' },
+      ],
+    },
+    {
+      label: 'Content & Comms',
+      items: [
+        { name: 'CMS', href: '/dashboard/admin/cms', icon: FileEdit, moduleKey: 'cms' },
+        { name: 'Gallery', href: '/dashboard/admin/gallery', icon: ImageIcon, moduleKey: 'gallery' },
+        { name: 'Channels', href: '/dashboard/admin/channels', icon: Hash, moduleKey: 'channels' },
+        { name: 'Chat', href: '/dashboard/admin/chat', icon: MessageSquare, moduleKey: 'chat' },
+        { name: 'Support Chats', href: '/dashboard/admin/support', icon: Headphones, moduleKey: 'support' },
+        { name: 'Engagement', href: '/dashboard/admin/engagement', icon: Newspaper, moduleKey: 'engagement' },
+        { name: 'Newsletter', href: '/dashboard/admin/newsletter', icon: Mail, moduleKey: 'newsletter' },
+      ],
+    },
+    {
+      label: 'System',
+      items: [
+        { name: 'Audit Logs', href: '/dashboard/admin/audit', icon: FileText, moduleKey: 'audit' },
+        { name: 'Referral Tracking', href: '/dashboard/admin/referrals', icon: Share2, moduleKey: 'referrals' },
+        { name: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, moduleKey: 'notifications' },
+      ],
+    },
+  ],
+  'general-overseer': [
+    {
+      label: 'Overview',
+      items: [
+        { name: 'Dashboard', href: '/dashboard/general-overseer', icon: LayoutDashboard },
+        { name: 'Analytics', href: '/dashboard/general-overseer/analytics', icon: BarChart3 },
+      ],
+    },
+    {
+      label: 'People',
+      items: [
+        { name: 'Users', href: '/dashboard/general-overseer/users', icon: Users },
+        { name: 'Realtors', href: '/dashboard/general-overseer/realtors', icon: Users },
+        { name: 'Clients', href: '/dashboard/general-overseer/clients', icon: Briefcase },
+        { name: 'Staff', href: '/dashboard/general-overseer/staff', icon: UserCog },
+      ],
+    },
+    {
+      label: 'Properties',
+      items: [
+        { name: 'Properties', href: '/dashboard/general-overseer/properties', icon: Home },
+      ],
+    },
+    {
+      label: 'HR & Leave',
+      items: [
+        { name: 'HR', href: '/dashboard/general-overseer/hr', icon: ClipboardList },
+        { name: 'Leave Approvals', href: '/dashboard/general-overseer/leave', icon: CalendarDays },
+      ],
+    },
+    {
+      label: 'System',
+      items: [
+        { name: 'Audit Logs', href: '/dashboard/general-overseer/audit', icon: FileText },
+        { name: 'Chat', href: '/dashboard/general-overseer/chat', icon: MessageSquare },
+        { name: 'Notifications', href: '/dashboard/general-overseer/notifications', icon: Bell },
+      ],
+    },
   ],
 };
 
@@ -159,8 +251,12 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const navigation = navigationConfig[role];
-  const branding = useBranding();
+  const isGrouped = role === 'admin' || role === 'general-overseer';
+  const groupedNav = isGrouped ? groupedNavigationConfig[role] : null;
+  const navigation = !isGrouped ? (navigationConfig[role] ?? []) : [];
+  const tenantBranding = useBranding();
+  const platformBranding = usePlatformBranding();
+  const branding = role === 'super-admin' ? {} : tenantBranding;
 
   const [currentUser, setCurrentUser] = useState<{
     firstName: string;
@@ -169,6 +265,15 @@ export function Sidebar({
     avatar?: string;
   } | null>(null);
 
+  // Department-level module restrictions (null = not loaded yet, [] = no restriction)
+  const [allowedModules, setAllowedModules] = useState<string[] | null>(null);
+
+  // All sections open by default
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    if (!isGrouped || !groupedNavigationConfig[role]) return {};
+    return Object.fromEntries(groupedNavigationConfig[role].map((s) => [s.label, true]));
+  });
+
   useEffect(() => {
     const load = () => setCurrentUser(getUser());
     load();
@@ -176,54 +281,112 @@ export function Sidebar({
     return () => window.removeEventListener('user-updated', load);
   }, [pathname]);
 
+  // Fetch department's allowedModules for roles that can have department restrictions
+  useEffect(() => {
+    if (role !== 'staff' && role !== 'hr' && role !== 'admin') {
+      setAllowedModules([]);
+      return;
+    }
+    api.get<any>('/staff/my-profile').then((data) => {
+      setAllowedModules(data?.department?.allowedModules ?? []);
+    }).catch(() => {
+      setAllowedModules([]); // On error, show all items
+    });
+  }, [role]);
+
   // Close mobile sidebar on route change
   useEffect(() => {
     if (onClose) onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  const userName = currentUser
-    ? `${currentUser.firstName} ${currentUser.lastName}`
-    : 'User';
+  // Auto-expand the section that contains the current active route
+  useEffect(() => {
+    if (!isGrouped || !groupedNav) return;
+    for (const section of groupedNav) {
+      const hasActive = section.items.some((item) =>
+        item.href === `/dashboard/${role}`
+          ? pathname === item.href
+          : pathname === item.href || pathname.startsWith(item.href + '/'),
+      );
+      if (hasActive) {
+        setOpenSections((prev) => ({ ...prev, [section.label]: true }));
+      }
+    }
+  }, [pathname, isGrouped, groupedNav, role]);
+
+  const toggleSection = (label: string) =>
+    setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }));
+
+  const checkActive = (href: string) =>
+    href === `/dashboard/${role}`
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + '/');
+
+  // Filter a nav item based on department's allowedModules.
+  // Items without a moduleKey (Dashboard, Settings) are always shown.
+  // If allowedModules is empty or null, no restriction applies.
+  const isModuleAllowed = (item: NavItem) => {
+    if (!item.moduleKey) return true;
+    if (!allowedModules || allowedModules.length === 0) return true;
+    return allowedModules.includes(item.moduleKey);
+  };
+
+  const userName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'User';
   const userInitials = currentUser
     ? `${currentUser.firstName[0]}${currentUser.lastName[0]}`
     : 'U';
-
-  const roleLabel = role.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const roleLabel =
+    role === 'super-admin'
+      ? 'Super Admin'
+      : role.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   return (
     <>
       {/* Mobile overlay */}
       {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />
       )}
 
       <aside
         className={cn(
-          // Base: white card sidebar
           'fixed left-0 top-0 z-50 h-screen flex flex-col',
-          'bg-white dark:bg-gray-900',
-          'border-r border-gray-200 dark:border-gray-800',
           'transition-all duration-300 ease-in-out',
-          // Desktop always visible, width depends on collapsed
+          role === 'super-admin'
+            ? 'bg-slate-900 border-r border-slate-700/50'
+            : 'bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800',
           'hidden md:flex',
           collapsed ? 'md:w-20' : 'md:w-64',
-          // Mobile: slide in via isOpen
           isOpen && '!flex w-72',
         )}
       >
         {/* ── Logo row ── */}
         <div
           className={cn(
-            'h-16 flex items-center border-b border-gray-100 dark:border-gray-800 shrink-0 px-4',
+            'h-16 flex items-center shrink-0 px-4',
+            role === 'super-admin'
+              ? 'border-b border-slate-700/60'
+              : 'border-b border-gray-100 dark:border-gray-800',
             collapsed ? 'justify-center' : 'justify-between',
           )}
         >
-          <Link href="/" className="flex items-center gap-2.5 min-w-0">
-            {branding.logo ? (
+          <Link
+            href={role === 'super-admin' ? '/dashboard/super-admin' : '/'}
+            className="flex items-center gap-2.5 min-w-0"
+          >
+            {role === 'super-admin' ? (
+              platformBranding.logo ? (
+                <img
+                  src={platformBranding.logo}
+                  alt={getPlatformName(platformBranding)}
+                  className="w-9 h-9 rounded-xl object-contain shrink-0 bg-slate-800"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 flex items-center justify-center shrink-0">
+                  <Crown className="w-5 h-5 text-amber-400" />
+                </div>
+              )
+            ) : branding.logo ? (
               <img
                 src={getImageUrl(branding.logo)}
                 alt={branding.companyName || 'Logo'}
@@ -235,16 +398,35 @@ export function Sidebar({
               </div>
             )}
             {!collapsed && (
-              <span className="text-base font-bold text-gray-900 dark:text-white truncate">
-                {getShortName(branding)}
-              </span>
+              <div>
+                <span
+                  className={cn(
+                    'text-base font-bold truncate block',
+                    role === 'super-admin' ? 'text-white' : 'text-gray-900 dark:text-white',
+                  )}
+                >
+                  {role === 'super-admin'
+                    ? getPlatformName(platformBranding)
+                    : getShortName(branding)}
+                </span>
+                {role === 'super-admin' && (
+                  <span className="text-[10px] text-amber-400/80 font-medium tracking-wide uppercase">
+                    Super Admin
+                  </span>
+                )}
+              </div>
             )}
           </Link>
 
           {/* Mobile close */}
           <button
             onClick={onClose}
-            className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 transition-colors"
+            className={cn(
+              'md:hidden p-1.5 rounded-lg transition-colors',
+              role === 'super-admin'
+                ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600',
+            )}
           >
             <X className="w-5 h-5" />
           </button>
@@ -253,7 +435,12 @@ export function Sidebar({
           {!collapsed && (
             <button
               onClick={() => onCollapsedChange?.(!collapsed)}
-              className="hidden md:flex p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 transition-colors"
+              className={cn(
+                'hidden md:flex p-1.5 rounded-lg transition-colors',
+                role === 'super-admin'
+                  ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600',
+              )}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -263,75 +450,198 @@ export function Sidebar({
         {/* ── User profile ── */}
         <div
           className={cn(
-            'py-4 border-b border-gray-100 dark:border-gray-800 shrink-0',
+            'py-4 shrink-0',
+            role === 'super-admin'
+              ? 'border-b border-slate-700/60'
+              : 'border-b border-gray-100 dark:border-gray-800',
             collapsed ? 'flex justify-center px-2' : 'px-4 flex items-center gap-3',
           )}
         >
-          <Avatar className="w-10 h-10 shrink-0 ring-2 ring-primary/20">
+          <Avatar
+            className={cn(
+              'w-10 h-10 shrink-0 ring-2',
+              role === 'super-admin' ? 'ring-amber-500/30' : 'ring-primary/20',
+            )}
+          >
             {currentUser?.avatar && (
               <AvatarImage src={getImageUrl(currentUser.avatar)} alt={userName} />
             )}
-            <AvatarFallback className="bg-primary text-white text-sm font-semibold">
+            <AvatarFallback
+              className={cn(
+                'text-white text-sm font-semibold',
+                role === 'super-admin' ? 'bg-amber-600' : 'bg-primary',
+              )}
+            >
               {userInitials}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+              <p
+                className={cn(
+                  'text-sm font-semibold truncate',
+                  role === 'super-admin' ? 'text-white' : 'text-gray-900 dark:text-white',
+                )}
+              >
                 {userName}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{roleLabel}</p>
+              <p
+                className={cn(
+                  'text-xs',
+                  role === 'super-admin'
+                    ? 'text-slate-400'
+                    : 'text-gray-500 dark:text-gray-400',
+                )}
+              >
+                {roleLabel}
+              </p>
             </div>
           )}
         </div>
 
         {/* ── Navigation ── */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 scrollbar-thin">
-          <ul className="space-y-0.5">
-            {navigation.map((item) => {
-              const isActive =
-                item.href === `/dashboard/${role}`
-                  ? pathname === item.href
-                  : pathname === item.href || pathname.startsWith(item.href + '/');
-              return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    title={collapsed ? item.name : undefined}
-                    className={cn(
-                      'relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150',
-                      collapsed ? 'justify-center px-2 py-3' : 'px-3 py-2.5',
-                      isActive
-                        ? 'bg-primary/10 text-primary dark:bg-primary/15'
-                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',
+          {isGrouped && groupedNav ? (
+            /* Grouped accordion for admin / general-overseer */
+            <div>
+              {groupedNav.map((section, idx) => {
+                const isOpen = openSections[section.label] ?? true;
+                const hasActiveItem = section.items.some((item) => checkActive(item.href));
+
+                return (
+                  <div key={section.label} className={idx > 0 ? 'mt-1' : ''}>
+                    {/* Section header — hidden in icon-rail (collapsed) mode */}
+                    {!collapsed && (
+                      <button
+                        onClick={() => toggleSection(section.label)}
+                        className={cn(
+                          'w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors mb-0.5',
+                          hasActiveItem
+                            ? 'text-primary'
+                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300',
+                        )}
+                      >
+                        <span>{section.label}</span>
+                        <ChevronDown
+                          className={cn(
+                            'w-3 h-3 transition-transform duration-200',
+                            !isOpen && '-rotate-90',
+                          )}
+                        />
+                      </button>
                     )}
-                  >
-                    {/* Left accent bar for active item */}
-                    {isActive && !collapsed && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r-full" />
+
+                    {/* Items — always shown when in icon-rail mode */}
+                    {(collapsed || isOpen) && (
+                      <ul className="space-y-0.5">
+                        {section.items.filter(isModuleAllowed).map((item) => {
+                          const active = checkActive(item.href);
+                          return (
+                            <li key={item.name}>
+                              <Link
+                                href={item.href}
+                                title={collapsed ? item.name : undefined}
+                                className={cn(
+                                  'relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150',
+                                  collapsed ? 'justify-center px-2 py-3' : 'px-3 py-2.5',
+                                  active
+                                    ? 'bg-primary/10 text-primary dark:bg-primary/15'
+                                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',
+                                )}
+                              >
+                                {active && !collapsed && (
+                                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full bg-primary" />
+                                )}
+                                <item.icon
+                                  className={cn(
+                                    'w-5 h-5 shrink-0',
+                                    active ? 'text-primary' : '',
+                                  )}
+                                />
+                                {!collapsed && <span>{item.name}</span>}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     )}
-                    <item.icon
+
+                    {/* Thin divider between sections (not after the last) */}
+                    {!collapsed && idx < groupedNav.length - 1 && (
+                      <div className="mt-2 mb-1.5 mx-2 h-px bg-gray-100 dark:bg-gray-800" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Flat nav for realtor / client / staff / super-admin */
+            <ul className="space-y-0.5">
+              {navigation.filter(isModuleAllowed).map((item) => {
+                const active = checkActive(item.href);
+                return (
+                  <li key={item.name}>
+                    <Link
+                      href={item.href}
+                      title={collapsed ? item.name : undefined}
                       className={cn(
-                        'w-5 h-5 shrink-0',
-                        isActive ? 'text-primary' : '',
+                        'relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150',
+                        collapsed ? 'justify-center px-2 py-3' : 'px-3 py-2.5',
+                        role === 'super-admin'
+                          ? active
+                            ? 'bg-amber-500/15 text-amber-400'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          : active
+                            ? 'bg-primary/10 text-primary dark:bg-primary/15'
+                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',
                       )}
-                    />
-                    {!collapsed && <span>{item.name}</span>}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                    >
+                      {active && !collapsed && (
+                        <span
+                          className={cn(
+                            'absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full',
+                            role === 'super-admin' ? 'bg-amber-400' : 'bg-primary',
+                          )}
+                        />
+                      )}
+                      <item.icon
+                        className={cn(
+                          'w-5 h-5 shrink-0',
+                          active
+                            ? role === 'super-admin'
+                              ? 'text-amber-400'
+                              : 'text-primary'
+                            : '',
+                        )}
+                      />
+                      {!collapsed && <span>{item.name}</span>}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </nav>
 
-        {/* ── Bottom: expand toggle (collapsed) + Settings + Logout ── */}
-        <div className="border-t border-gray-100 dark:border-gray-800 px-2 py-3 space-y-0.5 shrink-0">
-          {/* Expand button shown only when collapsed */}
+        {/* ── Bottom: expand + Settings + Logout ── */}
+        <div
+          className={cn(
+            'px-2 py-3 space-y-0.5 shrink-0 border-t',
+            role === 'super-admin'
+              ? 'border-slate-700/60'
+              : 'border-gray-100 dark:border-gray-800',
+          )}
+        >
           {collapsed && (
             <button
               onClick={() => onCollapsedChange?.(false)}
               title="Expand sidebar"
-              className="w-full flex justify-center px-2 py-2.5 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 transition-colors"
+              className={cn(
+                'w-full flex justify-center px-2 py-2.5 rounded-xl transition-colors',
+                role === 'super-admin'
+                  ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600',
+              )}
             >
               <ChevronLeft className="w-5 h-5 rotate-180" />
             </button>
@@ -341,8 +651,10 @@ export function Sidebar({
             href={`/dashboard/${role}/settings`}
             title={collapsed ? 'Settings' : undefined}
             className={cn(
-              'flex items-center gap-3 rounded-xl text-sm font-medium text-gray-500 dark:text-gray-400',
-              'hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all',
+              'flex items-center gap-3 rounded-xl text-sm font-medium transition-all',
+              role === 'super-admin'
+                ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',
               collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5',
             )}
           >
@@ -357,8 +669,10 @@ export function Sidebar({
             }}
             title={collapsed ? 'Logout' : undefined}
             className={cn(
-              'w-full flex items-center gap-3 rounded-xl text-sm font-medium',
-              'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all',
+              'w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-all',
+              role === 'super-admin'
+                ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
+                : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20',
               collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5',
             )}
           >

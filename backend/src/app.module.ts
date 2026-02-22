@@ -41,6 +41,7 @@ import { HealthModule } from './health/health.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { DepartmentModule } from './modules/department/department.module';
 import { HrModule } from './modules/hr/hr.module';
+import { RolesModule } from './modules/roles/roles.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { SharedFilesModule } from './modules/shared-files/shared-files.module';
 
@@ -75,6 +76,12 @@ import { QueueModule } from './common/services/queue.module';
 
 // Multi-tenancy
 import { CompanyModule } from './modules/company/company.module';
+
+// Master support (admin → super admin cross-tenant chat)
+import { MasterSupportModule } from './modules/master-support/master-support.module';
+
+// Master platform settings (super admin branding + CMS)
+import { MasterPlatformModule } from './modules/master-platform/master-platform.module';
 
 @Module({
   imports: [
@@ -128,6 +135,7 @@ import { CompanyModule } from './modules/company/company.module';
     HrModule,
     TasksModule,
     SharedFilesModule,
+    RolesModule,
 
     // Awards
     AwardModule,
@@ -160,6 +168,8 @@ import { CompanyModule } from './modules/company/company.module';
 
     // Multi-tenancy
     CompanyModule,
+    MasterSupportModule,
+    MasterPlatformModule,
 
     // Real-time (Supabase Realtime)
     RealtimeModule,

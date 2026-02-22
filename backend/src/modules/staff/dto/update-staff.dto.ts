@@ -67,4 +67,9 @@ export class UpdateStaffDto {
   @IsOptional()
   @IsNumber()
   sickLeaveBalance?: number;
+
+  @ApiPropertyOptional({ description: 'RBAC Role ID to assign (null to remove role)' })
+  @IsOptional()
+  @IsUUID()
+  roleId?: string | null;
 }

@@ -21,6 +21,7 @@ enum UserRole {
   SUPER_ADMIN
   GENERAL_OVERSEER
   ADMIN
+  HR
   REALTOR
   CLIENT
   STAFF
@@ -975,6 +976,8 @@ model Department {
   name        String   @unique
   code        String   @unique
   description String?
+  role           UserRole @default(STAFF)
+  allowedModules String[]
 
   // Parent department for hierarchy
   parentId    String?
@@ -997,6 +1000,26 @@ model Department {
   @@map("departments")
 }
 
+// ===========================================
+// RBAC ROLES
+// ===========================================
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions Json     @default("[]") // Array of {resource, action, scope?}
+  isSystem    Boolean  @default(false) // System roles cannot be deleted
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  staffProfiles StaffProfile[]
+
+  @@index([name])
+  @@map("roles")
+}
+
 model StaffProfile {
   id              String         @id @default(uuid())
   userId          String         @unique
@@ -1010,6 +1033,10 @@ model StaffProfile {
   hireDate        DateTime
   terminationDate DateTime?
   isActive        Boolean        @default(true)
+
+  // RBAC Role assignment
+  roleId          String?
+  staffRole       Role?          @relation(fields: [roleId], references: [id])
 
   // Department & Reporting
   departmentId    String
@@ -1054,6 +1081,7 @@ model StaffProfile {
   @@index([departmentId])
   @@index([managerId])
   @@index([employeeId])
+  @@index([roleId])
   @@map("staff_profiles")
 }
 

@@ -35,29 +35,48 @@ export class StaffPermissionGuard implements CanActivate {
     }
 
     // Super admins and admins bypass permission checks
-    if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') {
+    if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.role === 'GENERAL_OVERSEER') {
       return true;
     }
 
-    // For staff members, check their permissions
-    if (user.role === 'STAFF') {
+    // For staff members, check their individual + role-based permissions
+    if (user.role === 'STAFF' || user.role === 'HR') {
       const staffProfile = await this.prisma.staffProfile.findUnique({
         where: { userId: user.id },
-        include: { permissions: true },
+        include: {
+          permissions: true,
+          staffRole: true,
+        },
       });
 
       if (!staffProfile) {
         throw new ForbiddenException('Staff profile not found');
       }
 
-      // Check if staff has all required permissions
-      const hasAllPermissions = requiredPermissions.every((required) =>
-        staffProfile.permissions.some(
+      // Helper: check a single permission requirement against individual + role permissions
+      const hasPermission = (required: PermissionRequirement): boolean => {
+        // Check individual staff permissions
+        const individualMatch = staffProfile.permissions.some(
           (p) =>
             p.resource === required.resource &&
             (p.action === required.action || p.action === 'manage'),
-        ),
-      );
+        );
+        if (individualMatch) return true;
+
+        // Check role-based permissions
+        if (staffProfile.staffRole) {
+          const rolePerms = (staffProfile.staffRole.permissions as any[]) ?? [];
+          return rolePerms.some(
+            (p: any) =>
+              p.resource === required.resource &&
+              (p.action === required.action || p.action === 'manage'),
+          );
+        }
+
+        return false;
+      };
+
+      const hasAllPermissions = requiredPermissions.every(hasPermission);
 
       if (!hasAllPermissions) {
         throw new ForbiddenException(

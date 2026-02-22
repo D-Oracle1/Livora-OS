@@ -32,6 +32,7 @@ export class StaffService {
     // Check if department exists
     const department = await this.prisma.department.findUnique({
       where: { id: createStaffDto.departmentId },
+      select: { id: true, role: true },
     });
 
     if (!department) {
@@ -61,7 +62,7 @@ export class StaffService {
           firstName: createStaffDto.firstName,
           lastName: createStaffDto.lastName,
           phone: createStaffDto.phone,
-          role: UserRole.STAFF,
+          role: department.role ?? UserRole.STAFF,
           status: UserStatus.ACTIVE,
           emailVerified: true,
         },
@@ -79,6 +80,7 @@ export class StaffService {
           managerId: createStaffDto.managerId,
           baseSalary: createStaffDto.baseSalary,
           currency: createStaffDto.currency || 'NGN',
+          roleId: createStaffDto.roleId,
         },
         include: {
           user: {
@@ -103,6 +105,7 @@ export class StaffService {
               },
             },
           },
+          staffRole: true,
         },
       });
 
@@ -251,6 +254,7 @@ export class StaffService {
           },
         },
         permissions: true,
+        staffRole: true,
         _count: {
           select: {
             directReports: true,
@@ -266,6 +270,29 @@ export class StaffService {
       throw new NotFoundException('Staff member not found');
     }
 
+    return staff;
+  }
+
+  async getMyProfile(userId: string) {
+    // Returns null instead of throwing if the user has no staff profile
+    const staff = await this.prisma.staffProfile.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        employeeId: true,
+        position: true,
+        title: true,
+        isActive: true,
+        department: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            allowedModules: true,
+          },
+        },
+      },
+    });
     return staff;
   }
 
@@ -296,6 +323,7 @@ export class StaffService {
           },
         },
         permissions: true,
+        staffRole: true,
       },
     });
 
@@ -399,6 +427,17 @@ export class StaffService {
     if (updateStaffDto.lastName) userUpdate.lastName = updateStaffDto.lastName;
     if (updateStaffDto.phone) userUpdate.phone = updateStaffDto.phone;
 
+    // If department is changing, also update the user's role to match new department
+    if (updateStaffDto.departmentId && updateStaffDto.departmentId !== staff.departmentId) {
+      const newDept = await this.prisma.department.findUnique({
+        where: { id: updateStaffDto.departmentId },
+        select: { role: true },
+      });
+      if (newDept) {
+        userUpdate.role = newDept.role ?? UserRole.STAFF;
+      }
+    }
+
     // Update staff profile fields
     const staffUpdate: any = {};
     if (updateStaffDto.position) staffUpdate.position = updateStaffDto.position;
@@ -411,6 +450,7 @@ export class StaffService {
     if (updateStaffDto.terminationDate) staffUpdate.terminationDate = new Date(updateStaffDto.terminationDate);
     if (updateStaffDto.annualLeaveBalance !== undefined) staffUpdate.annualLeaveBalance = updateStaffDto.annualLeaveBalance;
     if (updateStaffDto.sickLeaveBalance !== undefined) staffUpdate.sickLeaveBalance = updateStaffDto.sickLeaveBalance;
+    if (updateStaffDto.roleId !== undefined) staffUpdate.roleId = updateStaffDto.roleId;
 
     const result = await this.prisma.$transaction(async (prisma) => {
       if (Object.keys(userUpdate).length > 0) {
@@ -579,9 +619,26 @@ export class StaffService {
 
   // Permission management
   async getPermissions(staffProfileId: string) {
-    return this.prisma.staffPermission.findMany({
-      where: { staffProfileId },
+    const staff = await this.prisma.staffProfile.findUnique({
+      where: { id: staffProfileId },
+      include: {
+        permissions: true,
+        staffRole: true,
+      },
     });
+
+    if (!staff) throw new NotFoundException('Staff member not found');
+
+    const individual = staff.permissions;
+    const rolePerms: any[] = staff.staffRole
+      ? ((staff.staffRole.permissions as any[]) ?? []).map((p: any) => ({
+          ...p,
+          fromRole: true,
+          roleName: staff.staffRole!.name,
+        }))
+      : [];
+
+    return { individual, fromRole: rolePerms, role: staff.staffRole };
   }
 
   async assignPermission(staffProfileId: string, dto: AssignPermissionDto) {
@@ -628,6 +685,7 @@ export class StaffService {
   }
 
   async hasPermission(staffProfileId: string, resource: string, action: string): Promise<boolean> {
+    // Check individual permission record
     const permission = await this.prisma.staffPermission.findFirst({
       where: {
         staffProfileId,
@@ -639,6 +697,22 @@ export class StaffService {
       },
     });
 
-    return !!permission;
+    if (permission) return true;
+
+    // Check role-based permissions
+    const staff = await this.prisma.staffProfile.findUnique({
+      where: { id: staffProfileId },
+      include: { staffRole: true },
+    });
+
+    if (staff?.staffRole) {
+      const rolePerms = (staff.staffRole.permissions as any[]) ?? [];
+      return rolePerms.some(
+        (p: any) =>
+          p.resource === resource && (p.action === action || p.action === 'manage'),
+      );
+    }
+
+    return false;
   }
 }

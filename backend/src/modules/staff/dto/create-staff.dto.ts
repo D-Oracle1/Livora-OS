@@ -2,6 +2,7 @@ import { IsString, IsEmail, IsEnum, IsOptional, IsNumber, IsDateString, MinLengt
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { StaffPosition, EmploymentType } from '@prisma/client';
 
+
 export class CreateStaffDto {
   @ApiProperty({ description: 'User email address' })
   @IsEmail()
@@ -63,4 +64,9 @@ export class CreateStaffDto {
   @IsOptional()
   @IsString()
   currency?: string;
+
+  @ApiPropertyOptional({ description: 'RBAC Role ID to assign to this staff member' })
+  @IsOptional()
+  @IsUUID()
+  roleId?: string;
 }
