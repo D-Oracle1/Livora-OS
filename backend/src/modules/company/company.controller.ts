@@ -250,6 +250,16 @@ export class CompanyController {
     return this.companyService.bulkPurgeTenants(dto.ids);
   }
 
+  @Post('migrate-all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Apply latest tenant schema DDL to all active companies' })
+  @ApiResponse({ status: 200, description: 'Migration results' })
+  async migrateAll() {
+    return this.companyService.migrateAllTenants();
+  }
+
   @Get(':id/export')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN')

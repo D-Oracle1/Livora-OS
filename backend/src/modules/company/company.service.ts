@@ -616,6 +616,36 @@ export class CompanyService {
   }
 
   /**
+   * Re-apply the tenant schema DDL to EVERY active company in sequence.
+   * Idempotent — safe to run at any time without data loss.
+   */
+  async migrateAllTenants(): Promise<{ migrated: number; failed: number; results: { slug: string; ok: boolean; error?: string }[] }> {
+    const companies = await this.masterPrisma.company.findMany({
+      where: { isActive: true },
+      select: { id: true, slug: true },
+    });
+
+    const results: { slug: string; ok: boolean; error?: string }[] = [];
+    let migrated = 0;
+    let failed = 0;
+
+    for (const co of companies) {
+      try {
+        await this.tenantPrisma.provisionDatabase(co.slug);
+        results.push({ slug: co.slug, ok: true });
+        migrated++;
+      } catch (e: any) {
+        this.logger.error(`Migration failed for ${co.slug}: ${e.message}`);
+        results.push({ slug: co.slug, ok: false, error: e.message?.slice(0, 120) });
+        failed++;
+      }
+    }
+
+    this.logger.log(`Migrate-all complete: ${migrated} ok, ${failed} failed`);
+    return { migrated, failed, results };
+  }
+
+  /**
    * Permanently delete a company: wipe all tenant data, delete Vercel Blob files,
    * and remove the company record from the master DB.
    */

@@ -98,6 +98,7 @@ export default function CompaniesPage() {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [migratingAll, setMigratingAll] = useState(false);
   const frontendDomain = typeof window !== 'undefined' ? window.location.hostname : '';
   const [editLogoUploading, setEditLogoUploading] = useState(false);
   const [editData, setEditData] = useState({
@@ -393,6 +394,30 @@ export default function CompaniesPage() {
     }
   };
 
+  const handleMigrateAll = async () => {
+    setMigratingAll(true);
+    const toastId = toast.loading('Applying schema to all active tenants…');
+    try {
+      const res = await api.post<any>('/companies/migrate-all', {});
+      const result = res?.data || res;
+      const { migrated = 0, failed = 0 } = result || {};
+      if (failed === 0) {
+        toast.success(`All ${migrated} tenants migrated successfully`, { id: toastId });
+      } else {
+        toast.warning(`${migrated} migrated, ${failed} failed — check server logs`, { id: toastId });
+      }
+    } catch (error: any) {
+      const msg: string = error.message || 'Migration failed';
+      if (msg.includes('504') || msg.includes('Gateway') || msg.includes('timed out')) {
+        toast.warning('Migration is running in the background. Wait 30s then refresh.', { id: toastId });
+      } else {
+        toast.error(msg, { id: toastId });
+      }
+    } finally {
+      setMigratingAll(false);
+    }
+  };
+
   const toggleSelectId = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -473,6 +498,16 @@ export default function CompaniesPage() {
         </div>
         <Button variant="outline" size="icon" onClick={fetchCompanies} title="Refresh">
           <RefreshCw className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleMigrateAll}
+          disabled={migratingAll}
+          title="Apply latest schema DDL to all active tenant databases (fixes missing columns)"
+        >
+          {migratingAll ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+          Migrate All
         </Button>
         {companies.length > 0 && (
           <Button

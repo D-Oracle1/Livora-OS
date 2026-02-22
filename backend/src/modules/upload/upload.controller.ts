@@ -69,22 +69,19 @@ export class UploadController {
   @ApiResponse({ status: 400, description: 'Invalid file' })
   async uploadAvatar(
     @UploadedFile() file: MulterFile,
-    @Req() req: Request & { user: { id: string } },
+    @Req() req: Request & { user: { id: string; companyId?: string } },
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-
-    const userId = req.user.id;
-    return this.uploadService.updateUserAvatar(userId, file);
+    return this.uploadService.updateUserAvatar(req.user.id, file, req.user.companyId);
   }
 
   @Delete('avatar')
   @ApiOperation({ summary: 'Delete user avatar' })
   @ApiResponse({ status: 200, description: 'Avatar deleted successfully' })
-  async deleteAvatar(@Req() req: Request & { user: { id: string } }) {
-    const userId = req.user.id;
-    return this.uploadService.deleteUserAvatar(userId);
+  async deleteAvatar(@Req() req: Request & { user: { id: string; companyId?: string } }) {
+    return this.uploadService.deleteUserAvatar(req.user.id, req.user.companyId);
   }
 
   @Post('property-images')

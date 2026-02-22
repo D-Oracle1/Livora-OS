@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { MasterPrismaService } from '../../database/master-prisma.service';
+import { TenantPrismaService } from '../../database/tenant-prisma.service';
 import { put, del } from '@vercel/blob';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
@@ -22,6 +23,7 @@ export class UploadService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly masterPrisma: MasterPrismaService,
+    private readonly tenantPrisma: TenantPrismaService,
   ) {}
 
   private async uploadToBlob(
@@ -44,22 +46,39 @@ export class UploadService {
     }
   }
 
-  private async resolveUser(userId: string): Promise<{ user: any; isSuperAdmin: boolean }> {
-    // Try tenant DB first
+  /**
+   * Resolve a user from either the correct tenant DB (via companyId) or the master super_admins table.
+   * `companyId` comes from the JWT payload and bypasses the request-scoped PrismaService so that
+   * the lookup works even when the backend receives requests on its own domain (no tenant context).
+   */
+  private async resolveUser(
+    userId: string,
+    companyId?: string | null,
+  ): Promise<{ user: any; isSuperAdmin: boolean; resolvedCompanyId?: string }> {
+    // 1. Direct tenant DB lookup when companyId is available (most reliable path)
+    if (companyId) {
+      try {
+        const client = await this.tenantPrisma.getClient(companyId);
+        const tenantUser = await client.user.findUnique({ where: { id: userId } });
+        if (tenantUser) return { user: tenantUser, isSuperAdmin: false, resolvedCompanyId: companyId };
+      } catch { /* fall through */ }
+    }
+
+    // 2. Fallback via request-scoped PrismaService (works when tenant context is set correctly)
     const tenantUser = await this.prisma.user.findUnique({ where: { id: userId } }).catch(() => null);
     if (tenantUser) return { user: tenantUser, isSuperAdmin: false };
 
-    // Fall back to master super_admins table
+    // 3. Master super_admins table
     const superAdmin = await this.masterPrisma.superAdmin.findUnique({ where: { id: userId } });
     if (superAdmin) return { user: superAdmin, isSuperAdmin: true };
 
     throw new NotFoundException('User not found');
   }
 
-  async updateUserAvatar(userId: string, file: MulterFile) {
-    const { user, isSuperAdmin } = await this.resolveUser(userId);
+  async updateUserAvatar(userId: string, file: MulterFile, companyId?: string | null) {
+    const resolved = await this.resolveUser(userId, companyId);
+    const { user, isSuperAdmin } = resolved;
 
-    // Delete old avatar from blob storage if present
     if (user.avatar) {
       await this.deleteFromBlob(user.avatar);
     }
@@ -71,19 +90,19 @@ export class UploadService {
         where: { id: userId },
         data: { avatar: avatarUrl },
       });
+    } else if (resolved.resolvedCompanyId) {
+      const client = await this.tenantPrisma.getClient(resolved.resolvedCompanyId);
+      await client.user.update({ where: { id: userId }, data: { avatar: avatarUrl } });
     } else {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { avatar: avatarUrl },
-      });
+      await this.prisma.user.update({ where: { id: userId }, data: { avatar: avatarUrl } });
     }
 
-    // Return the URL so the frontend can update local state and patch profile
     return { url: avatarUrl };
   }
 
-  async deleteUserAvatar(userId: string) {
-    const { user, isSuperAdmin } = await this.resolveUser(userId);
+  async deleteUserAvatar(userId: string, companyId?: string | null) {
+    const resolved = await this.resolveUser(userId, companyId);
+    const { user, isSuperAdmin } = resolved;
 
     if (user.avatar) {
       await this.deleteFromBlob(user.avatar);
@@ -94,6 +113,15 @@ export class UploadService {
         where: { id: userId },
         data: { avatar: null },
         select: { id: true, email: true, firstName: true, lastName: true, avatar: true },
+      });
+    }
+
+    if (resolved.resolvedCompanyId) {
+      const client = await this.tenantPrisma.getClient(resolved.resolvedCompanyId);
+      return client.user.update({
+        where: { id: userId },
+        data: { avatar: null },
+        select: { id: true, email: true, firstName: true, lastName: true, avatar: true, role: true },
       });
     }
 
