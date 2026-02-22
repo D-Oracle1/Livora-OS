@@ -120,8 +120,8 @@ export default function NewsletterPage() {
   // ── Data fetching ────────────────────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
     try {
-      const data = await api.get<Stats>('/newsletter/stats');
-      setStats(data);
+      const raw = await api.get<any>('/newsletter/stats');
+      setStats(raw?.data ?? raw);
     } catch {
       // silently fail
     }
@@ -129,8 +129,8 @@ export default function NewsletterPage() {
 
   const fetchCounts = useCallback(async () => {
     try {
-      const data = await api.get<Counts>('/newsletter/counts');
-      setCounts(data);
+      const raw = await api.get<any>('/newsletter/counts');
+      setCounts(raw?.data ?? raw);
     } catch {
       // silently fail
     }
@@ -148,16 +148,17 @@ export default function NewsletterPage() {
         setListData(res.data || []);
         setListTotalPages(res.meta?.totalPages || 1);
       } else {
-        const res = await api.get<{ count: number; data: Recipient[] }>(
-          `/newsletter/recipients?type=${listTab}`,
-        );
+        const raw = await api.get<any>(`/newsletter/recipients?type=${listTab}`);
+        // TransformInterceptor wraps { count, data } → { success, data: { count, data }, timestamp }
+        const inner = raw?.data ?? raw;
+        const arr: Recipient[] = Array.isArray(inner) ? inner : (inner?.data ?? []);
         const filtered = listSearch
-          ? (res.data || []).filter(
+          ? arr.filter(
               (r) =>
                 r.email.toLowerCase().includes(listSearch.toLowerCase()) ||
                 (r.name && r.name.toLowerCase().includes(listSearch.toLowerCase())),
             )
-          : res.data || [];
+          : arr;
         setListData(filtered);
         setListTotalPages(1);
       }
