@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { MasterPrismaService } from '../../database/master-prisma.service';
 import { put, del } from '@vercel/blob';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
@@ -18,7 +19,10 @@ interface MulterFile {
 
 @Injectable()
 export class UploadService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly masterPrisma: MasterPrismaService,
+  ) {}
 
   private async uploadToBlob(
     file: MulterFile,
@@ -40,66 +44,64 @@ export class UploadService {
     }
   }
 
+  private async resolveUser(userId: string): Promise<{ user: any; isSuperAdmin: boolean }> {
+    // Try tenant DB first
+    const tenantUser = await this.prisma.user.findUnique({ where: { id: userId } }).catch(() => null);
+    if (tenantUser) return { user: tenantUser, isSuperAdmin: false };
+
+    // Fall back to master super_admins table
+    const superAdmin = await this.masterPrisma.superAdmin.findUnique({ where: { id: userId } });
+    if (superAdmin) return { user: superAdmin, isSuperAdmin: true };
+
+    throw new NotFoundException('User not found');
+  }
+
   async updateUserAvatar(userId: string, file: MulterFile) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const { user, isSuperAdmin } = await this.resolveUser(userId);
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    // Delete old avatar if exists
+    // Delete old avatar from blob storage if present
     if (user.avatar) {
       await this.deleteFromBlob(user.avatar);
     }
 
-    // Upload new avatar to Vercel Blob
     const avatarUrl = await this.uploadToBlob(file, 'avatars');
 
-    const updatedUser = await this.prisma.user.update({
-      where: { id: userId },
-      data: { avatar: avatarUrl },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        avatar: true,
-        role: true,
-      },
-    });
+    if (isSuperAdmin) {
+      await this.masterPrisma.superAdmin.update({
+        where: { id: userId },
+        data: { avatar: avatarUrl },
+      });
+    } else {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { avatar: avatarUrl },
+      });
+    }
 
-    return updatedUser;
+    // Return the URL so the frontend can update local state and patch profile
+    return { url: avatarUrl };
   }
 
   async deleteUserAvatar(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    const { user, isSuperAdmin } = await this.resolveUser(userId);
 
     if (user.avatar) {
       await this.deleteFromBlob(user.avatar);
     }
 
-    const updatedUser = await this.prisma.user.update({
+    if (isSuperAdmin) {
+      return this.masterPrisma.superAdmin.update({
+        where: { id: userId },
+        data: { avatar: null },
+        select: { id: true, email: true, firstName: true, lastName: true, avatar: true },
+      });
+    }
+
+    return this.prisma.user.update({
       where: { id: userId },
       data: { avatar: null },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        avatar: true,
-        role: true,
-      },
+      select: { id: true, email: true, firstName: true, lastName: true, avatar: true, role: true },
     });
-
-    return updatedUser;
   }
 
   async uploadPropertyImages(files: MulterFile[]): Promise<string[]> {

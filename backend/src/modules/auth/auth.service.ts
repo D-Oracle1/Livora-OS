@@ -430,13 +430,30 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({ where: { userId } }).catch(() => {});
   }
 
-  async updateProfile(userId: string, updateDto: UpdateUserDto) {
+  async updateProfile(userId: string, updateDto: UpdateUserDto, isSuperAdmin = false) {
     const data: any = {};
     if (updateDto.firstName) data.firstName = updateDto.firstName;
     if (updateDto.lastName) data.lastName = updateDto.lastName;
     if (updateDto.phone !== undefined) data.phone = updateDto.phone;
+    if (updateDto.avatar !== undefined) data.avatar = updateDto.avatar;
 
-    const updatedUser = await this.prisma.user.update({
+    if (isSuperAdmin) {
+      const updated = await this.masterPrisma.superAdmin.update({
+        where: { id: userId },
+        data,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          avatar: true,
+        },
+      });
+      return { ...updated, role: 'SUPER_ADMIN', isSuperAdmin: true };
+    }
+
+    return this.prisma.user.update({
       where: { id: userId },
       data,
       select: {
@@ -450,7 +467,6 @@ export class AuthService {
         referralCode: true,
       },
     });
-    return updatedUser;
   }
 
   async getMyReferrals(userId: string) {

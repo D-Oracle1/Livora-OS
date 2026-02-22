@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Put,
+  Post,
   Body,
   UseGuards,
 } from '@nestjs/common';
@@ -134,5 +135,18 @@ export class MasterPlatformController {
   @ApiResponse({ status: 200, description: 'Updated CMS content' })
   async updateCms(@Body() dto: UpdateCmsDto) {
     return this.service.updateSettings('platform_cms', dto);
+  }
+
+  /**
+   * Super admin: sync master database schema (idempotent DDL)
+   */
+  @Post('migrate-db')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Apply master DB schema (idempotent — safe to run any time)' })
+  @ApiResponse({ status: 200, description: 'Master schema synced' })
+  async migrateDb() {
+    return this.service.syncMasterSchema();
   }
 }

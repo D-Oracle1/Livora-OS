@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Loader2, Save, User, Palette, Globe, Upload, X,
-  Lock, Eye, EyeOff, Shield, Crown, Check,
+  Lock, Eye, EyeOff, Shield, Crown, Check, Database,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ export default function SuperAdminSettings() {
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' });
   const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [migratingDb, setMigratingDb] = useState(false);
 
   // Platform Branding
   const [branding, setBranding] = useState({
@@ -119,6 +120,20 @@ export default function SuperAdminSettings() {
     finally {
       setAvatarUploading(false);
       if (avatarRef.current) avatarRef.current.value = '';
+    }
+  };
+
+  // ── Master DB Migration ──
+  const handleMigrateDb = async () => {
+    setMigratingDb(true);
+    try {
+      const res = await api.post<any>('/master/platform-settings/migrate-db');
+      const d = res?.data || res;
+      toast.success(d?.message || 'Master database schema is up to date');
+    } catch (e: any) {
+      toast.error(e.message || 'Migration failed');
+    } finally {
+      setMigratingDb(false);
     }
   };
 
@@ -553,6 +568,41 @@ export default function SuperAdminSettings() {
                   <span className="text-sm text-slate-200">{item.value}</span>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/50 border-slate-700/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-base flex items-center gap-2">
+                <Database className="w-4 h-4" style={accentStyle} /> Database Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm text-slate-300 font-medium">Sync Master DB Schema</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Applies the master database schema (creates missing tables &amp; columns). Safe to run any time — all statements are idempotent.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleMigrateDb}
+                  disabled={migratingDb}
+                  className="shrink-0 border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  {migratingDb ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <Database className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  {migratingDb ? 'Syncing...' : 'Sync Schema'}
+                </Button>
+              </div>
+              <p className="text-xs text-slate-600 border-t border-slate-700/40 pt-3">
+                This runs automatically on every backend deployment. Use this button only if you need to manually trigger a schema sync.
+              </p>
             </CardContent>
           </Card>
         </div>

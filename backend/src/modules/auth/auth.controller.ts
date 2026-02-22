@@ -153,9 +153,9 @@ export class AuthController {
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   async updateProfile(
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
     @Body() updateDto: UpdateUserDto,
   ) {
-    return this.authService.updateProfile(userId, updateDto);
+    return this.authService.updateProfile(user.id, updateDto, user.isSuperAdmin);
   }
 }
