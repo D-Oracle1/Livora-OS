@@ -31,6 +31,7 @@ export default function DashboardLayout({
       super_admin: ['/dashboard/super-admin', '/dashboard/admin'],
       admin: ['/dashboard/admin'],
       general_overseer: ['/dashboard/general-overseer'],
+      hr: ['/dashboard/hr'],
       realtor: ['/dashboard/realtor'],
       staff: ['/dashboard/staff'],
       client: ['/dashboard/client'],

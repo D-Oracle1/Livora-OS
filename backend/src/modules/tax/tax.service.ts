@@ -31,20 +31,22 @@ export class TaxService {
     year?: number;
     quarter?: number;
   }) {
-    const { page = 1, limit = 20, realtorId, year, quarter } = query;
-    const skip = (page - 1) * limit;
+    const pageNum = Math.max(1, parseInt(String(query.page ?? 1), 10) || 1);
+    const limitNum = Math.max(1, parseInt(String(query.limit ?? 20), 10) || 20);
+    const skip = (pageNum - 1) * limitNum;
+    const { realtorId, year, quarter } = query;
 
     const where: any = {};
 
     if (realtorId) where.realtorId = realtorId;
-    if (year) where.year = year;
-    if (quarter) where.quarter = quarter;
+    if (year) where.year = Number(year);
+    if (quarter) where.quarter = Number(quarter);
 
     const [taxes, total] = await Promise.all([
       this.prisma.tax.findMany({
         where,
         skip,
-        take: limit,
+        take: limitNum,
         orderBy: [{ year: 'desc' }, { quarter: 'desc' }],
         include: {
           sale: {
@@ -69,10 +71,10 @@ export class TaxService {
     return {
       data: taxes,
       meta: {
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limitNum),
       },
     };
   }

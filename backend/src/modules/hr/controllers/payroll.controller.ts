@@ -26,14 +26,14 @@ export class PayrollController {
   constructor(private readonly payrollService: PayrollService) {}
 
   @Post('generate')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Generate payroll for a period' })
   generate(@Body() dto: GeneratePayrollDto) {
     return this.payrollService.generate(dto);
   }
 
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get all payroll records' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -70,7 +70,7 @@ export class PayrollController {
   }
 
   @Get('summary')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get payroll summary' })
   @ApiQuery({ name: 'periodStart', required: true })
   @ApiQuery({ name: 'periodEnd', required: true })
@@ -84,21 +84,21 @@ export class PayrollController {
   }
 
   @Get(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR', 'STAFF')
   @ApiOperation({ summary: 'Get payroll record by ID' })
   findById(@Param('id', ParseUUIDPipe) id: string) {
     return this.payrollService.findById(id);
   }
 
   @Put(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Update payroll record' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePayrollDto) {
     return this.payrollService.update(id, dto);
   }
 
   @Put(':id/approve')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Approve payroll' })
   approve(
     @Param('id', ParseUUIDPipe) id: string,
@@ -109,7 +109,7 @@ export class PayrollController {
   }
 
   @Post('bulk-approve')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Bulk approve payroll' })
   bulkApprove(
     @CurrentUser('id') approverId: string,
@@ -119,7 +119,7 @@ export class PayrollController {
   }
 
   @Put(':id/paid')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Mark payroll as paid' })
   markAsPaid(@Param('id', ParseUUIDPipe) id: string) {
     return this.payrollService.markAsPaid(id);

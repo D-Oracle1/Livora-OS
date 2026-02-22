@@ -85,13 +85,34 @@ export class NewsletterController {
     return this.newsletterService.deleteSubscriber(id);
   }
 
+  @Get('recipients')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get recipients list by type' })
+  @ApiQuery({ name: 'type', required: true, enum: ['SUBSCRIBERS', 'CLIENTS', 'STAFF', 'REALTORS'] })
+  @ApiResponse({ status: 200, description: 'Recipient list' })
+  async getRecipients(@Query('type') type: 'SUBSCRIBERS' | 'CLIENTS' | 'STAFF' | 'REALTORS') {
+    return this.newsletterService.getRecipients(type);
+  }
+
+  @Get('counts')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get recipient counts for all types' })
+  @ApiResponse({ status: 200, description: 'Counts by type' })
+  async getCounts() {
+    return this.newsletterService.getCounts();
+  }
+
   @Post('send')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN', 'ADMIN')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Send bulk newsletter email to all active subscribers' })
+  @ApiOperation({ summary: 'Send bulk newsletter email' })
   @ApiResponse({ status: 201, description: 'Newsletter queued for sending' })
   async sendNewsletter(@Body() dto: SendNewsletterDto) {
-    return this.newsletterService.sendBulkEmail(dto.subject, dto.content);
+    return this.newsletterService.sendBulkEmail(dto);
   }
 }

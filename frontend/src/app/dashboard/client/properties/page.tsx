@@ -6,9 +6,7 @@ import {
   Home,
   Search,
   MapPin,
-  TrendingUp,
   DollarSign,
-  ArrowUpRight,
   Eye,
   Tag,
   FileText,
@@ -18,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatCurrency, formatPercentage, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import { ReceiptModal, ReceiptData } from '@/components/receipt';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -43,7 +41,6 @@ export default function ClientPropertiesPage() {
         purchasePrice: Number(p.originalPrice || p.price) || 0,
         purchaseDate: p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : '',
         currentValue: Number(p.price) || 0,
-        appreciation: Number(p.appreciationPercentage) || 0,
         isListed: p.isListed || false,
         listingPrice: Number(p.listingPrice) || 0,
         offers: 0,
@@ -79,14 +76,11 @@ export default function ClientPropertiesPage() {
 
   const stats = useMemo(() => {
     const totalValue = filteredProperties.reduce((sum, p) => sum + p.currentValue, 0);
-    const totalPurchaseValue = filteredProperties.reduce((sum, p) => sum + p.purchasePrice, 0);
-    const appreciation = totalValue - totalPurchaseValue;
     const listedCount = filteredProperties.filter(p => p.isListed).length;
 
     return [
       { title: 'Total Properties', value: filteredProperties.length.toString(), icon: Home, color: 'text-blue-600', bgColor: 'bg-blue-100' },
       { title: 'Portfolio Value', value: formatCurrency(totalValue), icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-100' },
-      { title: 'Total Appreciation', value: `+${formatCurrency(appreciation)}`, icon: TrendingUp, color: 'text-primary', bgColor: 'bg-primary/10' },
       { title: 'Listed for Sale', value: listedCount.toString(), icon: Tag, color: 'text-orange-600', bgColor: 'bg-orange-100' },
     ];
   }, [filteredProperties]);
@@ -134,7 +128,7 @@ export default function ClientPropertiesPage() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Title', 'Type', 'Address', 'Purchase Price', 'Current Value', 'Appreciation', 'Status', 'Purchase Date'];
+    const headers = ['Title', 'Type', 'Address', 'Purchase Price', 'Current Value', 'Status', 'Purchase Date'];
     const csvContent = [
       headers.join(','),
       ...filteredProperties.map(p => [
@@ -143,7 +137,6 @@ export default function ClientPropertiesPage() {
         `"${p.address}"`,
         p.purchasePrice,
         p.currentValue,
-        `${p.appreciation}%`,
         p.isListed ? 'Listed' : 'Owned',
         p.purchaseDate,
       ].join(',')),
@@ -248,7 +241,7 @@ export default function ClientPropertiesPage() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                       <div>
                         <p className="text-xs text-muted-foreground">Purchase Price</p>
                         <p className="font-semibold">{formatCurrency(property.purchasePrice)}</p>
@@ -256,13 +249,6 @@ export default function ClientPropertiesPage() {
                       <div>
                         <p className="text-xs text-muted-foreground">Current Value</p>
                         <p className="font-semibold text-primary">{formatCurrency(property.currentValue)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Appreciation</p>
-                        <p className="font-semibold text-green-600 flex items-center">
-                          <ArrowUpRight className="w-4 h-4" />
-                          {formatPercentage(property.appreciation)}
-                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Purchased</p>

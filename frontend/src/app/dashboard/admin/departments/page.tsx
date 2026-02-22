@@ -12,8 +12,11 @@ import {
   Trash2,
   Loader2,
   RefreshCw,
+  Shield,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +35,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
@@ -40,6 +50,8 @@ interface DepartmentData {
   name: string;
   code: string;
   description: string | null;
+  role: string;
+  allowedModules: string[];
   parentId: string | null;
   headId: string | null;
   parent?: { id: string; name: string } | null;
@@ -49,6 +61,66 @@ interface DepartmentData {
   } | null;
   _count?: { staff: number; children: number };
 }
+
+// All modules available for selection, grouped by category
+const MODULE_CATEGORIES = [
+  {
+    category: 'HR & People',
+    modules: [
+      { key: 'attendance', label: 'Attendance Tracking' },
+      { key: 'leave', label: 'Leave Management' },
+      { key: 'performance', label: 'Performance Reviews' },
+      { key: 'staff_payroll', label: 'Staff Payroll' },
+      { key: 'realtor_payroll', label: 'Realtor Payroll' },
+      { key: 'policies', label: 'Policies & Penalties' },
+      { key: 'salary_config', label: 'Salary Configuration' },
+      { key: 'tasks', label: 'Task Management' },
+      { key: 'hr_hub', label: 'HR Hub' },
+    ],
+  },
+  {
+    category: 'Sales & Finance',
+    modules: [
+      { key: 'properties', label: 'Properties' },
+      { key: 'sales', label: 'Sales' },
+      { key: 'commission', label: 'Commission' },
+      { key: 'tax', label: 'Tax Reports' },
+      { key: 'analytics', label: 'Analytics' },
+      { key: 'rankings', label: 'Rankings' },
+    ],
+  },
+  {
+    category: 'Content & Communications',
+    modules: [
+      { key: 'cms', label: 'CMS' },
+      { key: 'gallery', label: 'Gallery' },
+      { key: 'channels', label: 'Team Channels' },
+      { key: 'chat', label: 'Chat' },
+      { key: 'support', label: 'Support Chats' },
+      { key: 'engagement', label: 'Engagement / Feed' },
+      { key: 'newsletter', label: 'Newsletter' },
+    ],
+  },
+  {
+    category: 'People Management',
+    modules: [
+      { key: 'staff', label: 'Staff' },
+      { key: 'realtors', label: 'Realtors' },
+      { key: 'clients', label: 'Clients' },
+      { key: 'departments', label: 'Departments' },
+      { key: 'team', label: 'Team View' },
+    ],
+  },
+  {
+    category: 'System',
+    modules: [
+      { key: 'audit', label: 'Audit Logs' },
+      { key: 'referrals', label: 'Referral Tracking' },
+      { key: 'notifications', label: 'Notifications' },
+      { key: 'files', label: 'Files' },
+    ],
+  },
+];
 
 const COLORS = [
   'bg-blue-500',
@@ -60,6 +132,23 @@ const COLORS = [
   'bg-indigo-500',
   'bg-pink-500',
 ];
+
+// Roles that can be assigned to a department (excludes SUPER_ADMIN and CLIENT)
+const DEPARTMENT_ROLES = [
+  { value: 'STAFF', label: 'Staff', description: 'Standard staff access' },
+  { value: 'HR', label: 'HR', description: 'HR dashboard & people management' },
+  { value: 'ADMIN', label: 'Admin', description: 'Full admin dashboard access' },
+  { value: 'GENERAL_OVERSEER', label: 'General Overseer', description: 'Oversight & executive access' },
+  { value: 'REALTOR', label: 'Realtor', description: 'Property sales & commission access' },
+];
+
+const roleBadge: Record<string, string> = {
+  STAFF: 'bg-gray-100 text-gray-700 border-gray-200',
+  HR: 'bg-teal-100 text-teal-700 border-teal-200',
+  ADMIN: 'bg-blue-100 text-blue-700 border-blue-200',
+  GENERAL_OVERSEER: 'bg-purple-100 text-purple-700 border-purple-200',
+  REALTOR: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+};
 
 export default function AdminDepartmentsPage() {
   const router = useRouter();
@@ -74,6 +163,8 @@ export default function AdminDepartmentsPage() {
   const [formName, setFormName] = useState('');
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
+  const [formRole, setFormRole] = useState('STAFF');
+  const [formAllowedModules, setFormAllowedModules] = useState<string[]>([]);
 
   const fetchDepartments = useCallback(async () => {
     setLoading(true);
@@ -102,6 +193,14 @@ export default function AdminDepartmentsPage() {
     setFormName('');
     setFormCode('');
     setFormDescription('');
+    setFormRole('STAFF');
+    setFormAllowedModules([]);
+  };
+
+  const toggleModule = (key: string) => {
+    setFormAllowedModules((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
   };
 
   const handleAddDepartment = async () => {
@@ -116,6 +215,8 @@ export default function AdminDepartmentsPage() {
         name: formName.trim(),
         code: formCode.trim().toUpperCase(),
         description: formDescription.trim() || undefined,
+        role: formRole,
+        allowedModules: formAllowedModules,
       });
       setAddDialogOpen(false);
       resetForm();
@@ -139,6 +240,8 @@ export default function AdminDepartmentsPage() {
       await api.put(`/departments/${selectedDept.id}`, {
         name: formName.trim(),
         description: formDescription.trim() || undefined,
+        role: formRole,
+        allowedModules: formAllowedModules,
       });
       setEditDialogOpen(false);
       resetForm();
@@ -173,6 +276,8 @@ export default function AdminDepartmentsPage() {
     setFormName(dept.name);
     setFormCode(dept.code);
     setFormDescription(dept.description || '');
+    setFormRole(dept.role || 'STAFF');
+    setFormAllowedModules(dept.allowedModules || []);
     setEditDialogOpen(true);
   };
 
@@ -247,6 +352,8 @@ export default function AdminDepartmentsPage() {
             const headInitials = dept.head?.user
               ? `${dept.head.user.firstName[0]}${dept.head.user.lastName[0]}`
               : null;
+            const deptRole = dept.role || 'STAFF';
+            const roleLabel = DEPARTMENT_ROLES.find(r => r.value === deptRole)?.label || deptRole;
 
             return (
               <motion.div
@@ -305,6 +412,25 @@ export default function AdminDepartmentsPage() {
                     )}
 
                     <div className="space-y-3">
+                      {/* Role + module count badges */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full font-medium border ${roleBadge[deptRole] || roleBadge.STAFF}`}
+                          >
+                            {roleLabel} role
+                          </span>
+                        </div>
+                        {(dept.allowedModules?.length ?? 0) > 0 ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium border bg-indigo-50 text-indigo-700 border-indigo-200">
+                            {dept.allowedModules.length} module{dept.allowedModules.length !== 1 ? 's' : ''}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">All modules</span>
+                        )}
+                      </div>
+
                       {headName && (
                         <div className="flex items-center gap-3">
                           <Avatar className="w-8 h-8">
@@ -339,42 +465,115 @@ export default function AdminDepartmentsPage() {
         </div>
       )}
 
+      {/* Reusable module picker — rendered inside both dialogs */}
       {/* Add Department Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Add New Department</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="dept-name">Department Name *</Label>
-              <Input
-                id="dept-name"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                placeholder="e.g., Sales"
-              />
+          <ScrollArea className="flex-1 pr-1">
+            <div className="space-y-4 py-2 pr-2">
+              <div className="space-y-2">
+                <Label htmlFor="dept-name">Department Name *</Label>
+                <Input
+                  id="dept-name"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="e.g., Communications"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dept-code">Department Code *</Label>
+                <Input
+                  id="dept-code"
+                  value={formCode}
+                  onChange={(e) => setFormCode(e.target.value.toUpperCase())}
+                  placeholder="e.g., COMMS"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dept-description">Description</Label>
+                <Input
+                  id="dept-description"
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="Brief description of the department"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Staff Role</Label>
+                <Select value={formRole} onValueChange={setFormRole}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role for this department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENT_ROLES.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        <span className="font-medium">{r.label}</span>
+                        <span className="text-muted-foreground ml-2 text-xs">— {r.description}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Staff created here automatically get this role and its dashboard.
+                </p>
+              </div>
+
+              {/* Module Access */}
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">Module Access</Label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormAllowedModules(MODULE_CATEGORIES.flatMap(c => c.modules.map(m => m.key)))}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Select all
+                    </button>
+                    <span className="text-muted-foreground text-xs">·</span>
+                    <button
+                      type="button"
+                      onClick={() => setFormAllowedModules([])}
+                      className="text-xs text-muted-foreground hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  {formAllowedModules.length === 0
+                    ? 'No restriction — staff see all modules for their role.'
+                    : `${formAllowedModules.length} module${formAllowedModules.length !== 1 ? 's' : ''} selected — staff only see these in their sidebar.`}
+                </p>
+                <div className="space-y-3">
+                  {MODULE_CATEGORIES.map((cat) => (
+                    <Card key={cat.category} className="border border-gray-100">
+                      <CardHeader className="py-2 px-3">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{cat.category}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-3 pb-3 pt-0 grid grid-cols-2 gap-1.5">
+                        {cat.modules.map((mod) => (
+                          <label key={mod.key} className="flex items-center gap-2 cursor-pointer group">
+                            <Checkbox
+                              checked={formAllowedModules.includes(mod.key)}
+                              onCheckedChange={() => toggleModule(mod.key)}
+                            />
+                            <span className="text-sm group-hover:text-foreground text-muted-foreground transition-colors">
+                              {mod.label}
+                            </span>
+                          </label>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="dept-code">Department Code *</Label>
-              <Input
-                id="dept-code"
-                value={formCode}
-                onChange={(e) => setFormCode(e.target.value.toUpperCase())}
-                placeholder="e.g., SALES"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dept-description">Description</Label>
-              <Input
-                id="dept-description"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder="Brief description of the department"
-              />
-            </div>
-          </div>
-          <DialogFooter>
+          </ScrollArea>
+          <DialogFooter className="pt-3 border-t">
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
               Cancel
             </Button>
@@ -388,38 +587,110 @@ export default function AdminDepartmentsPage() {
 
       {/* Edit Department Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Department</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-dept-name">Department Name *</Label>
-              <Input
-                id="edit-dept-name"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-              />
+          <ScrollArea className="flex-1 pr-1">
+            <div className="space-y-4 py-2 pr-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-dept-name">Department Name *</Label>
+                <Input
+                  id="edit-dept-name"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-dept-code">Department Code</Label>
+                <Input
+                  id="edit-dept-code"
+                  value={formCode}
+                  disabled
+                  className="bg-gray-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-dept-description">Description</Label>
+                <Input
+                  id="edit-dept-description"
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Staff Role</Label>
+                <Select value={formRole} onValueChange={setFormRole}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role for this department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENT_ROLES.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        <span className="font-medium">{r.label}</span>
+                        <span className="text-muted-foreground ml-2 text-xs">— {r.description}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Changing the role affects new staff only. Existing staff keep their current role unless transferred.
+                </p>
+              </div>
+
+              {/* Module Access */}
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">Module Access</Label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormAllowedModules(MODULE_CATEGORIES.flatMap(c => c.modules.map(m => m.key)))}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Select all
+                    </button>
+                    <span className="text-muted-foreground text-xs">·</span>
+                    <button
+                      type="button"
+                      onClick={() => setFormAllowedModules([])}
+                      className="text-xs text-muted-foreground hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  {formAllowedModules.length === 0
+                    ? 'No restriction — staff see all modules for their role.'
+                    : `${formAllowedModules.length} module${formAllowedModules.length !== 1 ? 's' : ''} selected — staff only see these in their sidebar.`}
+                </p>
+                <div className="space-y-3">
+                  {MODULE_CATEGORIES.map((cat) => (
+                    <Card key={cat.category} className="border border-gray-100">
+                      <CardHeader className="py-2 px-3">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{cat.category}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-3 pb-3 pt-0 grid grid-cols-2 gap-1.5">
+                        {cat.modules.map((mod) => (
+                          <label key={mod.key} className="flex items-center gap-2 cursor-pointer group">
+                            <Checkbox
+                              checked={formAllowedModules.includes(mod.key)}
+                              onCheckedChange={() => toggleModule(mod.key)}
+                            />
+                            <span className="text-sm group-hover:text-foreground text-muted-foreground transition-colors">
+                              {mod.label}
+                            </span>
+                          </label>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-dept-code">Department Code</Label>
-              <Input
-                id="edit-dept-code"
-                value={formCode}
-                disabled
-                className="bg-gray-100"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-dept-description">Description</Label>
-              <Input
-                id="edit-dept-description"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
+          </ScrollArea>
+          <DialogFooter className="pt-3 border-t">
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Cancel
             </Button>

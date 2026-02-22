@@ -19,7 +19,6 @@ import {
   Plus,
   Trash2,
   Upload,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -211,22 +210,12 @@ export default function CmsPage() {
       case 'branding':
         return (
           <div className="space-y-4">
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                Configure your company logo and name. These appear in the navigation bar, footer, and dashboard sidebar across the entire site.
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Company name, logo, and brand colour are managed by the platform administrator. Contact your RMS Platform support to update them.
               </p>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Company Name</label>
-              <Input value={sectionData.companyName || ''} onChange={(e) => updateField('companyName', e.target.value)} placeholder="RMS Platform" />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Short Name (Sidebar collapsed)</label>
-              <Input value={sectionData.shortName || ''} onChange={(e) => updateField('shortName', e.target.value)} placeholder="RMS" />
-            </div>
-            {renderImageField('Logo Image', 'logo')}
-            {renderImageField('Favicon', 'favicon')}
-            <div className="border-t pt-4 mt-4">
               <h3 className="font-semibold text-sm mb-3">Contact & Communication</h3>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

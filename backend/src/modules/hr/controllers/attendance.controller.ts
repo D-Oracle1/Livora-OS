@@ -67,7 +67,7 @@ export class AttendanceController {
   }
 
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get all attendance records' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -97,7 +97,7 @@ export class AttendanceController {
   }
 
   @Put(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Update attendance record' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -107,7 +107,7 @@ export class AttendanceController {
   }
 
   @Get('report')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get attendance report' })
   @ApiQuery({ name: 'departmentId', required: false })
   @ApiQuery({ name: 'startDate', required: true })

@@ -139,7 +139,10 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         await this.mailService.sendPerformanceReviewEmail(to, payload);
         break;
       case 'newsletter':
-        await this.mailService.sendNewsletterEmail(to, payload.subject, payload.content, payload.unsubscribeUrl);
+        await this.mailService.sendNewsletterEmail(to, payload.subject, payload.content, payload.unsubscribeUrl, {
+          branding: payload.branding,
+          attachments: payload.attachments,
+        });
         break;
       default:
         this.logger.warn(`Unknown email job type: ${type}`);

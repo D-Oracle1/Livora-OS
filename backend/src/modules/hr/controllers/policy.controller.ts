@@ -36,14 +36,14 @@ export class PolicyController {
   // ===========================================
 
   @Post()
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Create a new HR policy' })
   createPolicy(@Body() dto: CreatePolicyDto) {
     return this.policyService.createPolicy(dto);
   }
 
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get all HR policies' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -64,14 +64,14 @@ export class PolicyController {
   }
 
   @Get(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get policy by ID' })
   findPolicyById(@Param('id', ParseUUIDPipe) id: string) {
     return this.policyService.findPolicyById(id);
   }
 
   @Put(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Update policy' })
   updatePolicy(
     @Param('id', ParseUUIDPipe) id: string,
@@ -81,7 +81,7 @@ export class PolicyController {
   }
 
   @Delete(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Delete policy' })
   deletePolicy(@Param('id', ParseUUIDPipe) id: string) {
     return this.policyService.deletePolicy(id);
@@ -92,14 +92,14 @@ export class PolicyController {
   // ===========================================
 
   @Post('penalties')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Create a penalty record' })
   createPenalty(@Body() dto: CreatePenaltyDto) {
     return this.policyService.createPenalty(dto);
   }
 
   @Get('penalties/all')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get all penalties' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -132,14 +132,14 @@ export class PolicyController {
   }
 
   @Get('penalties/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get penalty by ID' })
   findPenaltyById(@Param('id', ParseUUIDPipe) id: string) {
     return this.policyService.findPenaltyById(id);
   }
 
   @Put('penalties/:id/waive')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Waive a penalty' })
   waivePenalty(
     @Param('id', ParseUUIDPipe) id: string,
@@ -150,7 +150,7 @@ export class PolicyController {
   }
 
   @Get('penalties/staff/:staffProfileId/summary')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get penalty summary for a staff member' })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
@@ -163,7 +163,7 @@ export class PolicyController {
   }
 
   @Get('penalties/staff/:staffProfileId/pending')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get pending penalties for payroll' })
   getPendingPenalties(@Param('staffProfileId', ParseUUIDPipe) staffProfileId: string) {
     return this.policyService.getPendingPenaltiesForPayroll(staffProfileId);

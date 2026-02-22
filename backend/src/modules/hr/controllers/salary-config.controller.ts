@@ -38,7 +38,7 @@ export class SalaryConfigController {
   // ===========================================
 
   @Get('summary')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get salary configuration summary' })
   getSummary() {
     return this.salaryConfigService.getSalaryConfigSummary();
@@ -49,14 +49,14 @@ export class SalaryConfigController {
   // ===========================================
 
   @Post('allowances')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Create allowance configuration' })
   createAllowance(@Body() dto: CreateAllowanceConfigDto) {
     return this.salaryConfigService.createAllowanceConfig(dto);
   }
 
   @Get('allowances')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get all allowance configurations' })
   @ApiQuery({ name: 'isActive', required: false })
   findAllAllowances(@Query('isActive') isActive?: string) {
@@ -66,14 +66,14 @@ export class SalaryConfigController {
   }
 
   @Get('allowances/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get allowance configuration by ID' })
   findAllowanceById(@Param('id', ParseUUIDPipe) id: string) {
     return this.salaryConfigService.findAllowanceConfigById(id);
   }
 
   @Put('allowances/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Update allowance configuration' })
   updateAllowance(
     @Param('id', ParseUUIDPipe) id: string,
@@ -83,7 +83,7 @@ export class SalaryConfigController {
   }
 
   @Delete('allowances/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Delete allowance configuration' })
   deleteAllowance(@Param('id', ParseUUIDPipe) id: string) {
     return this.salaryConfigService.deleteAllowanceConfig(id);
@@ -94,14 +94,14 @@ export class SalaryConfigController {
   // ===========================================
 
   @Post('deductions')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Create deduction configuration' })
   createDeduction(@Body() dto: CreateDeductionConfigDto) {
     return this.salaryConfigService.createDeductionConfig(dto);
   }
 
   @Get('deductions')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get all deduction configurations' })
   @ApiQuery({ name: 'isActive', required: false })
   findAllDeductions(@Query('isActive') isActive?: string) {
@@ -111,14 +111,14 @@ export class SalaryConfigController {
   }
 
   @Get('deductions/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get deduction configuration by ID' })
   findDeductionById(@Param('id', ParseUUIDPipe) id: string) {
     return this.salaryConfigService.findDeductionConfigById(id);
   }
 
   @Put('deductions/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Update deduction configuration' })
   updateDeduction(
     @Param('id', ParseUUIDPipe) id: string,
@@ -128,7 +128,7 @@ export class SalaryConfigController {
   }
 
   @Delete('deductions/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Delete deduction configuration' })
   deleteDeduction(@Param('id', ParseUUIDPipe) id: string) {
     return this.salaryConfigService.deleteDeductionConfig(id);
@@ -139,14 +139,14 @@ export class SalaryConfigController {
   // ===========================================
 
   @Post('structures')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Create salary structure' })
   createStructure(@Body() dto: CreateSalaryStructureDto) {
     return this.salaryConfigService.createSalaryStructure(dto);
   }
 
   @Get('structures')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get all salary structures' })
   @ApiQuery({ name: 'isActive', required: false })
   findAllStructures(@Query('isActive') isActive?: string) {
@@ -156,21 +156,21 @@ export class SalaryConfigController {
   }
 
   @Get('structures/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get salary structure by ID' })
   findStructureById(@Param('id', ParseUUIDPipe) id: string) {
     return this.salaryConfigService.findSalaryStructureById(id);
   }
 
   @Get('structures/position/:position')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get salary structure by position' })
   findStructureByPosition(@Param('position') position: StaffPosition) {
     return this.salaryConfigService.findSalaryStructureByPosition(position);
   }
 
   @Put('structures/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Update salary structure' })
   updateStructure(
     @Param('id', ParseUUIDPipe) id: string,
@@ -180,7 +180,7 @@ export class SalaryConfigController {
   }
 
   @Delete('structures/:id')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Delete salary structure' })
   deleteStructure(@Param('id', ParseUUIDPipe) id: string) {
     return this.salaryConfigService.deleteSalaryStructure(id);
@@ -191,7 +191,7 @@ export class SalaryConfigController {
   // ===========================================
 
   @Put('staff/:staffProfileId/salary')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Update staff salary' })
   updateStaffSalary(
     @Param('staffProfileId', ParseUUIDPipe) staffProfileId: string,
@@ -201,14 +201,14 @@ export class SalaryConfigController {
   }
 
   @Get('staff/:staffProfileId/allowances')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Calculate allowances for staff' })
   calculateStaffAllowances(@Param('staffProfileId', ParseUUIDPipe) staffProfileId: string) {
     return this.salaryConfigService.calculateAllowancesForStaff(staffProfileId);
   }
 
   @Get('staff/:staffProfileId/deductions')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Calculate deductions for staff' })
   @ApiQuery({ name: 'grossPay', required: true })
   calculateStaffDeductions(

@@ -71,11 +71,8 @@ export class PropertyController {
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
-    // Auto-scope to realtor's own properties
-    if (role === 'REALTOR' && !realtorId) {
-      const realtor = await this.prisma.realtorProfile.findUnique({ where: { userId } });
-      if (realtor) realtorId = realtor.id;
-    }
+    // Realtors see all company properties unless they explicitly filter by realtorId
+    // (admin-created properties often have no realtorId assigned)
     return this.propertyService.findAll({
       page,
       limit,

@@ -179,7 +179,7 @@ export class CommissionService {
 
     let updated: any;
     try {
-      // Attempt full update including payment metadata columns
+      // Attempt full update including all payment metadata + paidAt
       updated = await this.prisma.commission.update({
         where: { id },
         data: {
@@ -191,14 +191,22 @@ export class CommissionService {
         },
       });
     } catch {
-      // Fallback: payment columns may not exist in older tenant DBs — update only safe fields
-      updated = await this.prisma.commission.update({
-        where: { id },
-        data: {
-          status: CommissionStatus.PAID,
-          paidAt: new Date(),
-        },
-      });
+      try {
+        // Fallback 1: payment metadata columns may not exist — try with just paidAt
+        updated = await this.prisma.commission.update({
+          where: { id },
+          data: {
+            status: CommissionStatus.PAID,
+            paidAt: new Date(),
+          },
+        });
+      } catch {
+        // Fallback 2: paidAt column may not exist — update only the status
+        updated = await this.prisma.commission.update({
+          where: { id },
+          data: { status: CommissionStatus.PAID },
+        });
+      }
     }
 
     // Notify the realtor that their commission has been paid

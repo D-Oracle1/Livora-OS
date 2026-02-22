@@ -15,23 +15,57 @@ datasource db {
 }
 
 model Company {
-  id           String   @id @default(uuid())
-  name         String
-  slug         String   @unique
-  domain       String   @unique
-  databaseUrl  String
-  logo         String?
-  primaryColor String?  @default("#3b82f6")
-  inviteCode   String   @unique
-  isActive     Boolean  @default(true)
-  plan         String   @default("standard")
-  maxUsers     Int      @default(50)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String         @id @default(uuid())
+  name          String
+  slug          String         @unique
+  domain        String         @unique
+  databaseUrl   String
+  logo          String?
+  primaryColor  String?        @default("#3b82f6")
+  inviteCode    String         @unique
+  isActive      Boolean        @default(true)
+  plan          String         @default("standard")
+  maxUsers      Int            @default(50)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  supportThread SupportThread?
 
   @@index([domain])
   @@index([inviteCode])
   @@map("companies")
+}
+
+model SupportThread {
+  id        String           @id @default(uuid())
+  companyId String           @unique
+  company   Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  status    String           @default("open")
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  messages  SupportMessage[]
+
+  @@map("support_threads")
+}
+
+model SupportMessage {
+  id         String        @id @default(uuid())
+  threadId   String
+  thread     SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  content    String
+  senderType String
+  senderId   String
+  senderName String
+  createdAt  DateTime      @default(now())
+
+  @@map("support_messages")
+}
+
+model MasterSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("master_settings")
 }
 
 model SuperAdmin {

@@ -73,8 +73,9 @@ export default function AnalyticsPage() {
       if (timePeriod === 'month') {
         params.append('month', selectedMonth.toString());
       }
-      const response = await api.get<AnalyticsData>(`/admin/analytics?${params.toString()}`);
-      setData(response);
+      const raw: any = await api.get(`/admin/analytics?${params.toString()}`);
+      // api.get returns the full TransformInterceptor wrapper { success, data, timestamp }
+      setData(raw?.data ?? raw);
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast.error('Failed to load analytics data');

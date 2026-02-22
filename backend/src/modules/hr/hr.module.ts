@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AttendanceService } from './services/attendance.service';
 import { LeaveService } from './services/leave.service';
 import { PerformanceService } from './services/performance.service';
@@ -16,7 +16,7 @@ import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
-    forwardRef(() => NotificationModule),
+    NotificationModule,
     SettingsModule,
   ],
   controllers: [

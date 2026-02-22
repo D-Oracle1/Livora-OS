@@ -6,10 +6,11 @@ import Link from 'next/link';
 import {
   Clock,
   CalendarDays,
+  CalendarCheck,
   Star,
   Wallet,
   Users,
-  AlertCircle,
+  UserPlus,
   ArrowRight,
   Loader2,
   RefreshCw,
@@ -17,6 +18,8 @@ import {
   Shield,
   CheckSquare,
   Settings2,
+  ClipboardCheck,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -68,6 +71,19 @@ interface ReviewData {
   };
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+};
+
 export default function AdminHrPage() {
   const [loading, setLoading] = useState(true);
   const [totalStaff, setTotalStaff] = useState(0);
@@ -87,7 +103,6 @@ export default function AdminHrPage() {
         api.get<any>('/hr/reviews?status=IN_PROGRESS&limit=5'),
       ]);
 
-      // Staff
       if (staffRes.status === 'fulfilled') {
         const res = staffRes.value;
         const list = Array.isArray(res?.data) ? res.data : [];
@@ -96,19 +111,16 @@ export default function AdminHrPage() {
         setActiveStaff(list.filter((s: StaffMember) => s.isActive).length);
       }
 
-      // Departments
       if (deptRes.status === 'fulfilled') {
         const res = deptRes.value;
         setDepartments(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []);
       }
 
-      // Leave
       if (leaveRes.status === 'fulfilled') {
         const res = leaveRes.value;
         setPendingLeaves(Array.isArray(res?.data) ? res.data : []);
       }
 
-      // Reviews
       if (reviewRes.status === 'fulfilled') {
         const res = reviewRes.value;
         setActiveReviews(Array.isArray(res?.data) ? res.data : []);
@@ -124,238 +136,344 @@ export default function AdminHrPage() {
     fetchData();
   }, [fetchData]);
 
-  const stats = [
+  const deptStaffTotal = departments.reduce((s, d) => s + (d._count?.staff || 0), 0);
+
+  const statCards = [
     {
-      title: 'Total Staff',
-      value: totalStaff.toString(),
+      label: 'Total Staff',
+      value: totalStaff,
       sub: `${activeStaff} active`,
       icon: Users,
-      color: 'text-green-600',
-      bg: 'bg-green-100',
+      gradient: 'from-green-500 to-green-700',
+      iconBg: 'bg-green-400/30',
     },
     {
-      title: 'Departments',
-      value: departments.length.toString(),
-      sub: `${departments.reduce((s, d) => s + (d._count?.staff || 0), 0)} staff assigned`,
-      icon: Building,
-      color: 'text-cyan-600',
-      bg: 'bg-cyan-100',
+      label: 'Active Staff',
+      value: activeStaff,
+      sub: 'Currently employed',
+      icon: UserPlus,
+      gradient: 'from-emerald-500 to-emerald-700',
+      iconBg: 'bg-emerald-400/30',
     },
     {
-      title: 'Pending Leave',
-      value: pendingLeaves.length.toString(),
+      label: 'On Leave',
+      value: pendingLeaves.length,
       sub: pendingLeaves.length > 0 ? 'Awaiting approval' : 'All clear',
       icon: CalendarDays,
-      color: 'text-yellow-600',
-      bg: 'bg-yellow-100',
+      gradient: 'from-yellow-500 to-amber-600',
+      iconBg: 'bg-yellow-400/30',
     },
     {
-      title: 'Active Reviews',
-      value: activeReviews.length.toString(),
+      label: 'Departments',
+      value: departments.length,
+      sub: `${deptStaffTotal} staff assigned`,
+      icon: Building,
+      gradient: 'from-blue-500 to-blue-700',
+      iconBg: 'bg-blue-400/30',
+    },
+    {
+      label: 'Pending Reviews',
+      value: activeReviews.length,
       sub: activeReviews.length > 0 ? 'In progress' : 'None in progress',
       icon: Star,
+      gradient: 'from-purple-500 to-purple-700',
+      iconBg: 'bg-purple-400/30',
+    },
+    {
+      label: 'Dept. Staff',
+      value: deptStaffTotal,
+      sub: 'Across all departments',
+      icon: ClipboardCheck,
+      gradient: 'from-cyan-500 to-cyan-700',
+      iconBg: 'bg-cyan-400/30',
+    },
+  ];
+
+  const quickActions = [
+    {
+      label: 'Add Staff',
+      description: 'Onboard a new team member',
+      href: '/dashboard/admin/staff',
+      icon: UserPlus,
+      color: 'text-green-600',
+      iconBg: 'bg-green-100',
+      border: 'hover:border-green-300',
+    },
+    {
+      label: 'Approve Leave',
+      description: 'Review pending requests',
+      href: '/dashboard/admin/hr/leave',
+      icon: CalendarCheck,
+      color: 'text-yellow-600',
+      iconBg: 'bg-yellow-100',
+      border: 'hover:border-yellow-300',
+    },
+    {
+      label: 'Run Payroll',
+      description: 'Process staff payments',
+      href: '/dashboard/admin/hr/payroll',
+      icon: Wallet,
+      color: 'text-blue-600',
+      iconBg: 'bg-blue-100',
+      border: 'hover:border-blue-300',
+    },
+    {
+      label: 'Mark Attendance',
+      description: 'Log daily attendance',
+      href: '/dashboard/admin/hr/attendance',
+      icon: ClipboardCheck,
+      color: 'text-teal-600',
+      iconBg: 'bg-teal-100',
+      border: 'hover:border-teal-300',
+    },
+    {
+      label: 'New Review',
+      description: 'Start a performance cycle',
+      href: '/dashboard/admin/hr/performance',
+      icon: Star,
       color: 'text-purple-600',
-      bg: 'bg-purple-100',
+      iconBg: 'bg-purple-100',
+      border: 'hover:border-purple-300',
     },
   ];
 
   const hrModules = [
     {
       title: 'Attendance',
-      description: 'Track staff attendance, clock-in/out records, and overtime',
+      description: 'Track attendance & overtime',
       href: '/dashboard/admin/hr/attendance',
       icon: Clock,
       color: 'bg-green-500',
+      ring: 'hover:ring-green-200',
     },
     {
       title: 'Leave Management',
-      description: 'Manage leave requests, approvals, and balance tracking',
+      description: 'Leave requests & approvals',
       href: '/dashboard/admin/hr/leave',
       icon: CalendarDays,
       color: 'bg-yellow-500',
+      ring: 'hover:ring-yellow-200',
     },
     {
       title: 'Performance Reviews',
-      description: 'Conduct reviews, set goals, and track performance metrics',
+      description: 'Reviews, goals & metrics',
       href: '/dashboard/admin/hr/performance',
       icon: Star,
       color: 'bg-purple-500',
+      ring: 'hover:ring-purple-200',
     },
     {
       title: 'Staff Payroll',
-      description: 'Process payroll, manage deductions, and generate payslips',
+      description: 'Payroll & payslips',
       href: '/dashboard/admin/hr/payroll',
       icon: Wallet,
       color: 'bg-blue-500',
+      ring: 'hover:ring-blue-200',
     },
     {
       title: 'Realtor Commission Payroll',
-      description: 'Manage and process realtor commission payments by period',
+      description: 'Commission payments',
       href: '/dashboard/admin/hr/realtor-payroll',
       icon: Wallet,
       color: 'bg-emerald-500',
+      ring: 'hover:ring-emerald-200',
     },
     {
       title: 'Policies & Penalties',
-      description: 'Configure lateness, absence, and task penalty rules',
+      description: 'Penalty rules',
       href: '/dashboard/admin/hr/policies',
       icon: Shield,
       color: 'bg-red-500',
+      ring: 'hover:ring-red-200',
     },
     {
       title: 'Salary Configuration',
-      description: 'Manage salary structures, allowances, and deductions',
+      description: 'Salary structures',
       href: '/dashboard/admin/hr/salary-config',
       icon: Settings2,
       color: 'bg-indigo-500',
+      ring: 'hover:ring-indigo-200',
     },
     {
       title: 'Task Management',
-      description: 'Create, assign, and track staff tasks and deadlines',
+      description: 'Staff tasks',
       href: '/dashboard/admin/hr/tasks',
       icon: CheckSquare,
       color: 'bg-teal-500',
+      ring: 'hover:ring-teal-200',
     },
   ];
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading HR Control Center...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-8 pb-10"
+    >
+      {/* ── 1. HEADER ── */}
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">HR Dashboard</h1>
-          <p className="text-muted-foreground">Overview of all HR activities and management</p>
+          <h1 className="text-3xl font-bold tracking-tight">HR Control Center</h1>
+          <p className="text-muted-foreground mt-1">Manage people, performance, and operations</p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={fetchData} disabled={loading}>
+        <Button variant="outline" className="gap-2 self-start sm:self-auto" onClick={fetchData} disabled={loading}>
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
-      </div>
+      </motion.div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
+      {/* ── 2. LIVE STATS ROW ── */}
+      <motion.div variants={itemVariants} className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        {statCards.map((card, i) => (
           <motion.div
-            key={stat.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
+            key={card.label}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.05 * i, duration: 0.35, ease: 'easeOut' }}
+            className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${card.gradient} text-white p-5 shadow-md flex flex-col gap-3`}
           >
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 rounded-lg ${stat.bg}`}>
-                    <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                  </div>
-                </div>
-                <h3 className="text-2xl font-bold">{stat.value}</h3>
-                <p className="text-sm text-muted-foreground">{stat.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>
-              </CardContent>
-            </Card>
+            <div className={`w-10 h-10 rounded-lg ${card.iconBg} flex items-center justify-center`}>
+              <card.icon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="text-3xl font-bold leading-none">{card.value}</p>
+              <p className="text-sm font-medium mt-1 opacity-90">{card.label}</p>
+              <p className="text-xs mt-0.5 opacity-70">{card.sub}</p>
+            </div>
+            {/* decorative circle */}
+            <div className="absolute -right-4 -bottom-4 w-20 h-20 rounded-full bg-white/10 pointer-events-none" />
           </motion.div>
         ))}
-      </div>
+      </motion.div>
 
-      {/* Pending Leave Requests */}
-      {pendingLeaves.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="border-yellow-200 dark:border-yellow-800">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-yellow-600">
-                  <AlertCircle className="w-5 h-5" />
-                  Pending Leave Requests
-                </CardTitle>
-                <Link href="/dashboard/admin/hr/leave">
-                  <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                    View all <ArrowRight className="w-3 h-3" />
-                  </Button>
-                </Link>
+      {/* ── 3. QUICK ACTIONS BAR ── */}
+      <motion.div variants={itemVariants}>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</h2>
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+          {quickActions.map((action) => (
+            <Link key={action.label} href={action.href}>
+              <div
+                className={`flex flex-col gap-3 p-4 rounded-xl border bg-card cursor-pointer transition-all duration-200 hover:shadow-md ${action.border} hover:-translate-y-0.5`}
+              >
+                <div className={`w-10 h-10 rounded-lg ${action.iconBg} flex items-center justify-center`}>
+                  <action.icon className={`w-5 h-5 ${action.color}`} />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm leading-tight">{action.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{action.description}</p>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent>
+            </Link>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* ── 4. MODULE GRID ── */}
+      <motion.div variants={itemVariants}>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">HR Modules</h2>
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+          {hrModules.map((mod, i) => (
+            <motion.div
+              key={mod.title}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.06 * i, duration: 0.35, ease: 'easeOut' }}
+            >
+              <Link href={mod.href}>
+                <div
+                  className={`group flex flex-col gap-4 p-5 rounded-xl border bg-card cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ring-2 ring-transparent ${mod.ring}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className={`w-12 h-12 rounded-xl ${mod.color} flex items-center justify-center shadow-sm`}>
+                      <mod.icon className="w-6 h-6 text-white" />
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform duration-200" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base leading-tight">{mod.title}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{mod.description}</p>
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* ── 5. ACTIVITY FEED ── */}
+      <motion.div variants={itemVariants} className="grid gap-6 lg:grid-cols-2">
+        {/* Left: Pending Leave Requests */}
+        <Card className="border-yellow-200 dark:border-yellow-800/60">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-yellow-600 text-base">
+                <AlertCircle className="w-5 h-5" />
+                Pending Leave Requests
+              </CardTitle>
+              <Link href="/dashboard/admin/hr/leave">
+                <Button variant="ghost" size="sm" className="gap-1 text-xs h-7">
+                  View all <ArrowRight className="w-3 h-3" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {pendingLeaves.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
+                <CalendarCheck className="w-8 h-8 opacity-30" />
+                <p className="text-sm">No pending leave requests</p>
+              </div>
+            ) : (
               <div className="space-y-2">
                 {pendingLeaves.map((leave) => (
-                  <div key={leave.id} className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
-                    <div className="flex items-center gap-3">
-                      <CalendarDays className="w-5 h-5 text-yellow-600 shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium">
+                  <div
+                    key={leave.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-yellow-200 dark:bg-yellow-800 flex items-center justify-center shrink-0">
+                        <CalendarDays className="w-4 h-4 text-yellow-700 dark:text-yellow-300" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
                           {leave.staffProfile?.user?.firstName} {leave.staffProfile?.user?.lastName}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {leave.type.replace('_', ' ')} &middot; {leave.startDate?.split('T')[0]} to {leave.endDate?.split('T')[0]}
+                        <p className="text-xs text-muted-foreground truncate">
+                          {leave.type.replace(/_/g, ' ')} &middot;{' '}
+                          {leave.startDate?.split('T')[0]} to {leave.endDate?.split('T')[0]}
                         </p>
                       </div>
                     </div>
-                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">Pending</Badge>
+                    <Badge className="bg-yellow-100 text-yellow-700 shrink-0 border-yellow-200">Pending</Badge>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+            )}
+          </CardContent>
+        </Card>
 
-      {/* HR Modules */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {hrModules.map((mod, index) => (
-          <motion.div
-            key={mod.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 + index * 0.1 }}
-          >
-            <Link href={mod.href}>
-              <Card className="hover:shadow-lg transition-all hover:border-primary/30 cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-12 h-12 rounded-lg ${mod.color} flex items-center justify-center`}>
-                        <mod.icon className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg">{mod.title}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">{mod.description}</p>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Recently Added Staff */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
+        {/* Right: Recent Staff */}
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="w-5 h-5 text-primary" />
-                Recent Staff Members
+                Recent Staff
               </CardTitle>
               <Link href="/dashboard/admin/staff">
-                <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                <Button variant="ghost" size="sm" className="gap-1 text-xs h-7">
                   View all <ArrowRight className="w-3 h-3" />
                 </Button>
               </Link>
@@ -363,26 +481,40 @@ export default function AdminHrPage() {
           </CardHeader>
           <CardContent>
             {recentStaff.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No staff members yet</p>
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
+                <Users className="w-8 h-8 opacity-30" />
+                <p className="text-sm">No staff members yet</p>
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {recentStaff.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50"
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/40 hover:bg-muted/70 transition-colors gap-3"
                   >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-9 h-9">
-                        <AvatarFallback className="bg-primary text-white text-sm">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar className="w-9 h-9 shrink-0">
+                        <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
                           {member.user.firstName[0]}{member.user.lastName[0]}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{member.user.firstName} {member.user.lastName}</p>
-                        <p className="text-xs text-muted-foreground">{member.title} &middot; {member.department?.name || 'No dept'}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {member.user.firstName} {member.user.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {member.title} &middot; {member.department?.name || 'No dept'}
+                        </p>
                       </div>
                     </div>
-                    <Badge className={member.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                    <Badge
+                      variant="secondary"
+                      className={
+                        member.isActive
+                          ? 'bg-green-100 text-green-700 border-green-200 shrink-0'
+                          : 'bg-red-100 text-red-700 border-red-200 shrink-0'
+                      }
+                    >
                       {member.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                   </div>
@@ -392,48 +524,6 @@ export default function AdminHrPage() {
           </CardContent>
         </Card>
       </motion.div>
-
-      {/* Department Overview */}
-      {departments.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Building className="w-5 h-5 text-primary" />
-                  Departments
-                </CardTitle>
-                <Link href="/dashboard/admin/departments">
-                  <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                    Manage <ArrowRight className="w-3 h-3" />
-                  </Button>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {departments.map((dept) => (
-                  <Link key={dept.id} href={`/dashboard/admin/staff?department=${dept.id}`}>
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Building className="w-5 h-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{dept.name}</p>
-                        <p className="text-xs text-muted-foreground">{dept._count?.staff || 0} staff</p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
-    </div>
+    </motion.div>
   );
 }

@@ -34,7 +34,7 @@ export class LeaveController {
   }
 
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR', 'STAFF')
   @ApiOperation({ summary: 'Get all leave requests' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -74,14 +74,14 @@ export class LeaveController {
   }
 
   @Get(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR', 'STAFF')
   @ApiOperation({ summary: 'Get leave request by ID' })
   findById(@Param('id', ParseUUIDPipe) id: string) {
     return this.leaveService.findById(id);
   }
 
   @Put(':id/approve')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Approve a leave request' })
   approve(
     @Param('id', ParseUUIDPipe) id: string,
@@ -92,7 +92,7 @@ export class LeaveController {
   }
 
   @Put(':id/reject')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Reject a leave request' })
   reject(
     @Param('id', ParseUUIDPipe) id: string,

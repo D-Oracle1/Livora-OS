@@ -26,14 +26,14 @@ export class PerformanceController {
   constructor(private readonly performanceService: PerformanceService) {}
 
   @Post()
-  @Roles('SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR', 'STAFF')
   @ApiOperation({ summary: 'Create a performance review' })
   create(@CurrentUser('id') reviewerId: string, @Body() dto: CreateReviewDto) {
     return this.performanceService.create(reviewerId, dto);
   }
 
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get all performance reviews' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -74,21 +74,21 @@ export class PerformanceController {
   }
 
   @Get(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR', 'STAFF')
   @ApiOperation({ summary: 'Get performance review by ID' })
   findById(@Param('id', ParseUUIDPipe) id: string) {
     return this.performanceService.findById(id);
   }
 
   @Put(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR', 'STAFF')
   @ApiOperation({ summary: 'Update performance review' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateReviewDto) {
     return this.performanceService.update(id, dto);
   }
 
   @Post(':id/submit')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'STAFF')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR', 'STAFF')
   @ApiOperation({ summary: 'Submit performance review' })
   submit(@Param('id', ParseUUIDPipe) id: string) {
     return this.performanceService.submit(id);

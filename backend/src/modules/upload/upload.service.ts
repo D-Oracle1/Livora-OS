@@ -133,4 +133,9 @@ export class UploadService {
     );
     return urls;
   }
+
+  async uploadCompanyLogo(file: MulterFile): Promise<{ url: string }> {
+    const url = await this.uploadToBlob(file, 'company-logos');
+    return { url };
+  }
 }

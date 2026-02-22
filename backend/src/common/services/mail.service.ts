@@ -58,18 +58,82 @@ export class MailService {
     `;
   }
 
-  private async send(to: string, subject: string, html: string): Promise<void> {
+  private async send(
+    to: string,
+    subject: string,
+    html: string,
+    attachments?: Array<{ filename: string; href: string }>,
+  ): Promise<void> {
     try {
       await this.transporter.sendMail({
         from: this.fromAddress,
         to,
         subject: `${this.appName} - ${subject}`,
         html,
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
       });
       this.logger.log(`Email "${subject}" sent to ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send "${subject}" to ${to}: ${error.message}`);
     }
+  }
+
+  private brandedLetterheadTemplate(
+    content: string,
+    unsubscribeUrl: string,
+    branding?: { logoUrl?: string; companyName?: string; primaryColor?: string; address?: string },
+    attachmentLinks?: string,
+  ): string {
+    const company = branding?.companyName || this.appName;
+    const color = branding?.primaryColor || '#1e40af';
+    const logo = branding?.logoUrl
+      ? `<img src="${branding.logoUrl}" alt="${escapeHtml(company)}" style="height:50px;max-width:200px;object-fit:contain;display:block;margin:0 auto 12px;" />`
+      : '';
+    const address = branding?.address
+      ? `<p style="color:#9ca3af;font-size:12px;margin:0 0 6px;">${escapeHtml(branding.address)}</p>`
+      : '';
+    const attachmentsSection = attachmentLinks
+      ? `<tr><td style="padding:0 32px 16px;border-top:1px solid #e5e7eb;">
+          <p style="font-size:13px;color:#374151;font-weight:600;margin:16px 0 8px;">Attachments:</p>
+          ${attachmentLinks}
+         </td></tr>`
+      : '';
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);max-width:600px;width:100%;">
+          <tr>
+            <td style="background-color:${color};padding:28px 32px;text-align:center;">
+              ${logo}
+              <h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:700;letter-spacing:0.5px;">${escapeHtml(company)}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;color:#1f2937;font-size:15px;line-height:1.7;">
+              ${content}
+            </td>
+          </tr>
+          ${attachmentsSection}
+          <tr>
+            <td style="background-color:#f9fafb;padding:20px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+              ${address}
+              <p style="color:#d1d5db;font-size:11px;margin:0;">
+                You received this email because you are subscribed to our communications.<br/>
+                <a href="${unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline;">Unsubscribe</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
   }
 
   // ============ Authentication Emails ============
@@ -367,16 +431,35 @@ export class MailService {
 
   // ============ Newsletter Emails ============
 
-  async sendNewsletterEmail(to: string, subject: string, content: string, unsubscribeUrl: string): Promise<void> {
-    const html = this.baseTemplate(`
-      ${content}
-      <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0 15px;" />
-      <p style="color: #999; font-size: 11px; text-align: center;">
-        You received this email because you subscribed to our newsletter.
-        <br />
-        <a href="${unsubscribeUrl}" style="color: #999; text-decoration: underline;">Unsubscribe</a>
-      </p>
-    `);
-    await this.send(to, subject, html);
+  async sendNewsletterEmail(
+    to: string,
+    subject: string,
+    content: string,
+    unsubscribeUrl: string,
+    options?: {
+      branding?: { logoUrl?: string; companyName?: string; primaryColor?: string; address?: string };
+      attachments?: Array<{ filename: string; url: string }>;
+    },
+  ): Promise<void> {
+    const attachmentLinks = options?.attachments
+      ?.map(
+        (a) =>
+          `<p style="margin:4px 0;"><a href="${a.url}" style="color:#2563eb;text-decoration:none;font-size:13px;">📎 ${escapeHtml(a.filename)}</a></p>`,
+      )
+      .join('');
+
+    const html = this.brandedLetterheadTemplate(
+      content,
+      unsubscribeUrl,
+      options?.branding,
+      attachmentLinks || undefined,
+    );
+
+    const nodemailerAttachments = options?.attachments?.map((a) => ({
+      filename: a.filename,
+      href: a.url,
+    }));
+
+    await this.send(to, subject, html, nodemailerAttachments);
   }
 }

@@ -350,6 +350,18 @@ export class ClientService {
       },
     });
 
+    // Auto-subscribe new client to newsletter
+    try {
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || undefined;
+      await this.prisma.newsletterSubscriber.upsert({
+        where: { email: user.email },
+        update: { isActive: true, name: fullName },
+        create: { email: user.email, name: fullName },
+      });
+    } catch {
+      // Don't fail if newsletter subscribe fails
+    }
+
     return {
       ...user.clientProfile,
       user: {

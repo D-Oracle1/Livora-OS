@@ -1,8 +1,10 @@
-import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { MailService } from '../../common/services/mail.service';
 import { QueueService } from '../../common/services/queue.service';
 import { ConfigService } from '@nestjs/config';
+import { SendNewsletterDto } from './dto/newsletter.dto';
+import { UserRole, UserStatus } from '@prisma/client';
 
 @Injectable()
 export class NewsletterService {
@@ -112,35 +114,103 @@ export class NewsletterService {
     return { message: 'Subscriber deleted' };
   }
 
-  async sendBulkEmail(subject: string, content: string) {
-    const subscribers = await this.prisma.newsletterSubscriber.findMany({
-      where: { isActive: true },
-      select: { email: true, unsubscribeToken: true },
-    });
-
-    if (subscribers.length === 0) {
-      return { message: 'No active subscribers to send to', sent: 0 };
+  async getRecipients(type: 'SUBSCRIBERS' | 'CLIENTS' | 'STAFF' | 'REALTORS') {
+    switch (type) {
+      case 'SUBSCRIBERS': {
+        const rows = await this.prisma.newsletterSubscriber.findMany({
+          where: { isActive: true },
+          select: { email: true, name: true },
+          orderBy: { subscribedAt: 'desc' },
+        });
+        return { count: rows.length, data: rows };
+      }
+      case 'CLIENTS': {
+        const rows = await this.prisma.user.findMany({
+          where: { role: UserRole.CLIENT, status: UserStatus.ACTIVE },
+          select: { email: true, firstName: true, lastName: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        return {
+          count: rows.length,
+          data: rows.map((u) => ({ email: u.email, name: `${u.firstName} ${u.lastName}`.trim() })),
+        };
+      }
+      case 'STAFF': {
+        const rows = await this.prisma.user.findMany({
+          where: { role: { in: [UserRole.STAFF, UserRole.HR] }, status: UserStatus.ACTIVE },
+          select: { email: true, firstName: true, lastName: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        return {
+          count: rows.length,
+          data: rows.map((u) => ({ email: u.email, name: `${u.firstName} ${u.lastName}`.trim() })),
+        };
+      }
+      case 'REALTORS': {
+        const rows = await this.prisma.user.findMany({
+          where: { role: UserRole.REALTOR, status: UserStatus.ACTIVE },
+          select: { email: true, firstName: true, lastName: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        return {
+          count: rows.length,
+          data: rows.map((u) => ({ email: u.email, name: `${u.firstName} ${u.lastName}`.trim() })),
+        };
+      }
     }
+  }
 
-    const frontendUrl = (this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000').trim();
+  async getCounts() {
+    const [subscribers, clients, staff, realtors] = await Promise.all([
+      this.prisma.newsletterSubscriber.count({ where: { isActive: true } }),
+      this.prisma.user.count({ where: { role: UserRole.CLIENT, status: UserStatus.ACTIVE } }),
+      this.prisma.user.count({ where: { role: { in: [UserRole.STAFF, UserRole.HR] }, status: UserStatus.ACTIVE } }),
+      this.prisma.user.count({ where: { role: UserRole.REALTOR, status: UserStatus.ACTIVE } }),
+    ]);
+    return { subscribers, clients, staff, realtors };
+  }
+
+  async sendBulkEmail(dto: SendNewsletterDto) {
+    const { subject, content, recipientType = 'SUBSCRIBERS', specificEmails, attachments, branding } = dto;
+
     const apiUrl = (this.configService.get<string>('API_URL') || 'http://localhost:4000').trim();
 
+    let recipients: { email: string; name?: string | null; unsubscribeToken?: string }[] = [];
+
+    if (recipientType === 'CUSTOM') {
+      if (!specificEmails || specificEmails.length === 0) {
+        return { message: 'No recipients specified', sent: 0 };
+      }
+      recipients = specificEmails.map((email) => ({ email }));
+    } else {
+      const result = await this.getRecipients(recipientType as any);
+      recipients = result.data as any;
+    }
+
+    if (recipients.length === 0) {
+      return { message: 'No recipients to send to', sent: 0 };
+    }
+
     let queued = 0;
-    for (const subscriber of subscribers) {
-      const unsubscribeUrl = `${apiUrl}/api/v1/newsletter/unsubscribe/${subscriber.unsubscribeToken}`;
+    for (const recipient of recipients) {
+      const unsubscribeToken = (recipient as any).unsubscribeToken;
+      const unsubscribeUrl = unsubscribeToken
+        ? `${apiUrl}/api/v1/newsletter/unsubscribe/${unsubscribeToken}`
+        : `${apiUrl}/api/v1/newsletter/unsubscribe/noop`;
+
       try {
         await this.queueService.addEmailJob({
           type: 'newsletter',
-          to: subscriber.email,
-          data: { subject, content, unsubscribeUrl },
+          to: recipient.email,
+          data: { subject, content, unsubscribeUrl, branding, attachments },
         });
         queued++;
       } catch (error) {
-        this.logger.error(`Failed to queue newsletter for ${subscriber.email}: ${error.message}`);
+        this.logger.error(`Failed to queue newsletter for ${recipient.email}: ${error.message}`);
       }
     }
 
-    this.logger.log(`Newsletter "${subject}" queued for ${queued}/${subscribers.length} subscribers`);
-    return { message: `Newsletter queued for ${queued} subscribers`, sent: queued };
+    this.logger.log(`Newsletter "${subject}" queued for ${queued}/${recipients.length} recipients (type: ${recipientType})`);
+    return { message: `Newsletter queued for ${queued} recipients`, sent: queued };
   }
 }

@@ -186,6 +186,28 @@ export class UploadController {
     return { urls };
   }
 
+  @Post('company-logo')
+  @UseInterceptors(
+    FileInterceptor('logo', {
+      storage: memoryStorage(),
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload a company logo' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { logo: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Logo uploaded' })
+  async uploadCompanyLogo(@UploadedFile() file: MulterFile) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.uploadService.uploadCompanyLogo(file);
+  }
+
   @Post('task-files')
   @UseInterceptors(
     FilesInterceptor('files', 5, {

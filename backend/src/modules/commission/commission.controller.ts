@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Body,
   Param,
   Query,
   UseGuards,
@@ -90,7 +91,10 @@ export class CommissionController {
   @Roles('SUPER_ADMIN', 'ADMIN')
   @ApiOperation({ summary: 'Mark commission as paid' })
   @ApiResponse({ status: 200, description: 'Commission marked as paid' })
-  async markAsPaid(@Param('id') id: string) {
-    return this.commissionService.markAsPaid(id);
+  async markAsPaid(
+    @Param('id') id: string,
+    @Body() body: { paymentMethod?: string; paymentReference?: string; paymentNotes?: string },
+  ) {
+    return this.commissionService.markAsPaid(id, body);
   }
 }

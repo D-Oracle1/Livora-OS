@@ -20,6 +20,23 @@ import {
   RefreshCw,
   Briefcase,
   BarChart3,
+  LayoutDashboard,
+  UserCog,
+  Building,
+  Calculator,
+  FileText,
+  ClipboardList,
+  FileEdit,
+  ImageIcon,
+  Hash,
+  MessageSquare,
+  Headphones,
+  Newspaper,
+  Mail,
+  Shield,
+  Share2,
+  Bell,
+  ChevronRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +97,231 @@ function getYearOptions() {
   }
   return years;
 }
+
+// ─── Console Module Grid data ────────────────────────────────────────────────
+
+type ConsoleModule = {
+  name: string;
+  description: string;
+  href: string;
+  icon: React.ElementType;
+  color: string;       // Tailwind bg class for icon bubble
+  iconColor: string;   // Tailwind text class for icon
+};
+
+type ConsoleSection = {
+  label: string;
+  modules: ConsoleModule[];
+};
+
+const consoleSections: ConsoleSection[] = [
+  {
+    label: 'Overview',
+    modules: [
+      {
+        name: 'Dashboard',
+        description: 'Main admin overview',
+        href: '/dashboard/admin',
+        icon: LayoutDashboard,
+        color: 'bg-blue-100 dark:bg-blue-900/40',
+        iconColor: 'text-blue-600 dark:text-blue-400',
+      },
+      {
+        name: 'Analytics',
+        description: 'Reports & insights',
+        href: '/dashboard/admin/analytics',
+        icon: BarChart3,
+        color: 'bg-blue-100 dark:bg-blue-900/40',
+        iconColor: 'text-blue-600 dark:text-blue-400',
+      },
+    ],
+  },
+  {
+    label: 'People',
+    modules: [
+      {
+        name: 'Realtors',
+        description: 'Manage your agents',
+        href: '/dashboard/admin/realtors',
+        icon: Users,
+        color: 'bg-emerald-100 dark:bg-emerald-900/40',
+        iconColor: 'text-emerald-600 dark:text-emerald-400',
+      },
+      {
+        name: 'Clients',
+        description: 'Client accounts & info',
+        href: '/dashboard/admin/clients',
+        icon: Briefcase,
+        color: 'bg-emerald-100 dark:bg-emerald-900/40',
+        iconColor: 'text-emerald-600 dark:text-emerald-400',
+      },
+      {
+        name: 'Staff',
+        description: 'Internal team members',
+        href: '/dashboard/admin/staff',
+        icon: UserCog,
+        color: 'bg-emerald-100 dark:bg-emerald-900/40',
+        iconColor: 'text-emerald-600 dark:text-emerald-400',
+      },
+      {
+        name: 'Departments',
+        description: 'Org structure & teams',
+        href: '/dashboard/admin/departments',
+        icon: Building,
+        color: 'bg-emerald-100 dark:bg-emerald-900/40',
+        iconColor: 'text-emerald-600 dark:text-emerald-400',
+      },
+    ],
+  },
+  {
+    label: 'Sales & Finance',
+    modules: [
+      {
+        name: 'Properties',
+        description: 'Listings & inventory',
+        href: '/dashboard/admin/properties',
+        icon: Home,
+        color: 'bg-amber-100 dark:bg-amber-900/40',
+        iconColor: 'text-amber-600 dark:text-amber-400',
+      },
+      {
+        name: 'Sales',
+        description: 'Transactions & deals',
+        href: '/dashboard/admin/sales',
+        icon: DollarSign,
+        color: 'bg-green-100 dark:bg-green-900/40',
+        iconColor: 'text-green-600 dark:text-green-400',
+      },
+      {
+        name: 'Commission',
+        description: 'Agent earnings & splits',
+        href: '/dashboard/admin/commission',
+        icon: Calculator,
+        color: 'bg-amber-100 dark:bg-amber-900/40',
+        iconColor: 'text-amber-600 dark:text-amber-400',
+      },
+      {
+        name: 'Tax Reports',
+        description: 'Tax records & exports',
+        href: '/dashboard/admin/tax',
+        icon: FileText,
+        color: 'bg-green-100 dark:bg-green-900/40',
+        iconColor: 'text-green-600 dark:text-green-400',
+      },
+      {
+        name: 'Rankings',
+        description: 'Leaderboards & awards',
+        href: '/dashboard/admin/rankings',
+        icon: Crown,
+        color: 'bg-amber-100 dark:bg-amber-900/40',
+        iconColor: 'text-amber-600 dark:text-amber-400',
+      },
+    ],
+  },
+  {
+    label: 'HR',
+    modules: [
+      {
+        name: 'HR Hub',
+        description: 'HR tools & workforce',
+        href: '/dashboard/admin/hr',
+        icon: ClipboardList,
+        color: 'bg-purple-100 dark:bg-purple-900/40',
+        iconColor: 'text-purple-600 dark:text-purple-400',
+      },
+    ],
+  },
+  {
+    label: 'Content & Comms',
+    modules: [
+      {
+        name: 'CMS',
+        description: 'Pages & site content',
+        href: '/dashboard/admin/cms',
+        icon: FileEdit,
+        color: 'bg-pink-100 dark:bg-pink-900/40',
+        iconColor: 'text-pink-600 dark:text-pink-400',
+      },
+      {
+        name: 'Gallery',
+        description: 'Media & image library',
+        href: '/dashboard/admin/gallery',
+        icon: ImageIcon,
+        color: 'bg-rose-100 dark:bg-rose-900/40',
+        iconColor: 'text-rose-600 dark:text-rose-400',
+      },
+      {
+        name: 'Channels',
+        description: 'Broadcast channels',
+        href: '/dashboard/admin/channels',
+        icon: Hash,
+        color: 'bg-violet-100 dark:bg-violet-900/40',
+        iconColor: 'text-violet-600 dark:text-violet-400',
+      },
+      {
+        name: 'Chat',
+        description: 'Team messaging',
+        href: '/dashboard/admin/chat',
+        icon: MessageSquare,
+        color: 'bg-pink-100 dark:bg-pink-900/40',
+        iconColor: 'text-pink-600 dark:text-pink-400',
+      },
+      {
+        name: 'Support Chats',
+        description: 'Client support tickets',
+        href: '/dashboard/admin/support',
+        icon: Headphones,
+        color: 'bg-rose-100 dark:bg-rose-900/40',
+        iconColor: 'text-rose-600 dark:text-rose-400',
+      },
+      {
+        name: 'Engagement',
+        description: 'Posts, feeds & social',
+        href: '/dashboard/admin/engagement',
+        icon: Newspaper,
+        color: 'bg-violet-100 dark:bg-violet-900/40',
+        iconColor: 'text-violet-600 dark:text-violet-400',
+      },
+      {
+        name: 'Newsletter',
+        description: 'Email campaigns',
+        href: '/dashboard/admin/newsletter',
+        icon: Mail,
+        color: 'bg-pink-100 dark:bg-pink-900/40',
+        iconColor: 'text-pink-600 dark:text-pink-400',
+      },
+    ],
+  },
+  {
+    label: 'System',
+    modules: [
+      {
+        name: 'Audit Logs',
+        description: 'Activity & change history',
+        href: '/dashboard/admin/audit',
+        icon: Shield,
+        color: 'bg-slate-100 dark:bg-slate-800/60',
+        iconColor: 'text-slate-600 dark:text-slate-400',
+      },
+      {
+        name: 'Referral Tracking',
+        description: 'Referral links & stats',
+        href: '/dashboard/admin/referrals',
+        icon: Share2,
+        color: 'bg-slate-100 dark:bg-slate-800/60',
+        iconColor: 'text-slate-600 dark:text-slate-400',
+      },
+      {
+        name: 'Notifications',
+        description: 'Alerts & push settings',
+        href: '/dashboard/admin/notifications',
+        icon: Bell,
+        color: 'bg-slate-100 dark:bg-slate-800/60',
+        iconColor: 'text-slate-600 dark:text-slate-400',
+      },
+    ],
+  },
+];
 
 export default function AdminDashboard() {
   const [period, setPeriod] = useState<Period>('MONTHLY');
@@ -257,10 +499,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Award Banner */}
+      {/* 1. Award Banner */}
       <AwardBanner />
 
-      {/* Quick Stats Row */}
+      {/* 2. KPI Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {mainStats.map((stat, index) => (
           <motion.div
@@ -290,7 +532,177 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* Row 1: Main Chart + Tier Donut */}
+      {/* 3. Console Module Grid */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="text-lg">Control Panel</CardTitle>
+                <p className="text-sm text-muted-foreground mt-0.5">Quick access to all modules</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-6">
+              {consoleSections.map((section) => (
+                <div key={section.label}>
+                  {/* Section divider label */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/70">
+                      {section.label}
+                    </span>
+                    <div className="flex-1 h-px bg-border/60" />
+                  </div>
+
+                  {/* Module cards */}
+                  <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {section.modules.map((mod) => (
+                      <a
+                        key={mod.href}
+                        href={mod.href}
+                        className="group relative flex items-center gap-3 rounded-xl border border-border/60 bg-background px-4 py-3.5 transition-all duration-200 hover:border-border hover:shadow-md hover:-translate-y-0.5"
+                      >
+                        {/* Icon bubble */}
+                        <div className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${mod.color}`}>
+                          <mod.icon className={`w-4.5 h-4.5 ${mod.iconColor}`} style={{ width: '18px', height: '18px' }} />
+                        </div>
+
+                        {/* Text */}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold leading-tight truncate">{mod.name}</p>
+                          <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 truncate">{mod.description}</p>
+                        </div>
+
+                        {/* Arrow on hover */}
+                        <ChevronRight className="flex-shrink-0 w-4 h-4 text-muted-foreground/40 opacity-0 -translate-x-1 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* 4. Monthly Highlights */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+        <Card className="shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-[#fca639]" />
+                Monthly Highlights
+              </CardTitle>
+              <Button variant="outline" size="sm" asChild>
+                <a href="/dashboard/admin/rankings">View All Rankings</a>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {/* Staff of the Month */}
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-5 text-white">
+                <div className="absolute top-2 right-2 opacity-20"><UserCheck className="w-16 h-16" /></div>
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Crown className="w-5 h-5 text-yellow-300" />
+                    <span className="text-sm font-medium text-blue-100">Staff of the Month</span>
+                  </div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <Avatar className="w-12 h-12 border-2 border-white/30">
+                      <AvatarFallback className="bg-white/20 text-white font-bold">
+                        {highlights.staffOfMonth.name.split(' ').filter(Boolean).map((n: string) => n[0]).join('') || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-bold">{highlights.staffOfMonth.name}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium">{highlights.staffOfMonth.achievement}</p>
+                </div>
+              </div>
+
+              {/* Realtor of the Month */}
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#0b5c46] to-[#0e7a5e] p-5 text-white">
+                <div className="absolute top-2 right-2 opacity-20"><Award className="w-16 h-16" /></div>
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Star className="w-5 h-5 text-yellow-300" />
+                    <span className="text-sm font-medium text-green-100">Realtor of the Month</span>
+                  </div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <Avatar className="w-12 h-12 border-2 border-white/30">
+                      <AvatarFallback className="bg-white/20 text-white font-bold">
+                        {highlights.realtorOfMonth.name.split(' ').filter(Boolean).map((n: string) => n[0]).join('') || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-bold">{highlights.realtorOfMonth.name}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium">{highlights.realtorOfMonth.achievement}</p>
+                </div>
+              </div>
+
+              {/* Client of the Month */}
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#fca639] to-[#e8953a] p-5 text-white">
+                <div className="absolute top-2 right-2 opacity-20"><Users className="w-16 h-16" /></div>
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Trophy className="w-5 h-5 text-yellow-200" />
+                    <span className="text-sm font-medium text-orange-100">Client of the Month</span>
+                  </div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <Avatar className="w-12 h-12 border-2 border-white/30">
+                      <AvatarFallback className="bg-white/20 text-white font-bold">
+                        {highlights.clientOfMonth.name.split(' ').filter(Boolean).map((n: string) => n[0]).join('') || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-bold text-sm">{highlights.clientOfMonth.name}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium">{highlights.clientOfMonth.achievement}</p>
+                </div>
+              </div>
+
+              {/* Highest Selling Property */}
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 p-5 text-white">
+                <div className="absolute top-2 right-2 opacity-20"><Building2 className="w-16 h-16" /></div>
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Home className="w-5 h-5 text-purple-200" />
+                    <span className="text-sm font-medium text-purple-100">Top Property Sale</span>
+                  </div>
+                  {highestSellingProperty ? (
+                    <>
+                      <div className="mb-3">
+                        <p className="font-bold text-sm leading-tight">{highestSellingProperty.name}</p>
+                        <p className="text-xs text-purple-100 mt-1">{highestSellingProperty.type} - {highestSellingProperty.location}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-2xl font-bold">{formatCurrency(highestSellingProperty.price)}</p>
+                          <p className="text-xs text-purple-100">Sale Price</p>
+                        </div>
+                        <p className="text-xs"><span className="text-purple-200">Sold by:</span> {highestSellingProperty.soldBy}</p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="py-4">
+                      <p className="text-sm">No sales data for this period</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* 5. Sales Chart + Tier Donut (Financial Analysis) */}
       <div className="grid gap-6 lg:grid-cols-3">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="lg:col-span-2">
           <Card className="shadow-sm">
@@ -489,123 +901,7 @@ export default function AdminDashboard() {
         </motion.div>
       </div>
 
-      {/* Row 2: Monthly Highlights */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <Card className="shadow-sm">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#fca639]" />
-                Monthly Highlights
-              </CardTitle>
-              <Button variant="outline" size="sm" asChild>
-                <a href="/dashboard/admin/rankings">View All Rankings</a>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {/* Staff of the Month */}
-              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-5 text-white">
-                <div className="absolute top-2 right-2 opacity-20"><UserCheck className="w-16 h-16" /></div>
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Crown className="w-5 h-5 text-yellow-300" />
-                    <span className="text-sm font-medium text-blue-100">Staff of the Month</span>
-                  </div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <Avatar className="w-12 h-12 border-2 border-white/30">
-                      <AvatarFallback className="bg-white/20 text-white font-bold">
-                        {highlights.staffOfMonth.name.split(' ').filter(Boolean).map((n: string) => n[0]).join('') || '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-bold">{highlights.staffOfMonth.name}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium">{highlights.staffOfMonth.achievement}</p>
-                </div>
-              </div>
-
-              {/* Realtor of the Month */}
-              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#0b5c46] to-[#0e7a5e] p-5 text-white">
-                <div className="absolute top-2 right-2 opacity-20"><Award className="w-16 h-16" /></div>
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Star className="w-5 h-5 text-yellow-300" />
-                    <span className="text-sm font-medium text-green-100">Realtor of the Month</span>
-                  </div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <Avatar className="w-12 h-12 border-2 border-white/30">
-                      <AvatarFallback className="bg-white/20 text-white font-bold">
-                        {highlights.realtorOfMonth.name.split(' ').filter(Boolean).map((n: string) => n[0]).join('') || '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-bold">{highlights.realtorOfMonth.name}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium">{highlights.realtorOfMonth.achievement}</p>
-                </div>
-              </div>
-
-              {/* Client of the Month */}
-              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#fca639] to-[#e8953a] p-5 text-white">
-                <div className="absolute top-2 right-2 opacity-20"><Users className="w-16 h-16" /></div>
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Trophy className="w-5 h-5 text-yellow-200" />
-                    <span className="text-sm font-medium text-orange-100">Client of the Month</span>
-                  </div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <Avatar className="w-12 h-12 border-2 border-white/30">
-                      <AvatarFallback className="bg-white/20 text-white font-bold">
-                        {highlights.clientOfMonth.name.split(' ').filter(Boolean).map((n: string) => n[0]).join('') || '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-bold text-sm">{highlights.clientOfMonth.name}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium">{highlights.clientOfMonth.achievement}</p>
-                </div>
-              </div>
-
-              {/* Highest Selling Property */}
-              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 p-5 text-white">
-                <div className="absolute top-2 right-2 opacity-20"><Building2 className="w-16 h-16" /></div>
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Home className="w-5 h-5 text-purple-200" />
-                    <span className="text-sm font-medium text-purple-100">Top Property Sale</span>
-                  </div>
-                  {highestSellingProperty ? (
-                    <>
-                      <div className="mb-3">
-                        <p className="font-bold text-sm leading-tight">{highestSellingProperty.name}</p>
-                        <p className="text-xs text-purple-100 mt-1">{highestSellingProperty.type} - {highestSellingProperty.location}</p>
-                      </div>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-2xl font-bold">{formatCurrency(highestSellingProperty.price)}</p>
-                          <p className="text-xs text-purple-100">Sale Price</p>
-                        </div>
-                        <p className="text-xs"><span className="text-purple-200">Sold by:</span> {highestSellingProperty.soldBy}</p>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="py-4">
-                      <p className="text-sm">No sales data for this period</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Row 3: Recent Sales Table */}
+      {/* 6. Recent Sales Table */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
         <Card className="shadow-sm">
           <CardHeader>
