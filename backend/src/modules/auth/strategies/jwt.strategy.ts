@@ -114,6 +114,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
+      if ((error as any)?.message?.includes('inactive')) {
+        throw new UnauthorizedException('Company account has been suspended');
+      }
       throw new UnauthorizedException('Failed to validate user');
     }
   }

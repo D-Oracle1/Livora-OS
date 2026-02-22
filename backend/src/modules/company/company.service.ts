@@ -243,12 +243,22 @@ export class CompanyService {
       throw new NotFoundException('Company not found');
     }
 
+    // If deactivating, wipe all tenant sessions first (while DB is still accessible)
+    if (company.isActive) {
+      try {
+        const tenantClient = await this.tenantPrisma.getClient(id);
+        await tenantClient.refreshToken.deleteMany({});
+      } catch (e: any) {
+        this.logger.warn(`Could not clear sessions for ${id}: ${e.message}`);
+      }
+    }
+
     const updated = await this.masterPrisma.company.update({
       where: { id },
       data: { isActive: !company.isActive },
     });
 
-    // If deactivating, disconnect tenant client
+    // If deactivating, disconnect tenant client to enforce the lockout
     if (!updated.isActive) {
       await this.tenantPrisma.disconnectTenant(id);
     }

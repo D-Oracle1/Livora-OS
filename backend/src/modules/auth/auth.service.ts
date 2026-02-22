@@ -221,6 +221,19 @@ export class AuthService {
       throw new UnauthorizedException('Account is not active');
     }
 
+    // Block login if the tenant company has been deactivated
+    if (companyId) {
+      const co = await this.masterPrisma.company.findUnique({
+        where: { id: companyId },
+        select: { isActive: true },
+      });
+      if (co && !co.isActive) {
+        throw new UnauthorizedException(
+          'This company account has been suspended. Please contact support.',
+        );
+      }
+    }
+
     // Generate referral code if user doesn't have one (legacy accounts)
     if (!user.referralCode) {
       const referralCode = `REF-${uuidv4().substring(0, 8).toUpperCase()}`;

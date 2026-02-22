@@ -38,6 +38,15 @@ export class TenantMiddleware implements NestMiddleware {
 
     // Check if this is the master domain
     if (this.isMasterDomain(domain)) {
+      // Bridge for cross-origin frontend: read X-Company-ID header
+      const headerId = req.headers['x-company-id'] as string | undefined;
+      if (headerId) {
+        const co = await this.resolveCompanyById(headerId);
+        if (co?.isActive) {
+          req.tenant = { companyId: co.id, domain: co.domain, company: co };
+          return next();
+        }
+      }
       req.tenant = { companyId: null, domain, company: null };
       return next();
     }
@@ -58,6 +67,39 @@ export class TenantMiddleware implements NestMiddleware {
     }
 
     next();
+  }
+
+  private async resolveCompanyById(id: string): Promise<any | null> {
+    const key = `id:${id}`;
+    const cached = this.cache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    try {
+      const company = await this.masterPrisma.company.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          domain: true,
+          logo: true,
+          primaryColor: true,
+          isActive: true,
+        },
+      });
+
+      this.cache.set(key, {
+        data: company,
+        expiresAt: Date.now() + this.CACHE_TTL,
+      });
+
+      return company;
+    } catch (error) {
+      this.logger.error(`Failed to resolve company by id ${id}: ${error}`);
+      return null;
+    }
   }
 
   private async resolveCompany(domain: string): Promise<any | null> {
@@ -108,10 +150,11 @@ export class TenantMiddleware implements NestMiddleware {
     return masterDomains.some((d) => domain === d || domain.startsWith(`${d}:`));
   }
 
-  /** Clear cache for a specific domain (call after company update) */
-  clearCache(domain?: string) {
-    if (domain) {
-      this.cache.delete(domain);
+  /** Clear cache for a specific domain or company id (call after company update) */
+  clearCache(domainOrId?: string) {
+    if (domainOrId) {
+      this.cache.delete(domainOrId);
+      this.cache.delete(`id:${domainOrId}`);
     } else {
       this.cache.clear();
     }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getTenantId } from '@/lib/api';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
 const STORAGE_KEY = 'cms_branding';
@@ -38,7 +39,10 @@ if (typeof window !== 'undefined') {
 
 function fetchBranding(): Promise<void> {
   if (!cache.promise) {
-    cache.promise = fetch(`${API_BASE_URL}/api/v1/cms/public/branding`)
+    const headers: HeadersInit = {};
+    const tid = getTenantId();
+    if (tid) (headers as Record<string, string>)['X-Company-ID'] = tid;
+    cache.promise = fetch(`${API_BASE_URL}/api/v1/cms/public/branding`, { headers })
       .then((r) => (r.ok ? r.json() : null))
       .then((raw) => {
         const data = raw?.data || raw;

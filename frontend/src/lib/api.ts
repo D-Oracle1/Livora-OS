@@ -2,6 +2,13 @@ import { getToken } from './auth-storage';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
 
+// -- Tenant bridge --
+// Stores the resolved company ID for cross-origin deployments where the backend
+// cannot read the tenant's custom domain from the Host header.
+let _tenantId: string | null = null;
+export function setTenantId(id: string | null) { _tenantId = id; }
+export function getTenantId(): string | null { return _tenantId; }
+
 /** Resolve a backend-relative image path (e.g. /uploads/properties/x.jpg) to a full URL */
 export function getImageUrl(path: string): string {
   if (!path) return '';
@@ -17,12 +24,16 @@ export const api = {
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(_tenantId ? { 'X-Company-ID': _tenantId } : {}),
     };
   },
 
   getAuthHeaders(): HeadersInit {
     const token = getToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(_tenantId ? { 'X-Company-ID': _tenantId } : {}),
+    };
   },
 
   async get<T = any>(endpoint: string): Promise<T> {

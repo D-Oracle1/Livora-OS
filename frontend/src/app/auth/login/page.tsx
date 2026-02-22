@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Building2, Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -9,13 +9,29 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { setAuth, clearAuth } from '@/lib/auth-storage';
-import { getImageUrl } from '@/lib/api';
+import { getImageUrl, setTenantId } from '@/lib/api';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 
 export default function LoginPage() {
   const router = useRouter();
   const branding = useBranding();
   const companyName = getCompanyName(branding);
+  // Resolve tenant ID from custom domain on mount so the X-Company-ID header
+  // is sent with the login request and subsequent API calls.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const h = window.location.hostname;
+    if (h === 'localhost' || h.endsWith('.vercel.app') || h.endsWith('.railway.app')) return;
+    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    fetch(`${base}/api/v1/companies/resolve?domain=${encodeURIComponent(h)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const co = res?.data || res;
+        if (co?.id) setTenantId(co.id);
+      })
+      .catch(() => {});
+  }, []);
+
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -29,11 +45,13 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      const loginHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      const tid = (await import('@/lib/api')).getTenantId();
+      if (tid) loginHeaders['X-Company-ID'] = tid;
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: loginHeaders,
         body: JSON.stringify({
           email: formData.email.toLowerCase().trim(),
           password: formData.password,
@@ -68,6 +86,8 @@ export default function LoginPage() {
         router.push('/dashboard/admin');
       } else if (role === 'realtor') {
         router.push('/dashboard/realtor');
+      } else if (role === 'hr') {
+        router.push('/dashboard/hr');
       } else if (role === 'staff') {
         router.push('/dashboard/staff');
       } else {

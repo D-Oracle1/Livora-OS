@@ -90,6 +90,8 @@ export default function CompaniesPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [reprovisioning, setReprovisioning] = useState(false);
   const [exportingCompany, setExportingCompany] = useState<string | null>(null);
+  const [verifyingDNS, setVerifyingDNS] = useState(false);
+  const frontendDomain = typeof window !== 'undefined' ? window.location.hostname : '';
   const [editLogoUploading, setEditLogoUploading] = useState(false);
   const [editData, setEditData] = useState({
     name: '',
@@ -354,6 +356,24 @@ export default function CompaniesPage() {
       toast.error(error.message || 'Export failed');
     } finally {
       setExportingCompany(null);
+    }
+  };
+
+  const handleVerifyDNS = async () => {
+    if (!showDetail) return;
+    setVerifyingDNS(true);
+    try {
+      const res = await api.get<any>(`/companies/resolve?domain=${encodeURIComponent(showDetail.domain)}`);
+      const co = res?.data || res;
+      if (co?.id === showDetail.id) {
+        toast.success('Domain resolves correctly — DNS is configured');
+      } else {
+        toast.warning('Domain is not yet pointing to this platform');
+      }
+    } catch {
+      toast.error('Could not verify domain');
+    } finally {
+      setVerifyingDNS(false);
     }
   };
 
@@ -904,6 +924,16 @@ export default function CompaniesPage() {
                             : 'Migrate DB'
                           }
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleVerifyDNS}
+                          disabled={verifyingDNS}
+                          title="Check if the domain is pointing to this platform"
+                        >
+                          {verifyingDNS && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                          Verify DNS
+                        </Button>
                       </div>
                     ) : (
                       <div className="flex gap-2">
@@ -1051,6 +1081,47 @@ export default function CompaniesPage() {
                           <Button variant="outline" size="sm" onClick={() => copyToClipboard(showDetail.inviteCode)}>
                             <Copy className="w-4 h-4 mr-1" /> Copy
                           </Button>
+                        </div>
+                      </div>
+
+                      {/* DNS Configuration */}
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">DNS Configuration</p>
+                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3">
+                          <p className="text-xs text-amber-700 dark:text-amber-400">
+                            Ask the client to add a DNS record so{' '}
+                            <code className="font-mono">{showDetail.domain}</code> points to this platform.
+                          </p>
+                          <div className="grid grid-cols-3 gap-3 text-xs">
+                            <div>
+                              <p className="text-muted-foreground mb-0.5">Type</p>
+                              <p className="font-mono font-semibold">CNAME</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground mb-0.5">Host / Name</p>
+                              <p className="font-mono font-semibold">@ (root)</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground mb-0.5">Points to</p>
+                              <div className="flex items-center gap-1">
+                                <p className="font-mono font-semibold truncate">{frontendDomain}</p>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 shrink-0"
+                                  onClick={() => copyToClipboard(frontendDomain)}
+                                  title="Copy"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            After DNS is set, the platform operator must also add{' '}
+                            <strong>{showDetail.domain}</strong> to the frontend Vercel project
+                            (Settings → Domains).
+                          </p>
                         </div>
                       </div>
 
