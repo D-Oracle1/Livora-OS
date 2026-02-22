@@ -5,7 +5,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "prisma generate && prisma generate --schema=prisma/master.prisma && nest build && node -e \"require('fs').cpSync('src/generated','dist/generated',{recursive:true})\"",
+    "build": "prisma generate && prisma generate --schema=prisma/master.prisma && prisma db push --schema=prisma/master.prisma --skip-generate && nest build && node -e \"require('fs').cpSync('src/generated','dist/generated',{recursive:true})\"",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
