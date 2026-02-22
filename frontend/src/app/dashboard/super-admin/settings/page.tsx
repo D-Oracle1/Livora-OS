@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { api, getImageUrl } from '@/lib/api';
 import { getUser, updateUser, getToken } from '@/lib/auth-storage';
-import { invalidatePlatformBranding } from '@/hooks/use-platform-branding';
+import { invalidatePlatformBranding, usePlatformBranding } from '@/hooks/use-platform-branding';
 
 type Tab = 'profile' | 'branding' | 'cms' | 'security';
 
@@ -196,16 +196,25 @@ export default function SuperAdminSettings() {
     { id: 'security', label: 'Security', icon: Shield },
   ];
 
+  // Saved platform branding — used as fallback before the user edits the color field
+  const savedPlatformBranding = usePlatformBranding();
+
+  // Live accent color: the current (possibly unsaved) primaryColor value so the
+  // page gives an immediate preview as the user adjusts the color picker.
+  const accentColor = branding.primaryColor || savedPlatformBranding.primaryColor || '#f59e0b';
+  const accentStyle = { color: accentColor } as React.CSSProperties;
+  const accentBtnStyle = { backgroundColor: accentColor, borderColor: accentColor } as React.CSSProperties;
+
   const inputCls = 'bg-slate-900/60 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-amber-500/40';
   const labelCls = 'text-sm font-medium text-slate-300 block mb-1.5';
-  const sectionTitle = 'text-xs font-bold text-amber-400 uppercase tracking-widest mb-3';
+  const sectionTitle = 'text-xs font-bold uppercase tracking-widest mb-3';
 
   return (
     <div className="max-w-3xl space-y-6 pb-12">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Crown className="w-6 h-6 text-amber-400" /> Platform Settings
+          <Crown className="w-6 h-6" style={accentStyle} /> Platform Settings
         </h1>
         <p className="text-slate-400 text-sm mt-1">Manage your profile, platform identity, and CMS content</p>
       </div>
@@ -218,9 +227,10 @@ export default function SuperAdminSettings() {
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               activeTab === tab.id
-                ? 'bg-amber-500 text-slate-900 shadow'
+                ? 'text-slate-900 shadow'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
             }`}
+            style={activeTab === tab.id ? accentBtnStyle : {}}
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
@@ -242,8 +252,11 @@ export default function SuperAdminSettings() {
                   {avatar ? (
                     <img src={getImageUrl(avatar)} alt="avatar" className="w-20 h-20 rounded-full object-cover border-2 border-slate-600" />
                   ) : (
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-500/30 to-amber-600/20 border-2 border-amber-500/30 flex items-center justify-center">
-                      <User className="w-8 h-8 text-amber-400" />
+                    <div
+                      style={{ backgroundColor: `${accentColor}33`, borderColor: `${accentColor}4d` }}
+                      className="w-20 h-20 rounded-full border-2 flex items-center justify-center"
+                    >
+                      <User className="w-8 h-8" style={accentStyle} />
                     </div>
                   )}
                   {avatar && (
@@ -291,7 +304,7 @@ export default function SuperAdminSettings() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleSaveProfile} disabled={profileLoading} className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold">
+                <Button onClick={handleSaveProfile} disabled={profileLoading} style={accentBtnStyle} className="hover:opacity-90 text-slate-900 font-semibold">
                   {profileLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                   Save Profile
                 </Button>
@@ -311,7 +324,7 @@ export default function SuperAdminSettings() {
           <CardContent className="space-y-6">
             {/* Logo */}
             <div>
-              <p className={sectionTitle}>Platform Logo</p>
+              <p className={sectionTitle} style={accentStyle}>Platform Logo</p>
               <div className="flex items-center gap-5">
                 {branding.logo ? (
                   <div className="relative">
@@ -360,7 +373,7 @@ export default function SuperAdminSettings() {
             </div>
 
             <div className="flex justify-end pt-2">
-              <Button onClick={handleSaveBranding} disabled={brandingLoading} className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold">
+              <Button onClick={handleSaveBranding} disabled={brandingLoading} style={accentBtnStyle} className="hover:opacity-90 text-slate-900 font-semibold">
                 {brandingLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                 Save Branding
               </Button>
@@ -379,7 +392,7 @@ export default function SuperAdminSettings() {
           <CardContent className="space-y-6">
             {/* Hero */}
             <div>
-              <p className={sectionTitle}>Hero Section</p>
+              <p className={sectionTitle} style={accentStyle}>Hero Section</p>
               <div className="space-y-4">
                 <div>
                   <label className={labelCls}>Hero Title</label>
@@ -394,13 +407,13 @@ export default function SuperAdminSettings() {
 
             {/* About */}
             <div>
-              <p className={sectionTitle}>About / Description</p>
+              <p className={sectionTitle} style={accentStyle}>About / Description</p>
               <Textarea rows={4} value={cms.aboutText} onChange={e => setCms(c => ({ ...c, aboutText: e.target.value }))} className={`${inputCls} resize-none`} placeholder="Brief description of the RMS platform..." />
             </div>
 
             {/* Contact */}
             <div>
-              <p className={sectionTitle}>Contact & Support</p>
+              <p className={sectionTitle} style={accentStyle}>Contact & Support</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Contact Email</label>
@@ -423,7 +436,7 @@ export default function SuperAdminSettings() {
 
             {/* Social */}
             <div>
-              <p className={sectionTitle}>Social Links</p>
+              <p className={sectionTitle} style={accentStyle}>Social Links</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className={labelCls}>Twitter / X</label>
@@ -441,7 +454,7 @@ export default function SuperAdminSettings() {
             </div>
 
             <div className="flex justify-end pt-2">
-              <Button onClick={handleSaveCms} disabled={cmsLoading} className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold">
+              <Button onClick={handleSaveCms} disabled={cmsLoading} style={accentBtnStyle} className="hover:opacity-90 text-slate-900 font-semibold">
                 {cmsLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                 Save CMS Content
               </Button>
@@ -456,7 +469,7 @@ export default function SuperAdminSettings() {
           <Card className="bg-slate-800/50 border-slate-700/50">
             <CardHeader className="pb-4">
               <CardTitle className="text-white text-base flex items-center gap-2">
-                <Lock className="w-4 h-4 text-amber-400" /> Change Password
+                <Lock className="w-4 h-4" style={accentStyle} /> Change Password
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -515,7 +528,7 @@ export default function SuperAdminSettings() {
                 </p>
               )}
               <div className="flex justify-end pt-1">
-                <Button onClick={handleChangePassword} disabled={passwordLoading || !passwords.current || passwords.newPass !== passwords.confirm || passwords.newPass.length < 8} className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold">
+                <Button onClick={handleChangePassword} disabled={passwordLoading || !passwords.current || passwords.newPass !== passwords.confirm || passwords.newPass.length < 8} style={accentBtnStyle} className="hover:opacity-90 text-slate-900 font-semibold">
                   {passwordLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Lock className="w-4 h-4 mr-2" />}
                   Update Password
                 </Button>
@@ -529,12 +542,12 @@ export default function SuperAdminSettings() {
             </CardHeader>
             <CardContent className="space-y-3">
               {[
-                { label: 'Role', value: 'Super Administrator', icon: Crown, color: 'text-amber-400' },
-                { label: 'Session', value: 'JWT authenticated', icon: Shield, color: 'text-green-400' },
+                { label: 'Role', value: 'Super Administrator', icon: Crown, color: accentColor },
+                { label: 'Session', value: 'JWT authenticated', icon: Shield, color: '#4ade80' },
               ].map(item => (
                 <div key={item.label} className="flex items-center justify-between py-2 border-b border-slate-700/40 last:border-0">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
-                    <item.icon className={`w-4 h-4 ${item.color}`} />
+                    <item.icon className="w-4 h-4" style={{ color: item.color }} />
                     {item.label}
                   </div>
                   <span className="text-sm text-slate-200">{item.value}</span>

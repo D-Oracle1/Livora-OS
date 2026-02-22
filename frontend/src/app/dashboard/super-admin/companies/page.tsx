@@ -140,6 +140,15 @@ export default function CompaniesPage() {
     fetchCompanies();
   }, [fetchCompanies]);
 
+  // Reset edit state whenever a different company is opened in the detail modal
+  useEffect(() => {
+    if (showDetail) {
+      setEditMode(false);
+      setDetailTab('info');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDetail?.id]);
+
   const autoSlug = (name: string) => {
     return name
       .toLowerCase()

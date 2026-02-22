@@ -257,6 +257,8 @@ export function Sidebar({
   const tenantBranding = useBranding();
   const platformBranding = usePlatformBranding();
   const branding = role === 'super-admin' ? {} : tenantBranding;
+  // Dynamic accent color for super-admin — driven by saved platform branding
+  const saColor = role === 'super-admin' ? (platformBranding.primaryColor || '#f59e0b') : '#f59e0b';
 
   const [currentUser, setCurrentUser] = useState<{
     firstName: string;
@@ -382,8 +384,11 @@ export function Sidebar({
                   className="w-9 h-9 rounded-xl object-contain shrink-0 bg-slate-800"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 flex items-center justify-center shrink-0">
-                  <Crown className="w-5 h-5 text-amber-400" />
+                <div
+                  style={{ backgroundColor: `${saColor}26`, borderColor: `${saColor}4d` }}
+                  className="w-9 h-9 rounded-xl border flex items-center justify-center shrink-0"
+                >
+                  <Crown className="w-5 h-5" style={{ color: saColor }} />
                 </div>
               )
             ) : branding.logo ? (
@@ -410,7 +415,7 @@ export function Sidebar({
                     : getShortName(branding)}
                 </span>
                 {role === 'super-admin' && (
-                  <span className="text-[10px] text-amber-400/80 font-medium tracking-wide uppercase">
+                  <span className="text-[10px] font-medium tracking-wide uppercase" style={{ color: `${saColor}cc` }}>
                     Super Admin
                   </span>
                 )}
@@ -458,19 +463,15 @@ export function Sidebar({
           )}
         >
           <Avatar
-            className={cn(
-              'w-10 h-10 shrink-0 ring-2',
-              role === 'super-admin' ? 'ring-amber-500/30' : 'ring-primary/20',
-            )}
+            className="w-10 h-10 shrink-0 ring-2"
+            style={{ '--tw-ring-color': role === 'super-admin' ? `${saColor}4d` : undefined } as React.CSSProperties}
           >
             {currentUser?.avatar && (
               <AvatarImage src={getImageUrl(currentUser.avatar)} alt={userName} />
             )}
             <AvatarFallback
-              className={cn(
-                'text-white text-sm font-semibold',
-                role === 'super-admin' ? 'bg-amber-600' : 'bg-primary',
-              )}
+              className="text-white text-sm font-semibold"
+              style={{ backgroundColor: role === 'super-admin' ? saColor : undefined }}
             >
               {userInitials}
             </AvatarFallback>
@@ -589,30 +590,27 @@ export function Sidebar({
                         collapsed ? 'justify-center px-2 py-3' : 'px-3 py-2.5',
                         role === 'super-admin'
                           ? active
-                            ? 'bg-amber-500/15 text-amber-400'
+                            ? ''
                             : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                           : active
                             ? 'bg-primary/10 text-primary dark:bg-primary/15'
                             : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',
                       )}
+                      style={role === 'super-admin' && active
+                        ? { backgroundColor: `${saColor}26`, color: saColor }
+                        : {}}
                     >
                       {active && !collapsed && (
                         <span
-                          className={cn(
-                            'absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full',
-                            role === 'super-admin' ? 'bg-amber-400' : 'bg-primary',
-                          )}
+                          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full"
+                          style={role === 'super-admin'
+                            ? { backgroundColor: saColor }
+                            : { backgroundColor: 'hsl(var(--primary))' }}
                         />
                       )}
                       <item.icon
-                        className={cn(
-                          'w-5 h-5 shrink-0',
-                          active
-                            ? role === 'super-admin'
-                              ? 'text-amber-400'
-                              : 'text-primary'
-                            : '',
-                        )}
+                        className="w-5 h-5 shrink-0"
+                        style={active && role === 'super-admin' ? { color: saColor } : {}}
                       />
                       {!collapsed && <span>{item.name}</span>}
                     </Link>
