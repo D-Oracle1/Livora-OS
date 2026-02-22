@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { MasterPrismaService } from '../../database/master-prisma.service';
@@ -56,6 +57,13 @@ export class CompanyService {
     });
 
     this.logger.log(`Company created: ${company.name} (${company.slug})`);
+
+    // Seed branding into the tenant DB CMS so useBranding() picks it up immediately
+    await this.syncBrandingToTenant(company.id, {
+      name: company.name,
+      logo: company.logo || undefined,
+      primaryColor: company.primaryColor || undefined,
+    });
 
     // Return company without databaseUrl for security
     const { databaseUrl: _, ...safeCompany } = company;
@@ -183,7 +191,47 @@ export class CompanyService {
       },
     });
 
+    // Sync branding changes to the tenant DB CMS so the tenant frontend reflects updates
+    if (dto.name || dto.logo !== undefined || dto.primaryColor) {
+      await this.syncBrandingToTenant(id, {
+        name: dto.name,
+        logo: dto.logo,
+        primaryColor: dto.primaryColor,
+      });
+    }
+
     return updated;
+  }
+
+  /**
+   * Syncs name/logo/primaryColor into the tenant DB CMS branding settings.
+   * This ensures useBranding() on the tenant frontend picks up master-dashboard changes.
+   */
+  private async syncBrandingToTenant(
+    companyId: string,
+    branding: { name?: string; logo?: string; primaryColor?: string },
+  ): Promise<void> {
+    try {
+      const client = await this.tenantPrisma.getClient(companyId);
+      const existing = await client.systemSetting.findUnique({
+        where: { key: 'cms_branding' },
+      });
+      const current: Record<string, any> = existing ? (existing.value as any) : {};
+      const merged: Record<string, any> = { ...current };
+      if (branding.name) merged.companyName = branding.name;
+      if (branding.logo !== undefined) merged.logo = branding.logo;
+      if (branding.primaryColor) merged.primaryColor = branding.primaryColor;
+
+      await client.systemSetting.upsert({
+        where: { key: 'cms_branding' },
+        create: { key: 'cms_branding', value: merged },
+        update: { value: merged },
+      });
+      this.logger.debug(`Branding synced to tenant DB: ${companyId}`);
+    } catch (e: any) {
+      // Non-critical — log a warning but don't fail the main operation
+      this.logger.warn(`Branding sync skipped (${companyId}): ${e.message}`);
+    }
   }
 
   async toggleActive(id: string) {
@@ -340,6 +388,219 @@ export class CompanyService {
         revenue: 0,
       };
     }
+  }
+
+  async registerExisting(dto: {
+    name: string;
+    slug: string;
+    domain: string;
+    databaseUrl: string;
+    logo?: string;
+    primaryColor?: string;
+    maxUsers?: number;
+  }) {
+    const existingSlug = await this.masterPrisma.company.findUnique({ where: { slug: dto.slug } });
+    if (existingSlug) throw new ConflictException('Company slug already in use');
+
+    const existingDomain = await this.masterPrisma.company.findUnique({ where: { domain: dto.domain } });
+    if (existingDomain) throw new ConflictException('Domain already in use');
+
+    const inviteCode = this.generateInviteCode();
+    const company = await this.masterPrisma.company.create({
+      data: {
+        name: dto.name,
+        slug: dto.slug,
+        domain: dto.domain,
+        databaseUrl: dto.databaseUrl,
+        logo: dto.logo,
+        primaryColor: dto.primaryColor || '#3b82f6',
+        inviteCode,
+        maxUsers: dto.maxUsers || 50,
+      },
+    });
+
+    const { databaseUrl: _, ...safeCompany } = company;
+    return safeCompany;
+  }
+
+  async getCompanyUsers(
+    companyId: string,
+    query: { page?: number; limit?: number },
+  ) {
+    const company = await this.masterPrisma.company.findUnique({
+      where: { id: companyId },
+    });
+    if (!company) throw new NotFoundException('Company not found');
+
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    try {
+      const client = await this.tenantPrisma.getClient(companyId);
+      const [users, total] = await Promise.all([
+        client.user.findMany({
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+            status: true,
+            createdAt: true,
+          },
+        }),
+        client.user.count(),
+      ]);
+      return {
+        data: users,
+        meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      };
+    } catch {
+      return { data: [], meta: { page, limit, total: 0, totalPages: 0 } };
+    }
+  }
+
+  async assignUserRole(companyId: string, userId: string, role: string) {
+    const allowedRoles = ['ADMIN', 'REALTOR', 'CLIENT', 'STAFF', 'GENERAL_OVERSEER'];
+    if (!allowedRoles.includes(role)) {
+      throw new BadRequestException(`Invalid role. Allowed: ${allowedRoles.join(', ')}`);
+    }
+
+    const company = await this.masterPrisma.company.findUnique({
+      where: { id: companyId },
+    });
+    if (!company) throw new NotFoundException('Company not found');
+
+    try {
+      const client = await this.tenantPrisma.getClient(companyId);
+      const updated = await client.user.update({
+        where: { id: userId },
+        data: { role: role as any },
+        select: { id: true, firstName: true, lastName: true, email: true, role: true },
+      });
+      return updated;
+    } catch {
+      throw new NotFoundException('User not found in this company');
+    }
+  }
+
+  async reprovisionTenant(id: string) {
+    const company = await this.masterPrisma.company.findUnique({ where: { id }, select: { id: true, slug: true } });
+    if (!company) throw new NotFoundException('Company not found');
+    await this.tenantPrisma.provisionDatabase(company.slug);
+    return { message: `Tenant schema for "${company.slug}" has been migrated successfully` };
+  }
+
+  async exportTenantData(companyId: string): Promise<{ buffer: Buffer; filename: string }> {
+    const company = await this.masterPrisma.company.findUnique({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Company not found');
+
+    const client = await this.tenantPrisma.getClient(companyId);
+
+    const [users, staff, clients, realtors, properties, sales, commissions] = await Promise.all([
+      client.user.findMany({
+        select: { id: true, email: true, firstName: true, lastName: true, phone: true, role: true, status: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      client.staffProfile.findMany({
+        include: { user: { select: { email: true, firstName: true, lastName: true, phone: true, status: true } }, department: { select: { name: true } } },
+        orderBy: { createdAt: 'asc' },
+      }),
+      client.clientProfile.findMany({
+        include: {
+          user: { select: { email: true, firstName: true, lastName: true, phone: true, status: true } },
+          realtor: { include: { user: { select: { firstName: true, lastName: true, email: true } } } },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      client.realtorProfile.findMany({
+        include: { user: { select: { email: true, firstName: true, lastName: true, phone: true, status: true } } },
+        orderBy: { createdAt: 'asc' },
+      }),
+      client.property.findMany({
+        select: { title: true, type: true, status: true, price: true, address: true, city: true, state: true, country: true, bedrooms: true, bathrooms: true, area: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      }).catch(() => []),
+      client.sale.findMany({
+        include: {
+          property: { select: { title: true } },
+          client: { include: { user: { select: { firstName: true, lastName: true, email: true } } } },
+          realtor: { include: { user: { select: { firstName: true, lastName: true, email: true } } } },
+        },
+        orderBy: { createdAt: 'asc' },
+      }).catch(() => []),
+      client.commission.findMany({
+        include: {
+          realtor: { include: { user: { select: { firstName: true, lastName: true, email: true } } } },
+        },
+        orderBy: { createdAt: 'asc' },
+      }).catch(() => []),
+    ]);
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'RMS Platform';
+    workbook.created = new Date();
+
+    const addSheet = (name: string, headers: string[], rows: any[][]) => {
+      const sheet = workbook.addWorksheet(name);
+      sheet.addRow(headers);
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1e40af' } };
+      headerRow.alignment = { vertical: 'middle' };
+      sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
+      sheet.views = [{ state: 'frozen', ySplit: 1 }];
+      headers.forEach((_, i) => { sheet.getColumn(i + 1).width = 22; });
+      rows.forEach(r => sheet.addRow(r));
+    };
+
+    const fmt = (d: any) => d ? new Date(d).toISOString().split('T')[0] : '';
+    const name = (u: any) => u ? `${u.firstName} ${u.lastName}` : '';
+
+    addSheet('Users',
+      ['ID', 'Email', 'First Name', 'Last Name', 'Phone', 'Role', 'Status', 'Created'],
+      users.map(u => [u.id, u.email, u.firstName, u.lastName, u.phone ?? '', u.role, u.status, fmt(u.createdAt)]),
+    );
+
+    addSheet('Staff',
+      ['Employee ID', 'Name', 'Email', 'Phone', 'Position', 'Job Title', 'Department', 'Type', 'Salary', 'Currency', 'Hire Date', 'Status'],
+      staff.map(s => [s.employeeId, name(s.user), s.user?.email ?? '', s.user?.phone ?? '', s.position, s.title, s.department?.name ?? '', s.employmentType, Number(s.baseSalary), s.currency, fmt(s.hireDate), s.user?.status ?? '']),
+    );
+
+    addSheet('Clients',
+      ['Name', 'Email', 'Phone', 'Status', 'Assigned Realtor', 'Realtor Email', 'Total Purchase Value', 'Properties'],
+      clients.map(c => [name(c.user), c.user?.email ?? '', c.user?.phone ?? '', c.user?.status ?? '', name(c.realtor?.user), c.realtor?.user?.email ?? '', Number(c.totalPurchaseValue), 0]),
+    );
+
+    addSheet('Realtors',
+      ['Name', 'Email', 'Phone', 'Status', 'License No.', 'Agency', 'Specializations', 'Loyalty Tier', 'Total Sales', 'Total Commission'],
+      realtors.map(r => [name(r.user), r.user?.email ?? '', r.user?.phone ?? '', r.user?.status ?? '', r.licenseNumber, r.agency ?? '', (r.specializations as string[])?.join(', ') ?? '', r.loyaltyTier, r.totalSales, Number(r.totalCommission)]),
+    );
+
+    addSheet('Properties',
+      ['Title', 'Type', 'Status', 'Price', 'Address', 'City', 'State', 'Country', 'Beds', 'Baths', 'Area (sqft)', 'Listed Date'],
+      (properties as any[]).map(p => [p.title, p.type, p.status, Number(p.price), p.address ?? '', p.city ?? '', p.state ?? '', p.country ?? '', p.bedrooms ?? '', p.bathrooms ?? '', p.area ?? '', fmt(p.createdAt)]),
+    );
+
+    addSheet('Sales',
+      ['Date', 'Property', 'Client', 'Client Email', 'Realtor', 'Realtor Email', 'Sale Price', 'Status'],
+      (sales as any[]).map(s => [fmt(s.saleDate ?? s.createdAt), s.property?.title ?? '', name(s.client?.user), s.client?.user?.email ?? '', name(s.realtor?.user), s.realtor?.user?.email ?? '', Number(s.salePrice), s.status]),
+    );
+
+    addSheet('Commissions',
+      ['Realtor', 'Realtor Email', 'Amount', 'Rate (%)', 'Status', 'Paid At'],
+      (commissions as any[]).map(c => [name(c.realtor?.user), c.realtor?.user?.email ?? '', Number(c.amount), Number(c.rate ?? 0), c.status, fmt(c.paidAt)]),
+    );
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const filename = `${company.slug}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+    return { buffer: buffer as Buffer, filename };
   }
 
   private generateInviteCode(): string {

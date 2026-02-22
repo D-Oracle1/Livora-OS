@@ -19,6 +19,10 @@ import {
   Download,
   RefreshCw,
   Loader2,
+  KeyRound,
+  Upload,
+  FileSpreadsheet,
+  Copy,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +47,7 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { getToken } from '@/lib/auth-storage';
 
 interface ClientData {
   id: string;
@@ -110,6 +115,20 @@ export default function ClientsPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
+
+  // Reset password
+  const [resetPwdOpen, setResetPwdOpen] = useState(false);
+  const [resetPwdTarget, setResetPwdTarget] = useState<{ userId: string; name: string } | null>(null);
+  const [resetMode, setResetMode] = useState<'generate' | 'custom'>('generate');
+  const [resetPwdValue, setResetPwdValue] = useState('');
+  const [resetPwdResult, setResetPwdResult] = useState<string | null>(null);
+  const [resetPwdLoading, setResetPwdLoading] = useState(false);
+
+  // Bulk import
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState<any | null>(null);
   const [meta, setMeta] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
   const [formData, setFormData] = useState<ClientFormData>({
     firstName: '',
@@ -282,6 +301,80 @@ export default function ClientsPage() {
     setViewDialogOpen(true);
   };
 
+  const openResetPassword = (client: ClientData) => {
+    setResetPwdTarget({ userId: client.userId, name: `${client.user.firstName} ${client.user.lastName}` });
+    setResetMode('generate');
+    setResetPwdValue('');
+    setResetPwdResult(null);
+    setResetPwdOpen(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPwdTarget) return;
+    if (resetMode === 'custom' && resetPwdValue.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    setResetPwdLoading(true);
+    try {
+      const body: any = {};
+      if (resetMode === 'custom') body.newPassword = resetPwdValue;
+      const res = await api.patch<any>(`/admin/users/${resetPwdTarget.userId}/reset-password`, body);
+      const data = res.data || res;
+      setResetPwdResult(data.temporaryPassword || 'done');
+      toast.success('Password reset successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reset password');
+    } finally {
+      setResetPwdLoading(false);
+    }
+  };
+
+  const handleDownloadClientTemplate = async () => {
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const res = await fetch(`${base}/api/v1/clients/import-template`, {
+        headers: { Authorization: `Bearer ${getToken() || ''}` },
+      });
+      if (!res.ok) throw new Error('Failed to download template');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'client-import-template.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download template');
+    }
+  };
+
+  const handleBulkImportClients = async () => {
+    if (!importFile) { toast.error('Please select a file first'); return; }
+    setImporting(true);
+    setImportResults(null);
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const form = new FormData();
+      form.append('file', importFile);
+      const res = await fetch(`${base}/api/v1/clients/bulk-import`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken() || ''}` },
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Import failed');
+      const result = data.data || data;
+      setImportResults(result);
+      if (result.created > 0) { toast.success(`Import complete: ${result.created} created`); fetchClients(); }
+      else { toast.info('Import complete: no new records created'); }
+    } catch (error: any) {
+      toast.error(error.message || 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleExportCSV = () => {
     const headers = ['Name', 'Email', 'Phone', 'Properties', 'Portfolio Value', 'Assigned Realtor', 'Status'];
     const csvContent = [
@@ -385,6 +478,10 @@ export default function ClientsPage() {
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </Button>
+              <Button variant="outline" size="sm" onClick={() => { setImportFile(null); setImportResults(null); setImportOpen(true); }}>
+                <Upload className="w-4 h-4 mr-2" />
+                Import
+              </Button>
               <Button onClick={() => setAddDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Client
@@ -462,6 +559,10 @@ export default function ClientsPage() {
                               <Edit className="w-4 h-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openResetPassword(client)}>
+                              <KeyRound className="w-4 h-4 mr-2" />
+                              Reset Password
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleToggleStatus(client)}>
                               {client.user.status === 'ACTIVE' ? (
@@ -501,6 +602,120 @@ export default function ClientsPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={resetPwdOpen} onOpenChange={(open) => { setResetPwdOpen(open); if (!open) setResetPwdResult(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {resetPwdTarget && (
+              <p className="text-sm text-muted-foreground">Resetting password for <span className="font-medium text-foreground">{resetPwdTarget.name}</span></p>
+            )}
+            {!resetPwdResult ? (
+              <>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setResetMode('generate')} className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${resetMode === 'generate' ? 'bg-primary text-white border-primary' : 'border-gray-200 dark:border-gray-700 hover:bg-muted'}`}>Auto-generate</button>
+                  <button type="button" onClick={() => setResetMode('custom')} className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${resetMode === 'custom' ? 'bg-primary text-white border-primary' : 'border-gray-200 dark:border-gray-700 hover:bg-muted'}`}>Set custom</button>
+                </div>
+                {resetMode === 'custom' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password *</Label>
+                    <Input id="new-password" type="password" placeholder="Min. 8 characters" value={resetPwdValue} onChange={(e) => setResetPwdValue(e.target.value)} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg space-y-2">
+                {resetPwdResult !== 'done' ? (
+                  <>
+                    <p className="text-sm font-medium text-green-700 dark:text-green-400">Temporary password generated:</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-white dark:bg-gray-800 px-3 py-2 rounded border text-sm font-mono">{resetPwdResult}</code>
+                      <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => { navigator.clipboard.writeText(resetPwdResult!); toast.success('Copied!'); }}>
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm font-medium text-green-700 dark:text-green-400">Password reset successfully.</p>
+                )}
+                <p className="text-xs text-muted-foreground">User will need to log in again.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetPwdOpen(false); setResetPwdResult(null); }}>{resetPwdResult ? 'Close' : 'Cancel'}</Button>
+            {!resetPwdResult && (
+              <Button onClick={handleResetPassword} disabled={resetPwdLoading}>
+                {resetPwdLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Reset Password
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Import Dialog */}
+      <Dialog open={importOpen} onOpenChange={(open) => { setImportOpen(open); if (!open) { setImportFile(null); setImportResults(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bulk Import Clients</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-700 dark:text-blue-400 mb-2">Download the template, fill in client data, then upload.</p>
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadClientTemplate}>
+                <Download className="w-4 h-4" />
+                Download Template
+              </Button>
+            </div>
+            <div>
+              <Label className="mb-2 block">Upload File (.xlsx, .xls, .csv)</Label>
+              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-primary transition-colors bg-gray-50 dark:bg-gray-800">
+                <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResults(null); }} />
+                {importFile ? (
+                  <div className="text-center px-4">
+                    <FileSpreadsheet className="w-8 h-8 mx-auto mb-1 text-green-600" />
+                    <p className="text-sm font-medium truncate max-w-[200px]">{importFile.name}</p>
+                    <p className="text-xs text-muted-foreground">{(importFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Upload className="w-8 h-8 mx-auto mb-1 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Click to select or drag & drop</p>
+                    <p className="text-xs text-muted-foreground">.xlsx, .xls, .csv</p>
+                  </div>
+                )}
+              </label>
+            </div>
+            {importResults && (
+              <div className="space-y-2">
+                <div className="flex gap-4 text-sm">
+                  <span className="text-green-600 font-medium">{importResults.created} created</span>
+                  <span className="text-yellow-600 font-medium">{importResults.skipped} skipped</span>
+                  <span className="text-red-600 font-medium">{importResults.errors?.length || 0} errors</span>
+                </div>
+                {importResults.errors?.length > 0 && (
+                  <div className="max-h-32 overflow-y-auto border rounded-lg divide-y text-xs">
+                    {importResults.errors.map((err: any, i: number) => (
+                      <div key={i} className="px-3 py-1.5 text-red-600">Row {err.row}: {err.email} — {err.reason}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setImportOpen(false); setImportFile(null); setImportResults(null); }}>Close</Button>
+            <Button onClick={handleBulkImportClients} disabled={!importFile || importing}>
+              {importing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Client Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>

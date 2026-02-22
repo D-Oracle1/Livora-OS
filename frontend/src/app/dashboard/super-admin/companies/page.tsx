@@ -20,6 +20,7 @@ import {
   List,
   Pencil,
   Save,
+  Download,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -88,6 +89,7 @@ export default function CompaniesPage() {
   const [editMode, setEditMode] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [reprovisioning, setReprovisioning] = useState(false);
+  const [exportingCompany, setExportingCompany] = useState<string | null>(null);
   const [editLogoUploading, setEditLogoUploading] = useState(false);
   const [editData, setEditData] = useState({
     name: '',
@@ -332,6 +334,29 @@ export default function CompaniesPage() {
     }
   }, [detailTab, showDetail, fetchTenantUsers]);
 
+  const handleExportTenant = async (company: Company) => {
+    setExportingCompany(company.id);
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const res = await fetch(`${base}/api/v1/companies/${company.id}/export`, {
+        headers: { Authorization: `Bearer ${getToken() || ''}` },
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${company.slug}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Export downloaded');
+    } catch (error: any) {
+      toast.error(error.message || 'Export failed');
+    } finally {
+      setExportingCompany(null);
+    }
+  };
+
   const handleAssignRole = async (userId: string, newRole: string) => {
     if (!showDetail) return;
     setAssigningRole(userId);
@@ -463,6 +488,9 @@ export default function CompaniesPage() {
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRegenerateInvite(company)} title="Regenerate invite code">
                         <RotateCcw className="w-4 h-4" />
                       </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleExportTenant(company)} title="Export tenant data" disabled={exportingCompany === company.id}>
+                        {exportingCompany === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -530,6 +558,9 @@ export default function CompaniesPage() {
                   </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRegenerateInvite(company)} title="Regenerate invite code">
                     <RotateCcw className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleExportTenant(company)} title="Export tenant data" disabled={exportingCompany === company.id}>
+                    {exportingCompany === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   </Button>
                 </div>
               </CardContent>

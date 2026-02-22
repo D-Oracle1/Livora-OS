@@ -405,6 +405,18 @@ export class AuthService {
     return { message: 'Password changed successfully' };
   }
 
+  /**
+   * Admin-initiated password reset — no current password required.
+   * Invalidates all active refresh tokens to force a re-login.
+   */
+  async adminResetPassword(userId: string, newPassword: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) throw new BadRequestException('User not found');
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({ where: { id: userId }, data: { password: hashedPassword } });
+    await this.prisma.refreshToken.deleteMany({ where: { userId } }).catch(() => {});
+  }
+
   async updateProfile(userId: string, updateDto: UpdateUserDto) {
     const data: any = {};
     if (updateDto.firstName) data.firstName = updateDto.firstName;
@@ -623,6 +635,17 @@ export class AuthService {
           userId: user.id,
         },
       });
+      // Auto-subscribe new clients to newsletter
+      try {
+        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || undefined;
+        await prismaClient.newsletterSubscriber.upsert({
+          where: { email: user.email },
+          update: { isActive: true, name: fullName },
+          create: { email: user.email, name: fullName },
+        });
+      } catch {
+        // Don't fail registration if newsletter subscribe fails
+      }
     } else if (user.role === UserRole.ADMIN || user.role === UserRole.GENERAL_OVERSEER) {
       await prismaClient.adminProfile.create({
         data: {

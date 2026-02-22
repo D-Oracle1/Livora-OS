@@ -2,12 +2,16 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Param,
   Query,
+  Body,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { AuthService } from '../auth/auth.service';
+import { AdminResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -24,6 +28,7 @@ import * as bcrypt from 'bcryptjs';
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
+    private readonly authService: AuthService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -117,6 +122,30 @@ export class AdminController {
   @ApiResponse({ status: 200, description: 'Recent sales' })
   async getRecentSalesFeed(@Query('limit') limit?: number) {
     return this.adminService.getRecentSalesFeed(limit);
+  }
+
+  @Patch('users/:userId/reset-password')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Admin reset of any user password' })
+  @ApiResponse({ status: 200, description: 'Password reset. Returns temporaryPassword if auto-generated.' })
+  async resetUserPassword(
+    @Param('userId') userId: string,
+    @Body() dto: AdminResetPasswordDto,
+  ) {
+    let password = dto.newPassword?.trim();
+    let generated = false;
+    if (!password) {
+      // Generate a strong random password
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#';
+      password = Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      generated = true;
+    }
+    await this.authService.adminResetPassword(userId, password);
+    return {
+      success: true,
+      message: 'Password reset successfully. User will need to log in again.',
+      ...(generated ? { temporaryPassword: password } : {}),
+    };
   }
 
   @Get('analytics')

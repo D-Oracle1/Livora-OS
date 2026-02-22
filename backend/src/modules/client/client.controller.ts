@@ -7,7 +7,13 @@ import {
   Body,
   Query,
   UseGuards,
+  BadRequestException,
+  UseInterceptors,
+  UploadedFile,
+  Res,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ClientService } from './client.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -15,6 +21,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
+import { BulkImportService } from '../upload/bulk-import.service';
+import { Response } from 'express';
 
 @ApiTags('Clients')
 @Controller('clients')
@@ -24,6 +32,7 @@ export class ClientController {
   constructor(
     private readonly clientService: ClientService,
     private readonly prisma: PrismaService,
+    private readonly bulkImportService: BulkImportService,
   ) {}
 
   @Get()
@@ -64,6 +73,40 @@ export class ClientController {
     @Query('year') year?: number,
   ) {
     return this.clientService.getDashboard(userId, period, month, year);
+  }
+
+  @Get('import-template')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Download client import Excel template' })
+  async getImportTemplate(@Res() res: Response) {
+    const buffer = await this.bulkImportService.generateTemplate('client');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="client-import-template.xlsx"');
+    res.send(buffer);
+  }
+
+  @Post('bulk-import')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'text/csv',
+      ];
+      if (allowed.includes(file.mimetype) || file.originalname.match(/\.(xlsx|xls|csv)$/i)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only Excel and CSV files are allowed'), false);
+      }
+    },
+  }))
+  @ApiOperation({ summary: 'Bulk import clients from Excel/CSV file' })
+  async bulkImport(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.bulkImportService.importClients(file.buffer);
   }
 
   @Get(':id')

@@ -1,12 +1,19 @@
 import {
   Controller,
   Get,
+  Post,
   Put,
   Param,
   Body,
   Query,
   UseGuards,
+  BadRequestException,
+  UseInterceptors,
+  UploadedFile,
+  Res,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { RealtorService } from './realtor.service';
 import { UpdateRealtorDto } from './dto/update-realtor.dto';
@@ -15,13 +22,18 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { LoyaltyTier } from '@prisma/client';
+import { BulkImportService } from '../upload/bulk-import.service';
+import { Response } from 'express';
 
 @ApiTags('Realtors')
 @Controller('realtors')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth('JWT-auth')
 export class RealtorController {
-  constructor(private readonly realtorService: RealtorService) {}
+  constructor(
+    private readonly realtorService: RealtorService,
+    private readonly bulkImportService: BulkImportService,
+  ) {}
 
   @Get()
   @Roles('SUPER_ADMIN', 'ADMIN')
@@ -68,6 +80,40 @@ export class RealtorController {
     @Query('limit') limit?: number,
   ) {
     return this.realtorService.getLeaderboard(period, limit);
+  }
+
+  @Get('import-template')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Download realtor import Excel template' })
+  async getImportTemplate(@Res() res: Response) {
+    const buffer = await this.bulkImportService.generateTemplate('realtor');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="realtor-import-template.xlsx"');
+    res.send(buffer);
+  }
+
+  @Post('bulk-import')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'text/csv',
+      ];
+      if (allowed.includes(file.mimetype) || file.originalname.match(/\.(xlsx|xls|csv)$/i)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only Excel and CSV files are allowed'), false);
+      }
+    },
+  }))
+  @ApiOperation({ summary: 'Bulk import realtors from Excel/CSV file' })
+  async bulkImport(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.bulkImportService.importRealtors(file.buffer);
   }
 
   @Get(':id')

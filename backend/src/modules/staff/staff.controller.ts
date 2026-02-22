@@ -9,7 +9,13 @@ import {
   Query,
   UseGuards,
   ParseUUIDPipe,
+  BadRequestException,
+  UseInterceptors,
+  UploadedFile,
+  Res,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { StaffService } from './staff.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
@@ -20,13 +26,18 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { StaffPosition } from '@prisma/client';
+import { BulkImportService } from '../upload/bulk-import.service';
+import { Response } from 'express';
 
 @ApiTags('Staff')
 @Controller('staff')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth('JWT-auth')
 export class StaffController {
-  constructor(private readonly staffService: StaffService) {}
+  constructor(
+    private readonly staffService: StaffService,
+    private readonly bulkImportService: BulkImportService,
+  ) {}
 
   @Post()
   @Roles('SUPER_ADMIN', 'ADMIN')
@@ -69,11 +80,52 @@ export class StaffController {
     });
   }
 
+  @Get('my-profile')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'GENERAL_OVERSEER', 'HR', 'STAFF', 'REALTOR')
+  @ApiOperation({ summary: 'Get my staff profile including department allowedModules' })
+  getMyProfile(@CurrentUser('id') userId: string) {
+    return this.staffService.getMyProfile(userId);
+  }
+
   @Get('dashboard')
   @Roles('STAFF')
   @ApiOperation({ summary: 'Get staff dashboard data' })
   getDashboard(@CurrentUser('id') userId: string) {
     return this.staffService.getDashboard(userId);
+  }
+
+  @Get('import-template')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Download staff import Excel template' })
+  async getImportTemplate(@Res() res: Response) {
+    const buffer = await this.bulkImportService.generateTemplate('staff');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="staff-import-template.xlsx"');
+    res.send(buffer);
+  }
+
+  @Post('bulk-import')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'text/csv',
+      ];
+      if (allowed.includes(file.mimetype) || file.originalname.match(/\.(xlsx|xls|csv)$/i)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only Excel and CSV files are allowed'), false);
+      }
+    },
+  }))
+  @ApiOperation({ summary: 'Bulk import staff from Excel/CSV file' })
+  async bulkImport(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.bulkImportService.importStaff(file.buffer);
   }
 
   @Get(':id')
