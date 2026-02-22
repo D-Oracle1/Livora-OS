@@ -16,7 +16,10 @@ async function getFallbackPrisma(): Promise<PrismaService> {
   if (!fallbackInitPromise) {
     fallbackInitPromise = (async () => {
       const fallback = new PrismaService();
-      await fallback.$connect();
+      // Do NOT call $connect() here. Prisma connects lazily on the first query.
+      // Eager $connect() throws if DATABASE_URL is unavailable, which kills NestJS
+      // DI for the entire request before any service try/catch can handle it (→ 500).
+      // Lazy connection means failures surface at query-time and are caught normally.
       cachedFallback = fallback;
       return fallback;
     })();

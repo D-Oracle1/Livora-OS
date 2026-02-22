@@ -7,7 +7,7 @@
     "api/index.ts": {
       "maxDuration": 60,
       "memory": 1769,
-      "includeFiles": "{dist/**,src/generated/**,node_modules/.prisma/**,node_modules/@prisma/engines/**,node_modules/@supabase/**,node_modules/web-push/**,prisma/**}"
+      "includeFiles": "{dist/**,src/generated/**,node_modules/.prisma/**,node_modules/@prisma/engines/**,node_modules/@supabase/**,node_modules/web-push/**,node_modules/pg/**,node_modules/pg-protocol/**,node_modules/pg-types/**,node_modules/pgpass/**,node_modules/pg-connection-string/**,prisma/**}"
     }
   },
   "headers": [
