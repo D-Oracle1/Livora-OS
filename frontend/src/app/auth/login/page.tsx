@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { setAuth, clearAuth } from '@/lib/auth-storage';
+import { setAuth, clearAuth, getToken, getUser } from '@/lib/auth-storage';
 import { getImageUrl, setTenantId } from '@/lib/api';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 
@@ -16,6 +16,31 @@ export default function LoginPage() {
   const router = useRouter();
   const branding = useBranding();
   const companyName = getCompanyName(branding);
+
+  // If already authenticated, redirect to the appropriate dashboard immediately
+  useEffect(() => {
+    const token = getToken();
+    const user = getUser();
+    if (token && user) {
+      const role = (user as any).role?.toLowerCase();
+      if ((user as any).isSuperAdmin || role === 'super_admin') {
+        router.replace('/dashboard/super-admin');
+      } else if (role === 'general_overseer') {
+        router.replace('/dashboard/general-overseer');
+      } else if (role === 'admin') {
+        router.replace('/dashboard/admin');
+      } else if (role === 'realtor') {
+        router.replace('/dashboard/realtor');
+      } else if (role === 'hr') {
+        router.replace('/dashboard/hr');
+      } else if (role === 'staff') {
+        router.replace('/dashboard/staff');
+      } else {
+        router.replace('/dashboard/client');
+      }
+    }
+  }, [router]);
+
   // Resolve tenant ID from custom domain on mount so the X-Company-ID header
   // is sent with the login request and subsequent API calls.
   useEffect(() => {

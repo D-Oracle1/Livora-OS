@@ -32,9 +32,9 @@ export function middleware(request: NextRequest) {
 
   if (isMasterDomain(hostname)) {
     // ── Master platform domain ──
-    // Redirect bare root to the platform landing page
+    // Redirect bare root straight to the admin login page
     if (pathname === '/') {
-      return NextResponse.redirect(new URL('/platform', request.url));
+      return NextResponse.redirect(new URL('/auth/login', request.url));
     }
     // Allow all routes (including /dashboard/super-admin)
     return NextResponse.next();
