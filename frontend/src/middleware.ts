@@ -2,17 +2,26 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * ADMIN_ONLY mode: when NEXT_PUBLIC_ADMIN_ONLY=true this deployment only serves
- * the super-admin dashboard. All other dashboard routes are blocked.
+ * Route requests based on whether this is the master platform domain
+ * or a tenant custom domain.
  *
- * TENANT mode (default): super-admin routes are blocked so tenants cannot
- * accidentally reach the platform admin panel.
+ * Master domain  → super-admin & platform routes allowed, root → /platform
+ * Tenant domain  → super-admin & platform routes blocked, root → tenant app
  */
+function isMasterDomain(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+  if (hostname.endsWith('.vercel.app') || hostname.endsWith('.railway.app')) return true;
+  const platformDomain = process.env.PLATFORM_DOMAIN;
+  if (platformDomain && hostname === platformDomain) return true;
+  return false;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isAdminOnly = process.env.NEXT_PUBLIC_ADMIN_ONLY === 'true';
+  const host = request.headers.get('host') || '';
+  const hostname = host.split(':')[0].toLowerCase();
 
-  // Always allow Next.js internals, static assets, and public API
+  // Always allow Next.js internals, static assets, and public API routes
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
@@ -21,25 +30,21 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isAdminOnly) {
-    // ── Admin-only deployment ──
-    // Root path: redirect to the platform landing/pricing page
+  if (isMasterDomain(hostname)) {
+    // ── Master platform domain ──
+    // Redirect bare root to the platform landing page
     if (pathname === '/') {
       return NextResponse.redirect(new URL('/platform', request.url));
     }
-    // Allow super-admin dashboard, auth pages, and the public platform landing
-    const allowed =
-      pathname.startsWith('/dashboard/super-admin') ||
-      pathname.startsWith('/auth') ||
-      pathname.startsWith('/platform');
-
-    if (!allowed) {
-      return NextResponse.redirect(new URL('/platform', request.url));
-    }
+    // Allow all routes (including /dashboard/super-admin)
+    return NextResponse.next();
   } else {
-    // ── Tenant deployment ──
-    // Block super-admin routes so tenants can't stumble into the platform panel
-    if (pathname.startsWith('/dashboard/super-admin')) {
+    // ── Tenant custom domain ──
+    // Block super-admin and platform-level routes
+    if (
+      pathname.startsWith('/dashboard/super-admin') ||
+      pathname.startsWith('/platform')
+    ) {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
