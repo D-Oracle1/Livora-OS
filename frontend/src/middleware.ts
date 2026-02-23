@@ -11,7 +11,7 @@ import type { NextRequest } from 'next/server';
 function isMasterDomain(hostname: string): boolean {
   if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
   if (hostname.endsWith('.vercel.app') || hostname.endsWith('.railway.app')) return true;
-  const platformDomain = process.env.PLATFORM_DOMAIN;
+  const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN;
   if (platformDomain && hostname === platformDomain) return true;
   return false;
 }
