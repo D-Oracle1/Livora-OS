@@ -52,20 +52,9 @@ export async function configureApp(expressInstance?: express.Express) {
   ].filter(Boolean);
 
   app.enableCors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (server-to-server, mobile, Postman)
-      if (!origin) return callback(null, true);
-      // Allow exact match or Vercel preview deployments
-      if (
-        allowedOrigins.includes(origin) ||
-        origin.endsWith('.vercel.app')
-      ) {
-        return callback(null, true);
-      }
-      callback(null, false);
-    },
+    origin: true, // reflect request Origin — required for dynamic tenant custom domains
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret', 'x-company-id'],
     credentials: true,
   });
 
