@@ -5,6 +5,7 @@ import {
   Post,
   Body,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -14,7 +15,9 @@ import {
 } from '@nestjs/swagger';
 import { IsString, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import * as bcrypt from 'bcryptjs';
 import { MasterPlatformService } from './master-platform.service';
+import { MasterPrismaService } from '../../database/master-prisma.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -86,7 +89,10 @@ class UpdateCmsDto {
 @ApiTags('Master Platform Settings')
 @Controller('master/platform-settings')
 export class MasterPlatformController {
-  constructor(private readonly service: MasterPlatformService) {}
+  constructor(
+    private readonly service: MasterPlatformService,
+    private readonly masterPrisma: MasterPrismaService,
+  ) {}
 
   /**
    * Public: returns platform branding for the admin deployment's UI
@@ -148,5 +154,53 @@ export class MasterPlatformController {
   @ApiResponse({ status: 200, description: 'Master schema synced' })
   async migrateDb() {
     return this.service.syncMasterSchema();
+  }
+
+  /**
+   * Bootstrap: create OR reset the super admin account.
+   * Protected by MASTER_API_SECRET env var — NOT JWT-guarded.
+   *
+   * Use after first deployment OR to reset a forgotten super admin password:
+   *   POST /api/v1/master/platform-settings/bootstrap
+   *   Body: { secret: "<MASTER_API_SECRET>", email?, password?, firstName?, lastName? }
+   *
+   * If the super admin already exists, the password is updated.
+   */
+  @Post('bootstrap')
+  @ApiOperation({ summary: 'Create or reset super admin (requires MASTER_API_SECRET)' })
+  @ApiResponse({ status: 200, description: 'Super admin created or updated' })
+  async bootstrap(
+    @Body() body: {
+      secret: string;
+      email?: string;
+      password?: string;
+      firstName?: string;
+      lastName?: string;
+    },
+  ) {
+    const masterSecret = process.env.MASTER_API_SECRET;
+    if (!masterSecret || body.secret !== masterSecret) {
+      throw new UnauthorizedException('Invalid bootstrap secret');
+    }
+
+    const email = (body.email || 'superadmin@rms.com').toLowerCase().trim();
+    const password = body.password || 'SuperAdmin123!';
+    const firstName = body.firstName || 'Platform';
+    const lastName = body.lastName || 'Admin';
+
+    const hashed = await bcrypt.hash(password, 12);
+
+    const admin = await this.masterPrisma.superAdmin.upsert({
+      where: { email },
+      update: { password: hashed, firstName, lastName },
+      create: { email, password: hashed, firstName, lastName },
+      select: { id: true, email: true, firstName: true, lastName: true, createdAt: true },
+    });
+
+    return {
+      message: 'Super admin ready',
+      admin,
+      credentials: { email, password },
+    };
   }
 }

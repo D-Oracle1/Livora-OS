@@ -5,7 +5,9 @@ const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 // -- Tenant bridge --
 // Stores the resolved company ID for cross-origin deployments where the backend
 // cannot read the tenant's custom domain from the Host header.
-let _tenantId: string | null = null;
+// NEXT_PUBLIC_COMPANY_ID can be set per-deployment (e.g. Vercel project env vars)
+// so tenant deployments on *.vercel.app URLs still send the correct X-Company-ID.
+let _tenantId: string | null = process.env.NEXT_PUBLIC_COMPANY_ID || null;
 export function setTenantId(id: string | null) { _tenantId = id; }
 export function getTenantId(): string | null { return _tenantId; }
 
