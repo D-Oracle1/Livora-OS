@@ -1,4 +1,10 @@
-import { getToken } from './auth-storage';
+import { getToken, clearAuth } from './auth-storage';
+
+function handleUnauthorized() {
+  if (typeof window === 'undefined') return;
+  clearAuth();
+  window.location.href = '/auth/login';
+}
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
 
@@ -43,6 +49,7 @@ export const api = {
       method: 'GET',
       headers: this.getHeaders(),
     });
+    if (response.status === 401) { handleUnauthorized(); throw new Error('Unauthorized'); }
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
       throw new Error(error.message || 'Request failed');
@@ -56,6 +63,7 @@ export const api = {
       headers: this.getHeaders(),
       body: data ? JSON.stringify(data) : undefined,
     });
+    if (response.status === 401) { handleUnauthorized(); throw new Error('Unauthorized'); }
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
       throw new Error(error.message || 'Request failed');
@@ -69,6 +77,7 @@ export const api = {
       headers: this.getHeaders(),
       body: data ? JSON.stringify(data) : undefined,
     });
+    if (response.status === 401) { handleUnauthorized(); throw new Error('Unauthorized'); }
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
       throw new Error(error.message || 'Request failed');
@@ -82,6 +91,7 @@ export const api = {
       headers: this.getHeaders(),
       body: data ? JSON.stringify(data) : undefined,
     });
+    if (response.status === 401) { handleUnauthorized(); throw new Error('Unauthorized'); }
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
       throw new Error(error.message || 'Request failed');
@@ -94,6 +104,7 @@ export const api = {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
+    if (response.status === 401) { handleUnauthorized(); throw new Error('Unauthorized'); }
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
       throw new Error(error.message || 'Request failed');
@@ -113,6 +124,7 @@ export const api = {
       body: formData,
     });
 
+    if (response.status === 401) { handleUnauthorized(); throw new Error('Unauthorized'); }
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Upload failed' }));
       throw new Error(error.message || 'Upload failed');
