@@ -319,6 +319,7 @@ export class CompanyService {
         slug: true,
         domain: true,
         logo: true,
+        primaryColor: true,
         isActive: true,
       },
     });
