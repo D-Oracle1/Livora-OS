@@ -78,6 +78,60 @@
     @apply glass rounded-xl shadow-glass;
   }
 
+  /* Platform landing — glassmorphism */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .glass-panel-strong {
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+  }
+
+  /* Super admin — neumorphic light */
+  .neuo-base {
+    background-color: #eef2f7;
+  }
+
+  .neuo-card {
+    background: #eef2f7;
+    border-radius: 16px;
+    box-shadow: 6px 6px 14px #c8cdd6, -6px -6px 14px #ffffff;
+  }
+
+  .neuo-card-sm {
+    background: #eef2f7;
+    border-radius: 12px;
+    box-shadow: 4px 4px 10px #c8cdd6, -4px -4px 10px #ffffff;
+  }
+
+  .neuo-inset {
+    background: #eef2f7;
+    border-radius: 12px;
+    box-shadow: inset 4px 4px 8px #c8cdd6, inset -4px -4px 8px #ffffff;
+  }
+
+  .neuo-btn {
+    background: #eef2f7;
+    border-radius: 10px;
+    box-shadow: 4px 4px 8px #c8cdd6, -4px -4px 8px #ffffff;
+    transition: box-shadow 0.2s, transform 0.1s;
+  }
+
+  .neuo-btn:hover {
+    box-shadow: 5px 5px 10px #c8cdd6, -5px -5px 10px #ffffff;
+  }
+
+  .neuo-btn:active {
+    box-shadow: inset 3px 3px 6px #c8cdd6, inset -3px -3px 6px #ffffff;
+    transform: scale(0.98);
+  }
+
   .gradient-primary {
     @apply bg-gradient-to-r from-primary-600 via-primary-500 to-primary-400;
   }

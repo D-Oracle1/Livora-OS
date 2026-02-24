@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { getToken } from '@/lib/auth-storage';
+import { usePlatformBranding } from '@/hooks/use-platform-branding';
 
 interface Company {
   id: string;
@@ -101,6 +102,8 @@ export default function CompaniesPage() {
   const [migratingAll, setMigratingAll] = useState(false);
   const frontendDomain = typeof window !== 'undefined' ? window.location.hostname : '';
   const [editLogoUploading, setEditLogoUploading] = useState(false);
+  const branding = usePlatformBranding();
+  const accent = branding.primaryColor || '#3b82f6';
   const [editData, setEditData] = useState({
     name: '',
     domain: '',
@@ -473,64 +476,68 @@ export default function CompaniesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Companies</h1>
-          <p className="text-muted-foreground">Manage tenant companies and their databases</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Companies</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Manage tenant companies and their databases</p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="w-4 h-4 mr-2" />
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium shadow-md hover:opacity-90 transition-opacity"
+          style={{ backgroundColor: accent }}
+        >
+          <Plus className="w-4 h-4" />
           Create Company
-        </Button>
+        </button>
       </div>
 
       {/* Search + View toggle */}
-      <div className="flex gap-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
             placeholder="Search companies..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-9"
+            className="w-full h-10 pl-9 pr-3 text-sm neuo-inset outline-none text-gray-700 placeholder:text-gray-400 rounded-xl"
           />
         </div>
-        <Button variant="outline" size="icon" onClick={fetchCompanies} title="Refresh">
+        <button onClick={fetchCompanies} title="Refresh" className="neuo-btn w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-700">
           <RefreshCw className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
+        </button>
+        <button
           onClick={handleMigrateAll}
           disabled={migratingAll}
-          title="Apply latest schema DDL to all active tenant databases (fixes missing columns)"
+          title="Apply latest schema DDL to all active tenant databases"
+          className="neuo-btn flex items-center gap-1.5 px-3 h-10 rounded-xl text-sm font-medium text-gray-600 disabled:opacity-50"
         >
-          {migratingAll ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+          {migratingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           Migrate All
-        </Button>
+        </button>
         {companies.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={() => setSelectedIds(selectedIds.size === companies.length ? new Set() : new Set(companies.map((c) => c.id)))}
             title="Select / deselect all visible companies"
+            className="neuo-btn flex items-center gap-1.5 px-3 h-10 rounded-xl text-sm font-medium text-gray-600"
           >
-            <CheckSquare className="w-4 h-4 mr-1.5" />
+            <CheckSquare className="w-4 h-4" />
             {selectedIds.size === companies.length && companies.length > 0 ? 'Deselect All' : 'Select All'}
-          </Button>
+          </button>
         )}
-        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="flex neuo-inset rounded-xl overflow-hidden">
           <button
             onClick={() => setViewMode('list')}
-            className={`px-2.5 py-2 transition-colors ${viewMode === 'list' ? 'bg-slate-800 text-amber-400' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            className="px-3 py-2 transition-colors"
+            style={viewMode === 'list' ? { color: accent } : { color: '#9ca3af' }}
             title="List view"
           >
             <List className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('grid')}
-            className={`px-2.5 py-2 transition-colors ${viewMode === 'grid' ? 'bg-slate-800 text-amber-400' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            className="px-3 py-2 transition-colors"
+            style={viewMode === 'grid' ? { color: accent } : { color: '#9ca3af' }}
             title="Grid view"
           >
             <LayoutGrid className="w-4 h-4" />
@@ -564,24 +571,25 @@ export default function CompaniesPage() {
       {/* Companies List */}
       {loading ? (
         <div className="flex items-center justify-center h-40">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: accent }} />
         </div>
       ) : companies.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Building2 className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No companies yet</h3>
-            <p className="text-muted-foreground mb-4">Create your first company to start onboarding clients</p>
-            <Button onClick={() => setShowCreate(true)}>
-              <Plus className="w-4 h-4 mr-2" /> Create Company
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="neuo-card p-12 flex flex-col items-center justify-center text-center">
+          <Building2 className="w-12 h-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">No companies yet</h3>
+          <p className="text-sm text-gray-400 mb-5">Create your first company to start onboarding clients</p>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium shadow-md"
+            style={{ backgroundColor: accent }}
+          >
+            <Plus className="w-4 h-4" /> Create Company
+          </button>
+        </div>
       ) : viewMode === 'list' ? (
         <div className="grid gap-3">
           {companies.map((company) => (
-            <Card key={company.id} className={`hover:shadow-md transition-shadow ${selectedIds.has(company.id) ? 'ring-2 ring-red-400 dark:ring-red-600' : ''}`}>
-              <CardContent className="p-4">
+            <div key={company.id} className={`neuo-card p-4 transition-all ${selectedIds.has(company.id) ? 'ring-2 ring-red-400' : ''}`}>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <input
@@ -648,16 +656,14 @@ export default function CompaniesPage() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
           ))}
         </div>
       ) : (
         /* Grid view */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {companies.map((company) => (
-            <Card key={company.id} className={`hover:shadow-md transition-shadow group ${selectedIds.has(company.id) ? 'ring-2 ring-red-400 dark:ring-red-600' : ''}`}>
-              <CardContent className="p-5">
+            <div key={company.id} className={`neuo-card p-5 transition-all ${selectedIds.has(company.id) ? 'ring-2 ring-red-400' : ''}`}>
                 {/* Logo + status */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -726,8 +732,7 @@ export default function CompaniesPage() {
                     {deletingId === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
           ))}
         </div>
       )}
@@ -760,13 +765,13 @@ export default function CompaniesPage() {
       {/* Create / Register Company Modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-lg max-h-[90vh] flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between shrink-0">
-              <CardTitle>Add Company</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => { setShowCreate(false); setLogoPreview(''); }}>
+          <div className="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+              <h2 className="font-semibold text-gray-800">Add Company</h2>
+              <button onClick={() => { setShowCreate(false); setLogoPreview(''); }} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
                 <X className="w-4 h-4" />
-              </Button>
-            </CardHeader>
+              </button>
+            </div>
 
             {/* Mode tabs */}
             <div className="flex border-b border-gray-100 dark:border-gray-800 shrink-0 px-6">
@@ -784,7 +789,7 @@ export default function CompaniesPage() {
               </button>
             </div>
 
-            <CardContent className="overflow-y-auto flex-1 pt-4">
+            <div className="overflow-y-auto flex-1 px-6 py-4">
               {/* ── Logo upload shared component ── */}
               {(() => {
                 const currentLogo = createMode === 'new' ? formData.logo : existingDbData.logo;
@@ -995,16 +1000,15 @@ export default function CompaniesPage() {
                   </div>
                 </form>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Individual delete confirmation */}
       {confirmDeleteCompany && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
-            <CardContent className="pt-6 pb-6 space-y-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                   <Trash2 className="w-5 h-5 text-red-600" />
@@ -1024,16 +1028,14 @@ export default function CompaniesPage() {
                   Delete Permanently
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+          </div>
         </div>
       )}
 
       {/* Bulk delete confirmation */}
       {confirmBulkDelete && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
-            <CardContent className="pt-6 pb-6 space-y-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                   <Trash2 className="w-5 h-5 text-red-600" />
@@ -1053,28 +1055,27 @@ export default function CompaniesPage() {
                   Delete {selectedIds.size} {selectedIds.size === 1 ? 'Company' : 'Companies'}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+          </div>
         </div>
       )}
 
       {/* Company Detail Modal */}
       {showDetail && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between shrink-0">
-              <CardTitle className="flex items-center gap-2">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2">
                 {showDetail.logo ? (
                   <img src={showDetail.logo} alt="" className="w-8 h-8 rounded object-contain" />
                 ) : (
-                  <Building2 className="w-5 h-5" />
+                  <Building2 className="w-5 h-5 text-gray-400" />
                 )}
-                {showDetail.name}
-              </CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowDetail(null)}>
+                <span className="font-semibold text-gray-800">{showDetail.name}</span>
+              </div>
+              <button onClick={() => setShowDetail(null)} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
                 <X className="w-4 h-4" />
-              </Button>
-            </CardHeader>
+              </button>
+            </div>
 
             {/* Tabs */}
             <div className="flex border-b border-gray-100 dark:border-gray-800 shrink-0 px-6">
@@ -1100,7 +1101,7 @@ export default function CompaniesPage() {
               </button>
             </div>
 
-            <CardContent className="overflow-y-auto flex-1 pt-4">
+            <div className="overflow-y-auto flex-1 px-6 py-4">
               {detailTab === 'info' && (
                 <div className="space-y-4">
                   {/* Edit / View toggle */}
@@ -1406,8 +1407,8 @@ export default function CompaniesPage() {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
     </div>

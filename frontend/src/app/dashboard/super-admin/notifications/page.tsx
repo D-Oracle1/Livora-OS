@@ -14,29 +14,27 @@ import {
   Trash2,
   Loader2,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { cn, formatDate } from '@/lib/utils';
 import { useNotifications } from '@/contexts/notification-context';
+import { usePlatformBranding } from '@/hooks/use-platform-branding';
 
 const getIcon = (type: string) => {
   switch (type) {
-    case 'SALE': return <DollarSign className="w-5 h-5 text-green-600" />;
-    case 'COMMISSION': return <DollarSign className="w-5 h-5 text-primary" />;
+    case 'SALE': return <DollarSign className="w-5 h-5 text-emerald-600" />;
+    case 'COMMISSION': return <DollarSign className="w-5 h-5 text-blue-600" />;
     case 'PROPERTY': case 'LISTING': case 'PRICE_CHANGE': return <Home className="w-5 h-5 text-purple-600" />;
     case 'RANKING': case 'LOYALTY': return <Award className="w-5 h-5 text-yellow-600" />;
     case 'CHAT': return <MessageSquare className="w-5 h-5 text-blue-600" />;
     case 'OFFER': return <DollarSign className="w-5 h-5 text-orange-600" />;
     case 'SYSTEM': return <AlertCircle className="w-5 h-5 text-red-600" />;
-    default: return <Bell className="w-5 h-5" />;
+    default: return <Bell className="w-5 h-5 text-gray-500" />;
   }
 };
 
 const getBgColor = (type: string) => {
   switch (type) {
-    case 'SALE': return 'bg-green-100';
-    case 'COMMISSION': return 'bg-primary/10';
+    case 'SALE': return 'bg-emerald-100';
+    case 'COMMISSION': return 'bg-blue-100';
     case 'PROPERTY': case 'LISTING': case 'PRICE_CHANGE': return 'bg-purple-100';
     case 'RANKING': case 'LOYALTY': return 'bg-yellow-100';
     case 'CHAT': return 'bg-blue-100';
@@ -48,54 +46,56 @@ const getBgColor = (type: string) => {
 
 export default function NotificationsPage() {
   const { notifications, unreadCount, isLoading, fetchNotifications, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
+  const branding = usePlatformBranding();
+  const accent = branding.primaryColor || '#3b82f6';
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 p-4 sm:p-6">
+      {/* Header card */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-primary/10">
-                  <Bell className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Notifications</h2>
-                  <p className="text-muted-foreground">
-                    You have {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
-                  </p>
-                </div>
+        <div className="neuo-card p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${accent}18` }}>
+                <Bell className="w-6 h-6" style={{ color: accent }} />
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={markAllAsRead} disabled={unreadCount === 0}>
-                  <CheckCheck className="w-4 h-4 mr-2" />
-                  Mark All Read
-                </Button>
+              <div>
+                <h1 className="text-xl font-bold text-gray-800">Notifications</h1>
+                <p className="text-sm text-gray-500">
+                  {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <button
+              onClick={markAllAsRead}
+              disabled={unreadCount === 0}
+              className="neuo-btn flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 disabled:opacity-40"
+            >
+              <CheckCheck className="w-4 h-4" />
+              Mark All Read
+            </button>
+          </div>
+        </div>
       </motion.div>
 
+      {/* Notifications list */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <Card>
-          <CardHeader>
-            <CardTitle>All Notifications</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="neuo-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-base font-semibold text-gray-800">All Notifications</h2>
+          </div>
+          <div className="p-4">
             {isLoading && notifications.length === 0 ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading notifications...</span>
+                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                <span className="ml-2 text-sm text-gray-400">Loading notifications...</span>
               </div>
             ) : notifications.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
+              <div className="text-center py-12 text-gray-400">
                 <Bell className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p>No notifications yet</p>
+                <p className="text-sm">No notifications yet</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -104,45 +104,59 @@ export default function NotificationsPage() {
                     key={notification.id}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 + index * 0.05 }}
+                    transition={{ delay: 0.05 + index * 0.04 }}
                     className={cn(
-                      'flex items-start gap-4 p-4 rounded-lg transition-colors',
+                      'flex items-start gap-4 p-4 rounded-xl transition-colors',
                       notification.isRead
-                        ? 'bg-gray-50 dark:bg-gray-800/30'
-                        : 'bg-primary/5 border-l-4 border-primary'
+                        ? 'bg-gray-50'
+                        : 'bg-white border-l-4 shadow-sm'
                     )}
+                    style={!notification.isRead ? { borderLeftColor: accent } : {}}
                   >
-                    <div className={cn('p-2 rounded-lg', getBgColor(notification.type))}>
+                    <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', getBgColor(notification.type))}>
                       {getIcon(notification.type)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="font-medium">{notification.title}</p>
-                          <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
-                          <p className="text-xs text-muted-foreground mt-2">{formatDate(notification.createdAt)}</p>
+                          <p className={cn('text-sm text-gray-800', !notification.isRead && 'font-semibold')}>{notification.title}</p>
+                          <p className="text-xs text-gray-500 mt-1">{notification.message}</p>
+                          <p className="text-xs text-gray-400 mt-1.5">{formatDate(notification.createdAt)}</p>
                         </div>
                         {!notification.isRead && (
-                          <Badge className="bg-primary shrink-0">New</Badge>
+                          <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0"
+                            style={{ backgroundColor: accent }}
+                          >
+                            New
+                          </span>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       {!notification.isRead && (
-                        <Button variant="ghost" size="icon" onClick={() => markAsRead(notification.id)}>
+                        <button
+                          onClick={() => markAsRead(notification.id)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                          title="Mark as read"
+                        >
                           <Check className="w-4 h-4" />
-                        </Button>
+                        </button>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => deleteNotification(notification.id)}>
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
+                      <button
+                        onClick={() => deleteNotification(notification.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </motion.div>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </motion.div>
     </div>
   );

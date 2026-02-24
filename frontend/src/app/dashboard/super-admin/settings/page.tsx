@@ -5,9 +5,6 @@ import {
   Loader2, Save, User, Palette, Globe, Upload, X,
   Lock, Eye, EyeOff, Shield, Crown, Check, Database,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -216,36 +213,46 @@ export default function SuperAdminSettings() {
 
   // Live accent color: the current (possibly unsaved) primaryColor value so the
   // page gives an immediate preview as the user adjusts the color picker.
-  const accentColor = branding.primaryColor || savedPlatformBranding.primaryColor || '#f59e0b';
-  const accentStyle = { color: accentColor } as React.CSSProperties;
-  const accentBtnStyle = { backgroundColor: accentColor, borderColor: accentColor } as React.CSSProperties;
+  const accent = branding.primaryColor || savedPlatformBranding.primaryColor || '#f59e0b';
 
-  const inputCls = 'bg-slate-900/60 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-amber-500/40';
-  const labelCls = 'text-sm font-medium text-slate-300 block mb-1.5';
-  const sectionTitle = 'text-xs font-bold uppercase tracking-widest mb-3';
+  const labelCls = 'text-sm font-medium text-gray-600 block mb-1.5';
+  const inputCls = 'w-full h-10 px-3 text-sm neuo-inset outline-none text-gray-800 placeholder:text-gray-400 rounded-xl';
+  const sectionTitle = 'text-xs font-bold uppercase tracking-widest mb-3 text-gray-500';
+
+  const SaveBtn = ({ onClick, loading, label }: { onClick: () => void; loading: boolean; label: string }) => (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-medium shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+      style={{ backgroundColor: accent }}
+    >
+      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+      {label}
+    </button>
+  );
 
   return (
-    <div className="max-w-3xl space-y-6 pb-12">
+    <div className="max-w-3xl space-y-6 pb-12 p-4 sm:p-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Crown className="w-6 h-6" style={accentStyle} /> Platform Settings
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <Crown className="w-6 h-6" style={{ color: accent }} /> Platform Settings
         </h1>
-        <p className="text-slate-400 text-sm mt-1">Manage your profile, platform identity, and CMS content</p>
+        <p className="text-sm text-gray-500 mt-1">Manage your profile, platform identity, and CMS content</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-slate-800/60 rounded-xl border border-slate-700/50 w-fit flex-wrap">
+      <div className="flex gap-1 p-1.5 neuo-inset rounded-2xl w-fit flex-wrap">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
               activeTab === tab.id
-                ? 'text-slate-900 shadow'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                ? 'text-white shadow-md'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'
             }`}
-            style={activeTab === tab.id ? accentBtnStyle : {}}
+            style={activeTab === tab.id ? { backgroundColor: accent } : {}}
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
@@ -256,355 +263,341 @@ export default function SuperAdminSettings() {
       {/* ── Profile Tab ── */}
       {activeTab === 'profile' && (
         <div className="space-y-5">
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-white text-base">Personal Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {/* Avatar */}
-              <div className="flex items-center gap-5">
-                <div className="relative">
-                  {avatar ? (
-                    <img src={getImageUrl(avatar)} alt="avatar" className="w-20 h-20 rounded-full object-cover border-2 border-slate-600" />
-                  ) : (
-                    <div
-                      style={{ backgroundColor: `${accentColor}33`, borderColor: `${accentColor}4d` }}
-                      className="w-20 h-20 rounded-full border-2 flex items-center justify-center"
-                    >
-                      <User className="w-8 h-8" style={accentStyle} />
-                    </div>
-                  )}
-                  {avatar && (
-                    <button
-                      onClick={() => setAvatar('')}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
-                    >
-                      <X className="w-3 h-3 text-white" />
-                    </button>
-                  )}
-                </div>
-                <div>
-                  <input type="file" accept="image/*" ref={avatarRef} onChange={handleAvatarUpload} className="hidden" />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => avatarRef.current?.click()}
-                    disabled={avatarUploading}
-                    className="border-slate-600 text-slate-300 hover:bg-slate-700"
+          <div className="neuo-card p-6 space-y-5">
+            <h2 className="text-base font-semibold text-gray-800">Personal Information</h2>
+
+            {/* Avatar */}
+            <div className="flex items-center gap-5">
+              <div className="relative">
+                {avatar ? (
+                  <img src={getImageUrl(avatar)} alt="avatar" className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md" />
+                ) : (
+                  <div
+                    className="w-20 h-20 rounded-full border-4 border-white shadow-md flex items-center justify-center"
+                    style={{ backgroundColor: `${accent}20` }}
                   >
-                    {avatarUploading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
-                    {avatar ? 'Change Photo' : 'Upload Photo'}
-                  </Button>
-                  <p className="text-xs text-slate-500 mt-1">JPG, PNG. Max 2MB.</p>
-                </div>
+                    <User className="w-8 h-8" style={{ color: accent }} />
+                  </div>
+                )}
+                {avatar && (
+                  <button
+                    onClick={() => setAvatar('')}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow"
+                  >
+                    <X className="w-3 h-3 text-white" />
+                  </button>
+                )}
               </div>
+              <div>
+                <input type="file" accept="image/*" ref={avatarRef} onChange={handleAvatarUpload} className="hidden" />
+                <button
+                  onClick={() => avatarRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="neuo-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gray-600 disabled:opacity-50"
+                >
+                  {avatarUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  {avatar ? 'Change Photo' : 'Upload Photo'}
+                </button>
+                <p className="text-xs text-gray-400 mt-1.5">JPG, PNG. Max 2MB.</p>
+              </div>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>First Name</label>
-                  <Input value={profile.firstName} onChange={e => setProfile(p => ({ ...p, firstName: e.target.value }))} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Last Name</label>
-                  <Input value={profile.lastName} onChange={e => setProfile(p => ({ ...p, lastName: e.target.value }))} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Email <Badge variant="outline" className="ml-1 text-xs border-slate-600 text-slate-500">read-only</Badge></label>
-                  <Input value={profile.email} disabled className="bg-slate-900/30 border-slate-700 text-slate-500" />
-                </div>
-                <div>
-                  <label className={labelCls}>Phone</label>
-                  <Input value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} className={inputCls} placeholder="+234 800 000 0000" />
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>First Name</label>
+                <input value={profile.firstName} onChange={e => setProfile(p => ({ ...p, firstName: e.target.value }))} className={inputCls} />
               </div>
+              <div>
+                <label className={labelCls}>Last Name</label>
+                <input value={profile.lastName} onChange={e => setProfile(p => ({ ...p, lastName: e.target.value }))} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Email <Badge variant="outline" className="ml-1 text-xs">read-only</Badge>
+                </label>
+                <input value={profile.email} disabled className={`${inputCls} opacity-50 cursor-not-allowed`} />
+              </div>
+              <div>
+                <label className={labelCls}>Phone</label>
+                <input value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} className={inputCls} placeholder="+234 800 000 0000" />
+              </div>
+            </div>
 
-              <div className="flex justify-end">
-                <Button onClick={handleSaveProfile} disabled={profileLoading} style={accentBtnStyle} className="hover:opacity-90 text-slate-900 font-semibold">
-                  {profileLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                  Save Profile
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            <div className="flex justify-end">
+              <SaveBtn onClick={handleSaveProfile} loading={profileLoading} label="Save Profile" />
+            </div>
+          </div>
         </div>
       )}
 
       {/* ── Platform Branding Tab ── */}
       {activeTab === 'branding' && (
-        <Card className="bg-slate-800/50 border-slate-700/50">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-white text-base">Platform Branding</CardTitle>
-            <p className="text-sm text-slate-400">Controls how the admin dashboard looks and what name/logo appears in the sidebar and platform pages.</p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Logo */}
+        <div className="neuo-card p-6 space-y-6">
+          <div>
+            <h2 className="text-base font-semibold text-gray-800">Platform Branding</h2>
+            <p className="text-sm text-gray-400 mt-0.5">Controls how the admin dashboard looks and what name/logo appears in the sidebar and platform pages.</p>
+          </div>
+
+          {/* Logo */}
+          <div>
+            <p className={sectionTitle}>Platform Logo</p>
+            <div className="flex items-center gap-5">
+              {branding.logo ? (
+                <div className="relative">
+                  <img src={getImageUrl(branding.logo)} alt="logo" className="w-20 h-20 rounded-xl object-contain neuo-inset p-1.5" />
+                  <button onClick={() => setBranding(b => ({ ...b, logo: '' }))} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow">
+                    <X className="w-3 h-3 text-white" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-xl neuo-inset flex items-center justify-center">
+                  <Palette className="w-7 h-7 text-gray-400" />
+                </div>
+              )}
+              <div>
+                <input type="file" accept="image/*" ref={logoRef} onChange={handleLogoUpload} className="hidden" />
+                <button onClick={() => logoRef.current?.click()} disabled={logoUploading} className="neuo-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gray-600 disabled:opacity-50">
+                  {logoUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  {branding.logo ? 'Replace Logo' : 'Upload Logo'}
+                </button>
+                <p className="text-xs text-gray-400 mt-1.5">PNG, SVG, JPG. Recommended 256×256.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Platform Name</label>
+              <input value={branding.platformName} onChange={e => setBranding(b => ({ ...b, platformName: e.target.value }))} className={inputCls} placeholder="RMS Platform" />
+              <p className="text-xs text-gray-400 mt-1">Shown in the sidebar, platform page, and browser tabs.</p>
+            </div>
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Tagline / Subtitle</label>
+              <input value={branding.tagline} onChange={e => setBranding(b => ({ ...b, tagline: e.target.value }))} className={inputCls} placeholder="Powering Real Estate Excellence" />
+            </div>
             <div>
-              <p className={sectionTitle} style={accentStyle}>Platform Logo</p>
-              <div className="flex items-center gap-5">
-                {branding.logo ? (
-                  <div className="relative">
-                    <img src={getImageUrl(branding.logo)} alt="logo" className="w-20 h-20 rounded-xl object-contain bg-slate-700 border border-slate-600 p-1.5" />
-                    <button onClick={() => setBranding(b => ({ ...b, logo: '' }))} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                      <X className="w-3 h-3 text-white" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-20 h-20 rounded-xl bg-slate-700 border border-slate-600 border-dashed flex items-center justify-center">
-                    <Palette className="w-7 h-7 text-slate-500" />
-                  </div>
-                )}
-                <div>
-                  <input type="file" accept="image/*" ref={logoRef} onChange={handleLogoUpload} className="hidden" />
-                  <Button size="sm" variant="outline" onClick={() => logoRef.current?.click()} disabled={logoUploading} className="border-slate-600 text-slate-300 hover:bg-slate-700">
-                    {logoUploading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
-                    {branding.logo ? 'Replace Logo' : 'Upload Logo'}
-                  </Button>
-                  <p className="text-xs text-slate-500 mt-1">PNG, SVG, JPG. Recommended 256×256.</p>
-                </div>
+              <label className={labelCls}>Primary Accent Color</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={branding.primaryColor || '#f59e0b'}
+                  onChange={e => setBranding(b => ({ ...b, primaryColor: e.target.value }))}
+                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer bg-transparent p-0.5"
+                />
+                <input
+                  value={branding.primaryColor}
+                  onChange={e => setBranding(b => ({ ...b, primaryColor: e.target.value }))}
+                  className={`${inputCls} w-32`}
+                  placeholder="#f59e0b"
+                />
+                <div className="w-8 h-8 rounded-lg shadow-sm border border-gray-100" style={{ backgroundColor: accent }} />
               </div>
             </div>
+            <div>
+              <label className={labelCls}>Favicon URL</label>
+              <input value={branding.favicon} onChange={e => setBranding(b => ({ ...b, favicon: e.target.value }))} className={inputCls} placeholder="https://example.com/favicon.ico" />
+            </div>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Platform Name</label>
-                <Input value={branding.platformName} onChange={e => setBranding(b => ({ ...b, platformName: e.target.value }))} className={inputCls} placeholder="RMS Platform" />
-                <p className="text-xs text-slate-500 mt-1">Shown in the sidebar, platform page, and browser tabs.</p>
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Tagline / Subtitle</label>
-                <Input value={branding.tagline} onChange={e => setBranding(b => ({ ...b, tagline: e.target.value }))} className={inputCls} placeholder="Powering Real Estate Excellence" />
-              </div>
-              <div>
-                <label className={labelCls}>Primary Accent Color</label>
-                <div className="flex items-center gap-3">
-                  <input type="color" value={branding.primaryColor || '#f59e0b'} onChange={e => setBranding(b => ({ ...b, primaryColor: e.target.value }))} className="w-10 h-10 rounded-lg border border-slate-600 cursor-pointer bg-transparent p-0.5" />
-                  <Input value={branding.primaryColor} onChange={e => setBranding(b => ({ ...b, primaryColor: e.target.value }))} className={`${inputCls} w-32`} placeholder="#f59e0b" />
-                </div>
-              </div>
-              <div>
-                <label className={labelCls}>Favicon URL</label>
-                <Input value={branding.favicon} onChange={e => setBranding(b => ({ ...b, favicon: e.target.value }))} className={inputCls} placeholder="https://example.com/favicon.ico" />
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <Button onClick={handleSaveBranding} disabled={brandingLoading} style={accentBtnStyle} className="hover:opacity-90 text-slate-900 font-semibold">
-                {brandingLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                Save Branding
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="flex justify-end pt-2">
+            <SaveBtn onClick={handleSaveBranding} loading={brandingLoading} label="Save Branding" />
+          </div>
+        </div>
       )}
 
       {/* ── Platform CMS Tab ── */}
       {activeTab === 'cms' && (
-        <Card className="bg-slate-800/50 border-slate-700/50">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-white text-base">Platform CMS</CardTitle>
-            <p className="text-sm text-slate-400">Content shown on the public platform landing page (rms-admin-dashboard.vercel.app/platform).</p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Hero */}
-            <div>
-              <p className={sectionTitle} style={accentStyle}>Hero Section</p>
-              <div className="space-y-4">
-                <div>
-                  <label className={labelCls}>Hero Title</label>
-                  <Input value={cms.heroTitle} onChange={e => setCms(c => ({ ...c, heroTitle: e.target.value }))} className={inputCls} placeholder="Manage Your Real Estate Business Like a Pro" />
-                </div>
-                <div>
-                  <label className={labelCls}>Hero Subtitle</label>
-                  <Textarea rows={2} value={cms.heroSubtitle} onChange={e => setCms(c => ({ ...c, heroSubtitle: e.target.value }))} className={`${inputCls} resize-none`} placeholder="One platform for property management, HR, CRM, and more." />
-                </div>
+        <div className="neuo-card p-6 space-y-6">
+          <div>
+            <h2 className="text-base font-semibold text-gray-800">Platform CMS</h2>
+            <p className="text-sm text-gray-400 mt-0.5">Content shown on the public platform landing page.</p>
+          </div>
+
+          {/* Hero */}
+          <div>
+            <p className={sectionTitle}>Hero Section</p>
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls}>Hero Title</label>
+                <input value={cms.heroTitle} onChange={e => setCms(c => ({ ...c, heroTitle: e.target.value }))} className={inputCls} placeholder="Manage Your Real Estate Business Like a Pro" />
+              </div>
+              <div>
+                <label className={labelCls}>Hero Subtitle</label>
+                <Textarea rows={2} value={cms.heroSubtitle} onChange={e => setCms(c => ({ ...c, heroSubtitle: e.target.value }))} className="neuo-inset rounded-xl text-sm text-gray-800 placeholder:text-gray-400 resize-none border-0 outline-none px-3 py-2.5 w-full" placeholder="One platform for property management, HR, CRM, and more." />
               </div>
             </div>
+          </div>
 
-            {/* About */}
-            <div>
-              <p className={sectionTitle} style={accentStyle}>About / Description</p>
-              <Textarea rows={4} value={cms.aboutText} onChange={e => setCms(c => ({ ...c, aboutText: e.target.value }))} className={`${inputCls} resize-none`} placeholder="Brief description of the RMS platform..." />
-            </div>
+          {/* About */}
+          <div>
+            <p className={sectionTitle}>About / Description</p>
+            <Textarea rows={4} value={cms.aboutText} onChange={e => setCms(c => ({ ...c, aboutText: e.target.value }))} className="neuo-inset rounded-xl text-sm text-gray-800 placeholder:text-gray-400 resize-none border-0 outline-none px-3 py-2.5 w-full" placeholder="Brief description of the RMS platform..." />
+          </div>
 
-            {/* Contact */}
-            <div>
-              <p className={sectionTitle} style={accentStyle}>Contact & Support</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Contact Email</label>
-                  <Input value={cms.contactEmail} onChange={e => setCms(c => ({ ...c, contactEmail: e.target.value }))} className={inputCls} placeholder="contact@rmsplatform.com" />
-                </div>
-                <div>
-                  <label className={labelCls}>Support Email</label>
-                  <Input value={cms.supportEmail} onChange={e => setCms(c => ({ ...c, supportEmail: e.target.value }))} className={inputCls} placeholder="support@rmsplatform.com" />
-                </div>
-                <div>
-                  <label className={labelCls}>Phone Number</label>
-                  <Input value={cms.contactPhone} onChange={e => setCms(c => ({ ...c, contactPhone: e.target.value }))} className={inputCls} placeholder="+234 800 000 0000" />
-                </div>
-                <div>
-                  <label className={labelCls}>Office Address</label>
-                  <Input value={cms.contactAddress} onChange={e => setCms(c => ({ ...c, contactAddress: e.target.value }))} className={inputCls} placeholder="123 Platform St, Lagos" />
-                </div>
+          {/* Contact */}
+          <div>
+            <p className={sectionTitle}>Contact & Support</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Contact Email</label>
+                <input value={cms.contactEmail} onChange={e => setCms(c => ({ ...c, contactEmail: e.target.value }))} className={inputCls} placeholder="contact@rmsplatform.com" />
+              </div>
+              <div>
+                <label className={labelCls}>Support Email</label>
+                <input value={cms.supportEmail} onChange={e => setCms(c => ({ ...c, supportEmail: e.target.value }))} className={inputCls} placeholder="support@rmsplatform.com" />
+              </div>
+              <div>
+                <label className={labelCls}>Phone Number</label>
+                <input value={cms.contactPhone} onChange={e => setCms(c => ({ ...c, contactPhone: e.target.value }))} className={inputCls} placeholder="+234 800 000 0000" />
+              </div>
+              <div>
+                <label className={labelCls}>Office Address</label>
+                <input value={cms.contactAddress} onChange={e => setCms(c => ({ ...c, contactAddress: e.target.value }))} className={inputCls} placeholder="123 Platform St, Lagos" />
               </div>
             </div>
+          </div>
 
-            {/* Social */}
-            <div>
-              <p className={sectionTitle} style={accentStyle}>Social Links</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className={labelCls}>Twitter / X</label>
-                  <Input value={cms.twitterUrl} onChange={e => setCms(c => ({ ...c, twitterUrl: e.target.value }))} className={inputCls} placeholder="https://twitter.com/..." />
-                </div>
-                <div>
-                  <label className={labelCls}>LinkedIn</label>
-                  <Input value={cms.linkedinUrl} onChange={e => setCms(c => ({ ...c, linkedinUrl: e.target.value }))} className={inputCls} placeholder="https://linkedin.com/..." />
-                </div>
-                <div>
-                  <label className={labelCls}>Instagram</label>
-                  <Input value={cms.instagramUrl} onChange={e => setCms(c => ({ ...c, instagramUrl: e.target.value }))} className={inputCls} placeholder="https://instagram.com/..." />
-                </div>
+          {/* Social */}
+          <div>
+            <p className={sectionTitle}>Social Links</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className={labelCls}>Twitter / X</label>
+                <input value={cms.twitterUrl} onChange={e => setCms(c => ({ ...c, twitterUrl: e.target.value }))} className={inputCls} placeholder="https://twitter.com/..." />
+              </div>
+              <div>
+                <label className={labelCls}>LinkedIn</label>
+                <input value={cms.linkedinUrl} onChange={e => setCms(c => ({ ...c, linkedinUrl: e.target.value }))} className={inputCls} placeholder="https://linkedin.com/..." />
+              </div>
+              <div>
+                <label className={labelCls}>Instagram</label>
+                <input value={cms.instagramUrl} onChange={e => setCms(c => ({ ...c, instagramUrl: e.target.value }))} className={inputCls} placeholder="https://instagram.com/..." />
               </div>
             </div>
+          </div>
 
-            <div className="flex justify-end pt-2">
-              <Button onClick={handleSaveCms} disabled={cmsLoading} style={accentBtnStyle} className="hover:opacity-90 text-slate-900 font-semibold">
-                {cmsLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                Save CMS Content
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="flex justify-end pt-2">
+            <SaveBtn onClick={handleSaveCms} loading={cmsLoading} label="Save CMS Content" />
+          </div>
+        </div>
       )}
 
       {/* ── Security Tab ── */}
       {activeTab === 'security' && (
         <div className="space-y-5">
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <Lock className="w-4 h-4" style={accentStyle} /> Change Password
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { id: 'current' as const, label: 'Current Password', key: 'current' as const },
-                { id: 'new' as const, label: 'New Password', key: 'newPass' as const },
-                { id: 'confirm' as const, label: 'Confirm New Password', key: 'confirm' as const },
-              ].map(f => (
-                <div key={f.id}>
-                  <label className={labelCls}>{f.label}</label>
-                  <div className="relative">
-                    <Input
-                      type={showPass[f.id] ? 'text' : 'password'}
-                      value={passwords[f.key]}
-                      onChange={e => setPasswords(p => ({ ...p, [f.key]: e.target.value }))}
-                      className={`${inputCls} pr-10`}
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPass(s => ({ ...s, [f.id]: !s[f.id] }))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                    >
-                      {showPass[f.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <div className="flex items-center gap-3 pt-2">
-                <div className="flex-1 h-1.5 rounded-full bg-slate-700 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      passwords.newPass.length === 0 ? 'w-0' :
-                      passwords.newPass.length < 6 ? 'w-1/4 bg-red-500' :
-                      passwords.newPass.length < 10 ? 'w-1/2 bg-amber-500' :
-                      passwords.newPass.length < 14 ? 'w-3/4 bg-blue-500' :
-                      'w-full bg-green-500'
-                    }`}
+          <div className="neuo-card p-6 space-y-4">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <Lock className="w-4 h-4" style={{ color: accent }} /> Change Password
+            </h2>
+
+            {[
+              { id: 'current' as const, label: 'Current Password', key: 'current' as const },
+              { id: 'new' as const, label: 'New Password', key: 'newPass' as const },
+              { id: 'confirm' as const, label: 'Confirm New Password', key: 'confirm' as const },
+            ].map(f => (
+              <div key={f.id}>
+                <label className={labelCls}>{f.label}</label>
+                <div className="relative">
+                  <input
+                    type={showPass[f.id] ? 'text' : 'password'}
+                    value={passwords[f.key]}
+                    onChange={e => setPasswords(p => ({ ...p, [f.key]: e.target.value }))}
+                    className={`${inputCls} pr-10`}
+                    placeholder="••••••••"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(s => ({ ...s, [f.id]: !s[f.id] }))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPass[f.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
-                <span className="text-xs text-slate-400 w-16 text-right">
-                  {passwords.newPass.length === 0 ? '' :
-                   passwords.newPass.length < 6 ? 'Weak' :
-                   passwords.newPass.length < 10 ? 'Fair' :
-                   passwords.newPass.length < 14 ? 'Good' : 'Strong'}
-                </span>
               </div>
-              {passwords.confirm && passwords.newPass !== passwords.confirm && (
-                <p className="text-xs text-red-400 flex items-center gap-1.5">
-                  <X className="w-3 h-3" /> Passwords do not match
-                </p>
-              )}
-              {passwords.confirm && passwords.newPass === passwords.confirm && passwords.newPass.length >= 8 && (
-                <p className="text-xs text-green-400 flex items-center gap-1.5">
-                  <Check className="w-3 h-3" /> Passwords match
-                </p>
-              )}
-              <div className="flex justify-end pt-1">
-                <Button onClick={handleChangePassword} disabled={passwordLoading || !passwords.current || passwords.newPass !== passwords.confirm || passwords.newPass.length < 8} style={accentBtnStyle} className="hover:opacity-90 text-slate-900 font-semibold">
-                  {passwordLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Lock className="w-4 h-4 mr-2" />}
-                  Update Password
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            ))}
 
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-white text-base">Security Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                { label: 'Role', value: 'Super Administrator', icon: Crown, color: accentColor },
-                { label: 'Session', value: 'JWT authenticated', icon: Shield, color: '#4ade80' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center justify-between py-2 border-b border-slate-700/40 last:border-0">
-                  <div className="flex items-center gap-2 text-sm text-slate-400">
-                    <item.icon className="w-4 h-4" style={{ color: item.color }} />
-                    {item.label}
-                  </div>
-                  <span className="text-sm text-slate-200">{item.value}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-800/50 border-slate-700/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <Database className="w-4 h-4" style={accentStyle} /> Database Management
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm text-slate-300 font-medium">Sync Master DB Schema</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Applies the master database schema (creates missing tables &amp; columns). Safe to run any time — all statements are idempotent.
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleMigrateDb}
-                  disabled={migratingDb}
-                  className="shrink-0 border-slate-600 text-slate-300 hover:bg-slate-700"
-                >
-                  {migratingDb ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <Database className="w-3.5 h-3.5 mr-1.5" />
-                  )}
-                  {migratingDb ? 'Syncing...' : 'Sync Schema'}
-                </Button>
+            <div className="flex items-center gap-3 pt-1">
+              <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    passwords.newPass.length === 0 ? 'w-0' :
+                    passwords.newPass.length < 6 ? 'w-1/4 bg-red-400' :
+                    passwords.newPass.length < 10 ? 'w-1/2 bg-amber-400' :
+                    passwords.newPass.length < 14 ? 'w-3/4 bg-blue-400' :
+                    'w-full bg-emerald-400'
+                  }`}
+                />
               </div>
-              <p className="text-xs text-slate-600 border-t border-slate-700/40 pt-3">
-                This runs automatically on every backend deployment. Use this button only if you need to manually trigger a schema sync.
+              <span className="text-xs text-gray-400 w-14 text-right">
+                {passwords.newPass.length === 0 ? '' :
+                 passwords.newPass.length < 6 ? 'Weak' :
+                 passwords.newPass.length < 10 ? 'Fair' :
+                 passwords.newPass.length < 14 ? 'Good' : 'Strong'}
+              </span>
+            </div>
+            {passwords.confirm && passwords.newPass !== passwords.confirm && (
+              <p className="text-xs text-red-500 flex items-center gap-1.5">
+                <X className="w-3 h-3" /> Passwords do not match
               </p>
-            </CardContent>
-          </Card>
+            )}
+            {passwords.confirm && passwords.newPass === passwords.confirm && passwords.newPass.length >= 8 && (
+              <p className="text-xs text-emerald-600 flex items-center gap-1.5">
+                <Check className="w-3 h-3" /> Passwords match
+              </p>
+            )}
+            <div className="flex justify-end pt-1">
+              <SaveBtn
+                onClick={handleChangePassword}
+                loading={passwordLoading}
+                label="Update Password"
+              />
+            </div>
+          </div>
+
+          <div className="neuo-card p-6 space-y-3">
+            <h2 className="text-base font-semibold text-gray-800">Security Status</h2>
+            {[
+              { label: 'Role', value: 'Super Administrator', icon: Crown, color: accent },
+              { label: 'Session', value: 'JWT authenticated', icon: Shield, color: '#10b981' },
+            ].map(item => (
+              <div key={item.label} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <item.icon className="w-4 h-4" style={{ color: item.color }} />
+                  {item.label}
+                </div>
+                <span className="text-sm font-medium text-gray-700">{item.value}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="neuo-card p-6 space-y-4">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <Database className="w-4 h-4" style={{ color: accent }} /> Database Management
+            </h2>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-gray-700 font-medium">Sync Master DB Schema</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Applies the master database schema (creates missing tables &amp; columns). Safe to run any time — all statements are idempotent.
+                </p>
+              </div>
+              <button
+                onClick={handleMigrateDb}
+                disabled={migratingDb}
+                className="neuo-btn flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-gray-600 disabled:opacity-50 shrink-0"
+              >
+                {migratingDb ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Database className="w-3.5 h-3.5" />
+                )}
+                {migratingDb ? 'Syncing...' : 'Sync Schema'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 border-t border-gray-100 pt-3">
+              This runs automatically on every backend deployment. Use this button only if you need to manually trigger a schema sync.
+            </p>
+          </div>
         </div>
       )}
     </div>

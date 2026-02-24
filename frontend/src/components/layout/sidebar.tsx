@@ -355,8 +355,9 @@ export function Sidebar({
           'fixed left-0 top-0 z-50 h-screen flex flex-col',
           'transition-all duration-300 ease-in-out',
           role === 'super-admin'
-            ? 'bg-slate-900 border-r border-slate-700/50'
+            ? 'bg-white border-r border-gray-100'
             : 'bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800',
+          role === 'super-admin' && 'shadow-[4px_0_20px_rgba(0,0,0,0.06)]',
           'hidden md:flex',
           collapsed ? 'md:w-20' : 'md:w-64',
           isOpen && '!flex w-72',
@@ -367,7 +368,7 @@ export function Sidebar({
           className={cn(
             'h-16 flex items-center shrink-0 px-4',
             role === 'super-admin'
-              ? 'border-b border-slate-700/60'
+              ? 'border-b border-gray-100'
               : 'border-b border-gray-100 dark:border-gray-800',
             collapsed ? 'justify-center' : 'justify-between',
           )}
@@ -381,7 +382,7 @@ export function Sidebar({
                 <img
                   src={platformBranding.logo}
                   alt={getPlatformName(platformBranding)}
-                  className="w-9 h-9 rounded-xl object-contain shrink-0 bg-slate-800"
+                  className="w-9 h-9 rounded-xl object-contain shrink-0 bg-gray-100"
                 />
               ) : (
                 <div
@@ -407,7 +408,7 @@ export function Sidebar({
                 <span
                   className={cn(
                     'text-base font-bold truncate block',
-                    role === 'super-admin' ? 'text-white' : 'text-gray-900 dark:text-white',
+                    role === 'super-admin' ? 'text-gray-900' : 'text-gray-900 dark:text-white',
                   )}
                 >
                   {role === 'super-admin'
@@ -415,7 +416,7 @@ export function Sidebar({
                     : getShortName(branding)}
                 </span>
                 {role === 'super-admin' && (
-                  <span className="text-[10px] font-medium tracking-wide uppercase" style={{ color: `${saColor}cc` }}>
+                  <span className="text-[10px] font-medium tracking-wide uppercase" style={{ color: saColor }}>
                     Super Admin
                   </span>
                 )}
@@ -428,9 +429,7 @@ export function Sidebar({
             onClick={onClose}
             className={cn(
               'md:hidden p-1.5 rounded-lg transition-colors',
-              role === 'super-admin'
-                ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600',
+              'text-gray-400 hover:bg-gray-100 hover:text-gray-600',
             )}
           >
             <X className="w-5 h-5" />
@@ -442,9 +441,7 @@ export function Sidebar({
               onClick={() => onCollapsedChange?.(!collapsed)}
               className={cn(
                 'hidden md:flex p-1.5 rounded-lg transition-colors',
-                role === 'super-admin'
-                  ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                  : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600',
+                'text-gray-400 hover:bg-gray-100 hover:text-gray-600',
               )}
             >
               <ChevronLeft className="w-4 h-4" />
@@ -457,7 +454,7 @@ export function Sidebar({
           className={cn(
             'py-4 shrink-0',
             role === 'super-admin'
-              ? 'border-b border-slate-700/60'
+              ? 'border-b border-gray-100'
               : 'border-b border-gray-100 dark:border-gray-800',
             collapsed ? 'flex justify-center px-2' : 'px-4 flex items-center gap-3',
           )}
@@ -481,7 +478,7 @@ export function Sidebar({
               <p
                 className={cn(
                   'text-sm font-semibold truncate',
-                  role === 'super-admin' ? 'text-white' : 'text-gray-900 dark:text-white',
+                  'text-gray-900 dark:text-white',
                 )}
               >
                 {userName}
@@ -489,9 +486,7 @@ export function Sidebar({
               <p
                 className={cn(
                   'text-xs',
-                  role === 'super-admin'
-                    ? 'text-slate-400'
-                    : 'text-gray-500 dark:text-gray-400',
+                  'text-gray-500 dark:text-gray-400',
                 )}
               >
                 {roleLabel}
@@ -591,7 +586,7 @@ export function Sidebar({
                         role === 'super-admin'
                           ? active
                             ? ''
-                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
                           : active
                             ? 'bg-primary/10 text-primary dark:bg-primary/15'
                             : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',
@@ -625,9 +620,7 @@ export function Sidebar({
         <div
           className={cn(
             'px-2 py-3 space-y-0.5 shrink-0 border-t',
-            role === 'super-admin'
-              ? 'border-slate-700/60'
-              : 'border-gray-100 dark:border-gray-800',
+            'border-gray-100 dark:border-gray-800',
           )}
         >
           {collapsed && (
@@ -636,9 +629,7 @@ export function Sidebar({
               title="Expand sidebar"
               className={cn(
                 'w-full flex justify-center px-2 py-2.5 rounded-xl transition-colors',
-                role === 'super-admin'
-                  ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                  : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600',
+                'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600',
               )}
             >
               <ChevronLeft className="w-5 h-5 rotate-180" />
@@ -650,9 +641,7 @@ export function Sidebar({
             title={collapsed ? 'Settings' : undefined}
             className={cn(
               'flex items-center gap-3 rounded-xl text-sm font-medium transition-all',
-              role === 'super-admin'
-                ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',
+              'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',
               collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5',
             )}
           >
@@ -668,9 +657,7 @@ export function Sidebar({
             title={collapsed ? 'Logout' : undefined}
             className={cn(
               'w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-all',
-              role === 'super-admin'
-                ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
-                : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20',
+              'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20',
               collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5',
             )}
           >

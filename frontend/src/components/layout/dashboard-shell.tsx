@@ -24,7 +24,7 @@ export function DashboardShell({ role, children, extras }: DashboardShellProps) 
   const isSuperAdmin = role === 'super-admin';
 
   return (
-    <div className={cn('min-h-screen', isSuperAdmin ? 'bg-slate-50 dark:bg-slate-950' : 'bg-gray-50 dark:bg-gray-950')}>
+    <div className={cn('min-h-screen', isSuperAdmin ? 'neuo-base' : 'bg-gray-50 dark:bg-gray-950')}>
       <Sidebar
         role={role}
         isOpen={mobileOpen}

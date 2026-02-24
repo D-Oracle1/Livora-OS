@@ -189,11 +189,15 @@ export function Header({ onMenuClick }: HeaderProps) {
   const isOnChatPage = pathname.includes('/chat');
   const recentNotifications = notifications.slice(0, 5);
 
+  const isSuperAdmin = role === 'super-admin';
+
   return (
     <header
       className={cn(
-        'sticky top-0 z-[60] h-16 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md',
-        'border-b border-gray-200 dark:border-gray-800',
+        'sticky top-0 z-[60] h-16',
+        isSuperAdmin
+          ? 'bg-white shadow-[0_2px_10px_rgba(0,0,0,0.05)] border-b border-gray-100'
+          : 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-800',
         'px-4 md:px-5 flex items-center justify-between gap-4',
         'transition-transform duration-300',
         visible ? 'translate-y-0' : '-translate-y-full',

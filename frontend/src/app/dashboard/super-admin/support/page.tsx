@@ -2,13 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageCircle, Send, Loader2, Search, Building2, ArrowLeft, CheckCheck } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { usePlatformBranding } from '@/hooks/use-platform-branding';
 
 interface SupportThread {
   id: string;
@@ -39,6 +37,8 @@ export default function SuperAdminSupportPage() {
   const [search, setSearch] = useState('');
   const [showMobileChat, setShowMobileChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const branding = usePlatformBranding();
+  const accent = branding.primaryColor || '#3b82f6';
 
   const fetchThreads = useCallback(async () => {
     try {
@@ -161,36 +161,36 @@ export default function SuperAdminSupportPage() {
     : threads;
 
   return (
-    <div className="h-[calc(100dvh-5rem)] md:h-[calc(100dvh-5.5rem)] overflow-hidden">
-      <Card className="h-full shadow-sm overflow-hidden">
+    <div className="h-[calc(100dvh-5rem)] md:h-[calc(100dvh-5.5rem)] overflow-hidden p-4 sm:p-6">
+      <div className="neuo-card h-full overflow-hidden">
         <div className="flex h-full">
           {/* Thread List */}
           <div className={cn(
-            'w-full md:w-80 border-r border-gray-200 dark:border-gray-700 flex flex-col',
+            'w-full md:w-80 border-r border-gray-100 flex flex-col bg-white',
             showMobileChat && 'hidden md:flex'
           )}>
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-slate-800 text-white">
-              <h2 className="font-semibold text-sm text-amber-400">Platform Support Inbox</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Tenant admin support threads</p>
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="font-semibold text-sm text-gray-800">Support Inbox</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Tenant admin support threads</p>
             </div>
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="p-3 border-b border-gray-100">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
+                <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search companies..."
-                  className="pl-9 h-9 text-sm"
+                  className="w-full h-9 pl-9 pr-3 text-sm neuo-inset outline-none text-gray-700 placeholder:text-gray-400 rounded-xl"
                 />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
               {loadingThreads ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                  <Loader2 className="w-6 h-6 animate-spin" style={{ color: accent }} />
                 </div>
               ) : filteredThreads.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-gray-400">
                   <MessageCircle className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No support threads yet</p>
                 </div>
@@ -202,21 +202,22 @@ export default function SuperAdminSupportPage() {
                     <button
                       key={thread.id}
                       onClick={() => selectThread(thread)}
-                      className={`w-full text-left p-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
-                        isActive ? 'bg-slate-800/5 border-l-2 border-l-amber-500' : ''
+                      className={`w-full text-left p-3 border-b border-gray-100 transition-colors ${
+                        isActive ? 'border-l-2' : 'hover:bg-gray-50'
                       }`}
+                      style={isActive ? { borderLeftColor: accent, backgroundColor: `${accent}0d` } : {}}
                     >
                       <div className="flex items-center gap-3">
                         {thread.company.logo ? (
-                          <img src={thread.company.logo} alt="" className="w-10 h-10 rounded-lg object-contain shrink-0 border" />
+                          <img src={thread.company.logo} alt="" className="w-10 h-10 rounded-lg object-contain shrink-0 border border-gray-100" />
                         ) : (
-                          <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                            <Building2 className="w-5 h-5 text-slate-500" />
+                          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                            <Building2 className="w-5 h-5 text-gray-400" />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="font-medium text-sm truncate">{thread.company.name}</p>
+                            <p className="font-medium text-sm text-gray-800 truncate">{thread.company.name}</p>
                             <Badge
                               variant={thread.status === 'resolved' ? 'secondary' : 'default'}
                               className="text-[9px] px-1.5 py-0 shrink-0"
@@ -224,7 +225,7 @@ export default function SuperAdminSupportPage() {
                               {thread.status === 'resolved' ? 'Done' : 'Open'}
                             </Badge>
                           </div>
-                          <p className="text-xs text-gray-500 truncate">
+                          <p className="text-xs text-gray-500 truncate mt-0.5">
                             {lastMsg?.content || 'No messages yet'}
                           </p>
                           <p className="text-[10px] text-gray-400 mt-0.5">
@@ -240,41 +241,42 @@ export default function SuperAdminSupportPage() {
           </div>
 
           {/* Chat Panel */}
-          <div className={cn('flex-1 flex flex-col', !showMobileChat && 'hidden md:flex')}>
+          <div className={cn('flex-1 flex flex-col bg-[#f8fafc]', !showMobileChat && 'hidden md:flex')}>
             {selectedThread ? (
               <>
                 {/* Chat Header */}
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 shrink-0 bg-slate-800 text-white">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="md:hidden text-white hover:bg-white/20"
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3 shrink-0 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+                  <button
+                    className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
                     onClick={() => { setShowMobileChat(false); setSelectedThread(null); }}
                   >
                     <ArrowLeft className="w-5 h-5" />
-                  </Button>
+                  </button>
                   {selectedThread.company.logo ? (
-                    <img src={selectedThread.company.logo} alt="" className="w-9 h-9 rounded-lg object-contain border border-white/20" />
+                    <img src={selectedThread.company.logo} alt="" className="w-9 h-9 rounded-lg object-contain border border-gray-100 shrink-0" />
                   ) : (
-                    <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-amber-400" />
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${accent}1a` }}>
+                      <Building2 className="w-5 h-5" style={{ color: accent }} />
                     </div>
                   )}
                   <div className="flex-1">
-                    <p className="font-semibold text-sm">{selectedThread.company.name}</p>
-                    <p className="text-xs text-white/60">{selectedThread.company.domain}</p>
+                    <p className="font-semibold text-sm text-gray-800">{selectedThread.company.name}</p>
+                    <p className="text-xs text-gray-400">{selectedThread.company.domain}</p>
                   </div>
-                  {selectedThread.status !== 'resolved' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-white/30 text-white hover:bg-white/10 hover:text-white text-xs h-7"
+                  {selectedThread.status === 'resolved' ? (
+                    <span className="text-xs font-medium px-3 py-1 rounded-full bg-emerald-50 text-emerald-600">
+                      Resolved
+                    </span>
+                  ) : (
+                    <button
                       onClick={handleResolve}
                       disabled={resolving}
+                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50"
+                      style={{ borderColor: `${accent}40`, color: accent }}
                     >
-                      {resolving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3 mr-1" />}
+                      {resolving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3" />}
                       Resolve
-                    </Button>
+                    </button>
                   )}
                 </div>
 
@@ -282,10 +284,10 @@ export default function SuperAdminSupportPage() {
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {loadingMessages ? (
                     <div className="flex items-center justify-center h-full">
-                      <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                      <Loader2 className="w-6 h-6 animate-spin" style={{ color: accent }} />
                     </div>
                   ) : messages.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <div className="flex items-center justify-center h-full text-gray-400">
                       <div className="text-center">
                         <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />
                         <p className="text-sm">No messages yet</p>
@@ -300,12 +302,13 @@ export default function SuperAdminSupportPage() {
                             <div
                               className={`max-w-[70%] rounded-2xl px-3.5 py-2 text-sm ${
                                 isOwn
-                                  ? 'bg-amber-500 text-white rounded-br-md'
-                                  : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md'
+                                  ? 'text-white rounded-br-md'
+                                  : 'bg-white text-gray-800 rounded-bl-md shadow-sm border border-gray-100'
                               }`}
+                              style={isOwn ? { backgroundColor: accent } : {}}
                             >
                               {!isOwn && (
-                                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-0.5">
+                                <p className="text-xs font-medium text-gray-500 mb-0.5">
                                   {msg.senderName}
                                 </p>
                               )}
@@ -323,9 +326,9 @@ export default function SuperAdminSupportPage() {
                 </div>
 
                 {/* Input */}
-                <div className="border-t border-gray-200 dark:border-gray-700 p-3 shrink-0">
+                <div className="border-t border-gray-100 p-3 shrink-0 bg-white">
                   {selectedThread.status === 'resolved' ? (
-                    <p className="text-xs text-center text-muted-foreground py-2">This thread is resolved.</p>
+                    <p className="text-xs text-center text-gray-400 py-2">This thread is resolved.</p>
                   ) : (
                     <div className="flex items-center gap-2">
                       <input
@@ -334,12 +337,13 @@ export default function SuperAdminSupportPage() {
                         onChange={(e) => setNewMessage(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Reply to this company..."
-                        className="flex-1 text-sm bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2.5 outline-none focus:ring-2 focus:ring-amber-500/30 border-0 text-gray-900 dark:text-gray-100 placeholder:text-gray-400"
+                        className="flex-1 text-sm neuo-inset rounded-full px-4 py-2.5 outline-none text-gray-900 placeholder:text-gray-400"
                       />
                       <button
                         onClick={handleSend}
                         disabled={!newMessage.trim() || sending}
-                        className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center hover:bg-amber-600 disabled:opacity-40 transition-colors shrink-0"
+                        className="w-10 h-10 rounded-full text-white flex items-center justify-center disabled:opacity-40 transition-all hover:opacity-90 shadow-md shrink-0"
+                        style={{ backgroundColor: accent }}
                       >
                         {sending ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -352,15 +356,15 @@ export default function SuperAdminSupportPage() {
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
                 <MessageCircle className="w-16 h-16 mb-4 opacity-20" />
-                <p className="font-medium">Select a support thread</p>
+                <p className="font-medium text-gray-600">Select a support thread</p>
                 <p className="text-sm mt-1">Choose a company's support request to respond</p>
               </div>
             )}
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
