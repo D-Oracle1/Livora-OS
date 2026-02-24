@@ -129,23 +129,29 @@ export class CompanyService {
   }
 
   async findById(id: string) {
-    const company = await this.masterPrisma.company.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        domain: true,
-        logo: true,
-        primaryColor: true,
-        inviteCode: true,
-        isActive: true,
-        plan: true,
-        maxUsers: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    let company: any;
+    try {
+      company = await this.masterPrisma.company.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          domain: true,
+          logo: true,
+          primaryColor: true,
+          inviteCode: true,
+          isActive: true,
+          plan: true,
+          maxUsers: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error: any) {
+      this.logger.error(`findById DB error for ${id}: ${error.message}`);
+      throw new BadRequestException('Failed to retrieve company. Please try again.');
+    }
 
     if (!company) {
       throw new NotFoundException('Company not found');

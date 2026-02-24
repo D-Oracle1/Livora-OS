@@ -75,5 +75,7 @@ CREATE TABLE IF NOT EXISTS "master_settings" (
 -- New columns added after initial release (safe if already present)
 ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "logo" TEXT;
 ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "primaryColor" TEXT DEFAULT '#3b82f6';
+ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "plan" TEXT NOT NULL DEFAULT 'standard';
+ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "maxUsers" INTEGER NOT NULL DEFAULT 50;
 ALTER TABLE "super_admins" ADD COLUMN IF NOT EXISTS "phone" TEXT;
 ALTER TABLE "super_admins" ADD COLUMN IF NOT EXISTS "avatar" TEXT;

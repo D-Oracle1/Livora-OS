@@ -57,6 +57,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     try {
       const admin = await this.masterPrisma.superAdmin.findUnique({
         where: { id: payload.sub },
+        select: { id: true, email: true, firstName: true, lastName: true },
       });
 
       if (!admin) {

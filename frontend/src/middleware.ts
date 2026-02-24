@@ -2,15 +2,21 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Route requests based on whether this is the master platform domain
- * or a tenant custom domain.
+ * Two deployment modes:
  *
- * Master domain  → super-admin & platform routes allowed, root → /platform
- * Tenant domain  → super-admin & platform routes blocked, root → tenant app
+ * ADMIN mode  (NEXT_PUBLIC_ADMIN_ONLY=true  — rms-admin-dashboard project)
+ *   • / → /platform  (Vicson Estate Suite landing page)
+ *   • /dashboard/super-admin, /auth/*, /platform → allowed
+ *   • everything else → /platform
+ *
+ * TENANT mode (default — frontend project, tenant custom domains)
+ *   • /dashboard/super-admin → blocked (redirect to /)
+ *   • /platform → blocked (redirect to /)
+ *   • everything else → allowed
  */
+
 function isMasterDomain(hostname: string): boolean {
   if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
-  if (hostname.endsWith('.vercel.app') || hostname.endsWith('.railway.app')) return true;
   const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN;
   if (platformDomain && hostname === platformDomain) return true;
   return false;
@@ -21,7 +27,7 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get('host') || '';
   const hostname = host.split(':')[0].toLowerCase();
 
-  // Always allow Next.js internals, static assets, and public API routes
+  // Always pass through Next.js internals, static assets, and API routes
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
@@ -30,17 +36,26 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isMasterDomain(hostname)) {
-    // ── Master platform domain ──
-    // Redirect bare root straight to the admin login page
+  // Admin mode: explicit env flag (rms-admin-dashboard project) OR master hostname
+  const isAdminMode =
+    process.env.NEXT_PUBLIC_ADMIN_ONLY === 'true' || isMasterDomain(hostname);
+
+  if (isAdminMode) {
+    // Root → platform landing page (Vicson Estate Suite)
     if (pathname === '/') {
-      return NextResponse.redirect(new URL('/auth/login', request.url));
+      return NextResponse.redirect(new URL('/platform', request.url));
     }
-    // Allow all routes (including /dashboard/super-admin)
-    return NextResponse.next();
+    // Allow admin dashboard, auth pages, and the platform landing
+    const allowed =
+      pathname.startsWith('/dashboard/super-admin') ||
+      pathname.startsWith('/dashboard/admin') ||
+      pathname.startsWith('/auth') ||
+      pathname.startsWith('/platform');
+    if (!allowed) {
+      return NextResponse.redirect(new URL('/platform', request.url));
+    }
   } else {
-    // ── Tenant custom domain ──
-    // Block super-admin and platform-level routes
+    // Tenant mode: block super-admin and platform routes
     if (
       pathname.startsWith('/dashboard/super-admin') ||
       pathname.startsWith('/platform')
@@ -53,8 +68,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    // Match all routes except static files
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

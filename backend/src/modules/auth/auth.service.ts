@@ -283,6 +283,7 @@ export class AuthService {
     try {
       const admin = await this.masterPrisma.superAdmin.findUnique({
         where: { email },
+        select: { id: true, email: true, password: true, firstName: true, lastName: true, phone: true },
       });
 
       if (!admin) {

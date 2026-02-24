@@ -20,7 +20,7 @@ export default function GOHRPage() {
     const fetch = async () => {
       try {
         const [leaveRes, staffRes]: any[] = await Promise.allSettled([
-          api.get('/hr/leave-requests?limit=5'),
+          api.get('/hr/leave?limit=5'),
           api.get('/staff?limit=100'),
         ]);
         if (leaveRes.status === 'fulfilled') {
