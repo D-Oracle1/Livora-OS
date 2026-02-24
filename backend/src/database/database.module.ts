@@ -15,13 +15,21 @@ async function getFallbackPrisma(): Promise<PrismaService> {
   // Prevent multiple concurrent initializations
   if (!fallbackInitPromise) {
     fallbackInitPromise = (async () => {
-      const fallback = new PrismaService();
-      // Do NOT call $connect() here. Prisma connects lazily on the first query.
-      // Eager $connect() throws if DATABASE_URL is unavailable, which kills NestJS
-      // DI for the entire request before any service try/catch can handle it (→ 500).
-      // Lazy connection means failures surface at query-time and are caught normally.
-      cachedFallback = fallback;
-      return fallback;
+      // Guard: PrismaClient constructor validates the datasource URL format.
+      // If DATABASE_URL is missing or invalid (e.g. cold-start env race), catch
+      // the validation error here so it surfaces at query-time, not DI-time.
+      try {
+        const fallback = new PrismaService();
+        cachedFallback = fallback;
+        return fallback;
+      } catch (err: any) {
+        new Logger('DatabaseModule').warn(
+          `Fallback PrismaService init failed (DATABASE_URL may be unset): ${err.message}`,
+        );
+        // Reset so the next request retries construction (env may become available)
+        fallbackInitPromise = null;
+        throw err;
+      }
     })();
   }
 

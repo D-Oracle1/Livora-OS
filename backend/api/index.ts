@@ -36,6 +36,18 @@ export default async function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
+  // Vercel Fluid Compute patches IncomingMessage.prototype with a `body` getter
+  // that throws "Invalid JSON" when body-parser tries to access it synchronously.
+  // Shadow it with `undefined` on this specific request instance so body-parser
+  // skips the getter and reads the body from the underlying stream as normal.
+  try {
+    Object.defineProperty(req, 'body', {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+  } catch { /* already an own property — no action needed */ }
+
   try {
     const expressApp = await getHandler();
     expressApp(req, res);
