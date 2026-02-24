@@ -350,8 +350,12 @@ export class AuthService {
   private isSmtpConfigured(): boolean {
     const host = this.configService.get<string>('email.host', '');
     const user = this.configService.get<string>('email.user', '');
+    const from = this.configService.get<string>('email.from', '');
     if (!host || host.includes('example.com') || host === 'smtp.example.com') return false;
     if (!user || user.includes('@example.com') || user.startsWith('your-email')) return false;
+    // Resend's shared test sender can only deliver to the account owner's own email.
+    // Treat it as unconfigured so users are auto-verified until a real domain is set.
+    if (from.endsWith('@resend.dev')) return false;
     return true;
   }
 
