@@ -1,57 +1,97 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle2, XCircle, Loader2, Mail } from 'lucide-react';
+import { CheckCircle2, Loader2, Mail, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 function VerifyEmailContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const token = params.get('token');
+  const emailParam = params.get('email') || '';
 
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'idle'>('idle');
-  const [message, setMessage] = useState('');
-  const [resendEmail, setResendEmail] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [email, setEmail] = useState(emailParam);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
-  const calledRef = useRef(false);
+  const [countdown, setCountdown] = useState(0);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Countdown timer for resend cooldown
   useEffect(() => {
-    if (!token || calledRef.current) return;
-    calledRef.current = true;
+    if (countdown <= 0) return;
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
+  const handleOtpChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, '').slice(-1);
+    const next = [...otp];
+    next[index] = digit;
+    setOtp(next);
+    if (digit && index < 5) inputRefs.current[index + 1]?.focus();
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      setOtp(pasted.split(''));
+      inputRefs.current[5]?.focus();
+    }
+  };
+
+  const handleVerify = async () => {
+    const code = otp.join('');
+    if (code.length < 6 || !email.trim()) return;
     setStatus('loading');
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    fetch(`${base}/api/v1/auth/verify-email?token=${encodeURIComponent(token)}`)
-      .then(async (r) => {
-        const data = await r.json();
-        if (r.ok) {
-          setStatus('success');
-          setMessage(data.message || 'Email verified successfully.');
-          setTimeout(() => router.push('/auth/login'), 3000);
-        } else {
-          setStatus('error');
-          setMessage(data.message || 'Invalid or expired link.');
-        }
-      })
-      .catch(() => {
-        setStatus('error');
-        setMessage('Something went wrong. Please try again.');
+    setErrorMsg('');
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const res = await fetch(`${base}/api/v1/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), otp: code }),
       });
-  }, [token, router]);
+      const data = await res.json();
+      if (res.ok) {
+        setStatus('success');
+        setTimeout(() => router.push('/auth/login'), 2500);
+      } else {
+        setStatus('error');
+        setErrorMsg(data.message || 'Invalid code. Please try again.');
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+      }
+    } catch {
+      setStatus('error');
+      setErrorMsg('Something went wrong. Please try again.');
+    }
+  };
 
   const handleResend = async () => {
-    if (!resendEmail.trim() || resending) return;
+    if (!email.trim() || resending || countdown > 0) return;
     setResending(true);
+    setResent(false);
     try {
       const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       await fetch(`${base}/api/v1/auth/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resendEmail.trim().toLowerCase() }),
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       setResent(true);
+      setCountdown(60);
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
     } catch {
       setResent(true);
     } finally {
@@ -59,114 +99,99 @@ function VerifyEmailContent() {
     }
   };
 
+  if (status === 'success') {
+    return (
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-md p-10 text-center space-y-4">
+        <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto">
+          <CheckCircle2 className="w-9 h-9 text-emerald-500" />
+        </div>
+        <h1 className="text-xl font-bold text-gray-800">Email Verified!</h1>
+        <p className="text-sm text-gray-500">Your account is now active. Redirecting to login…</p>
+        <Link href="/auth/login" className="block text-sm text-blue-600 hover:underline">
+          Go to Login
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full max-w-md bg-white rounded-2xl shadow-md p-8 text-center space-y-5">
+    <div className="w-full max-w-md bg-white rounded-2xl shadow-md p-8 text-center space-y-6">
+      {/* Icon + heading */}
+      <div className="space-y-3">
+        <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto">
+          <Mail className="w-8 h-8 text-blue-500" />
+        </div>
+        <h1 className="text-xl font-bold text-gray-800">Check your email</h1>
+        <p className="text-sm text-gray-500">
+          We sent a 6-digit verification code to{' '}
+          {email ? <span className="font-medium text-gray-700">{email}</span> : 'your email address'}.
+        </p>
+      </div>
 
-      {/* No token — show resend form */}
-      {!token && (
-        <>
-          <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto">
-            <Mail className="w-8 h-8 text-blue-500" />
-          </div>
-          <h1 className="text-xl font-bold text-gray-800">Check your email</h1>
-          <p className="text-sm text-gray-500">
-            We sent a verification link to your email address. Click the link to activate your account.
-          </p>
-          <p className="text-xs text-gray-400">Didn&apos;t receive it? Enter your email below to resend.</p>
-
-          {resent ? (
-            <p className="text-sm text-emerald-600 font-medium">
-              Verification email sent! Check your inbox (and spam folder).
-            </p>
-          ) : (
-            <div className="flex gap-2 mt-2">
-              <input
-                type="email"
-                value={resendEmail}
-                onChange={(e) => setResendEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-gray-800 placeholder:text-gray-400"
-              />
-              <button
-                onClick={handleResend}
-                disabled={!resendEmail.trim() || resending}
-                className="h-10 px-4 text-sm font-medium bg-blue-600 text-white rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors"
-              >
-                {resending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Resend'}
-              </button>
-            </div>
-          )}
-
-          <Link href="/auth/login" className="block text-sm text-blue-600 hover:underline mt-2">
-            Back to Login
-          </Link>
-        </>
+      {/* Email input (editable if not pre-filled) */}
+      {!emailParam && (
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="your@email.com"
+          className="w-full h-10 px-3 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-gray-800 placeholder:text-gray-400"
+        />
       )}
 
-      {/* Token present — show verification status */}
-      {token && status === 'loading' && (
-        <>
-          <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto">
-            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-          </div>
-          <h1 className="text-xl font-bold text-gray-800">Verifying your email…</h1>
-          <p className="text-sm text-gray-500">Just a moment.</p>
-        </>
+      {/* OTP boxes */}
+      <div className="flex justify-center gap-2" onPaste={handlePaste}>
+        {otp.map((digit, i) => (
+          <input
+            key={i}
+            ref={(el) => { inputRefs.current[i] = el; }}
+            type="text"
+            inputMode="numeric"
+            maxLength={1}
+            value={digit}
+            onChange={(e) => handleOtpChange(i, e.target.value)}
+            onKeyDown={(e) => handleKeyDown(i, e)}
+            className={`w-11 h-14 text-center text-xl font-bold border-2 rounded-xl outline-none transition-colors
+              ${digit ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-800'}
+              focus:border-blue-500 focus:bg-blue-50
+              ${status === 'error' ? 'border-red-300' : ''}`}
+          />
+        ))}
+      </div>
+
+      {/* Error */}
+      {status === 'error' && errorMsg && (
+        <p className="text-sm text-red-500 font-medium">{errorMsg}</p>
       )}
 
-      {token && status === 'success' && (
-        <>
-          <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-9 h-9 text-emerald-500" />
-          </div>
-          <h1 className="text-xl font-bold text-gray-800">Email Verified!</h1>
-          <p className="text-sm text-gray-500">{message}</p>
-          <p className="text-xs text-gray-400">Redirecting to login…</p>
-          <Link href="/auth/login" className="block text-sm text-blue-600 hover:underline">
-            Go to Login
-          </Link>
-        </>
-      )}
+      {/* Verify button */}
+      <button
+        onClick={handleVerify}
+        disabled={otp.join('').length < 6 || !email.trim() || status === 'loading'}
+        className="w-full h-11 bg-blue-600 text-white font-semibold rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+      >
+        {status === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
+        Verify Email
+      </button>
 
-      {token && status === 'error' && (
-        <>
-          <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto">
-            <XCircle className="w-9 h-9 text-red-500" />
-          </div>
-          <h1 className="text-xl font-bold text-gray-800">Verification Failed</h1>
-          <p className="text-sm text-gray-500">{message}</p>
+      {/* Resend */}
+      <div className="text-sm text-gray-500 space-y-1">
+        {resent && (
+          <p className="text-emerald-600 font-medium text-xs">New code sent — check your inbox.</p>
+        )}
+        <button
+          onClick={handleResend}
+          disabled={!email.trim() || resending || countdown > 0}
+          className="flex items-center gap-1 mx-auto text-blue-600 hover:underline disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          {countdown > 0 ? `Resend in ${countdown}s` : "Didn't receive it? Resend code"}
+        </button>
+      </div>
 
-          {resent ? (
-            <p className="text-sm text-emerald-600 font-medium">
-              New verification email sent! Check your inbox.
-            </p>
-          ) : (
-            <>
-              <p className="text-xs text-gray-400">Enter your email to get a new verification link.</p>
-              <div className="flex gap-2 mt-2">
-                <input
-                  type="email"
-                  value={resendEmail}
-                  onChange={(e) => setResendEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-gray-800 placeholder:text-gray-400"
-                />
-                <button
-                  onClick={handleResend}
-                  disabled={!resendEmail.trim() || resending}
-                  className="h-10 px-4 text-sm font-medium bg-blue-600 text-white rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors"
-                >
-                  {resending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Resend'}
-                </button>
-              </div>
-            </>
-          )}
-
-          <Link href="/auth/login" className="block text-sm text-blue-600 hover:underline mt-2">
-            Back to Login
-          </Link>
-        </>
-      )}
+      <Link href="/auth/login" className="block text-sm text-gray-400 hover:text-gray-600">
+        Back to Login
+      </Link>
     </div>
   );
 }

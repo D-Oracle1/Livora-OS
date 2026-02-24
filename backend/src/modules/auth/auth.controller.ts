@@ -94,11 +94,21 @@ export class AuthController {
 
   @Get('verify-email')
   @Public()
-  @ApiOperation({ summary: 'Verify email address using token from email link' })
+  @ApiOperation({ summary: 'Verify email address using token from email link (legacy)' })
   @ApiResponse({ status: 200, description: 'Email verified successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired token' })
-  async verifyEmail(@Query('token') token: string) {
+  async verifyEmailGet(@Query('token') token: string) {
     return this.authService.verifyEmail(token);
+  }
+
+  @Post('verify-email')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email address using OTP code' })
+  @ApiResponse({ status: 200, description: 'Email verified successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  async verifyEmailOtp(@Body('email') email: string, @Body('otp') otp: string) {
+    return this.authService.verifyEmailOtp(email, otp);
   }
 
   @Post('resend-verification')

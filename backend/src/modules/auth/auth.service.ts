@@ -69,9 +69,9 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 12);
 
-    // Generate email verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    // Generate 6-digit OTP (expires in 15 minutes)
+    const otp = this.generateOtp();
+    const verificationExpiry = new Date(Date.now() + 15 * 60 * 1000);
 
     const user = await this.prisma.user.create({
       data: {
@@ -83,7 +83,7 @@ export class AuthService {
         role: registerDto.role || UserRole.CLIENT,
         status: UserStatus.ACTIVE,
         emailVerified: false,
-        emailVerificationToken: verificationToken,
+        emailVerificationToken: otp,
         emailVerificationExpiry: verificationExpiry,
         referralCode: `REF-${uuidv4().substring(0, 8).toUpperCase()}`,
         referredBy: referrerId,
@@ -98,20 +98,16 @@ export class AuthService {
       await this.awardReferralReward(this.prisma, referrerId);
     }
 
-    const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
-    const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
-
     if (this.isSmtpConfigured()) {
-      // Send verification email (fire-and-forget)
-      this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
+      this.mailService.sendEmailVerificationEmail(user.email, otp, {
+        firstName: user.firstName,
+      }).catch((err) => {
         this.logger.error(`Failed to send verification email: ${err.message}`);
-        // Log URL so admin can manually verify via Vercel/server logs
-        this.logger.warn(`[VERIFY FALLBACK] ${user.email} → ${verifyUrl}`);
+        this.logger.warn(`[OTP FALLBACK] ${user.email} → ${otp}`);
       });
     } else {
-      // SMTP not configured — auto-verify and log the URL for manual use
       this.logger.warn(`SMTP not configured. Auto-verifying ${user.email}`);
-      this.logger.warn(`[VERIFY URL] ${verifyUrl}`);
+      this.logger.warn(`[OTP] ${user.email} → ${otp}`);
       await this.prisma.user.update({
         where: { id: user.id },
         data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpiry: null },
@@ -177,9 +173,9 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 12);
 
-    // Generate email verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    // Generate 6-digit OTP (expires in 15 minutes)
+    const otp = this.generateOtp();
+    const verificationExpiry = new Date(Date.now() + 15 * 60 * 1000);
 
     const user = await tenantClient.user.create({
       data: {
@@ -191,7 +187,7 @@ export class AuthService {
         role,
         status: UserStatus.ACTIVE,
         emailVerified: false,
-        emailVerificationToken: verificationToken,
+        emailVerificationToken: otp,
         emailVerificationExpiry: verificationExpiry,
         referralCode: `REF-${uuidv4().substring(0, 8).toUpperCase()}`,
         referredBy: referrerId,
@@ -206,17 +202,19 @@ export class AuthService {
       await this.awardReferralReward(tenantClient, referrerId);
     }
 
-    const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
-    const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
-
     if (this.isSmtpConfigured()) {
-      this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
+      this.mailService.sendEmailVerificationEmail(user.email, otp, {
+        firstName: user.firstName,
+        companyName: company.name,
+        logoUrl: company.logo ?? undefined,
+        primaryColor: company.primaryColor ?? undefined,
+      }).catch((err) => {
         this.logger.error(`Failed to send verification email: ${err.message}`);
-        this.logger.warn(`[VERIFY FALLBACK] ${user.email} → ${verifyUrl}`);
+        this.logger.warn(`[OTP FALLBACK] ${user.email} → ${otp}`);
       });
     } else {
       this.logger.warn(`SMTP not configured. Auto-verifying ${user.email}`);
-      this.logger.warn(`[VERIFY URL] ${verifyUrl}`);
+      this.logger.warn(`[OTP] ${user.email} → ${otp}`);
       await tenantClient.user.update({
         where: { id: user.id },
         data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpiry: null },
@@ -680,6 +678,33 @@ export class AuthService {
    * Works for both standard and invite-code registrations.
    * The token lookup goes through the request-scoped PrismaService (tenant or default DB).
    */
+  /** Verify via OTP code + email (new flow) */
+  async verifyEmailOtp(email: string, otp: string) {
+    if (!email || !otp) {
+      throw new BadRequestException('Email and OTP are required');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (!user || user.emailVerificationToken !== otp.trim()) {
+      throw new BadRequestException('Invalid OTP. Please check the code and try again.');
+    }
+
+    if (user.emailVerificationExpiry && user.emailVerificationExpiry < new Date()) {
+      throw new BadRequestException('OTP has expired. Please request a new one.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpiry: null },
+    });
+
+    return { message: 'Email verified successfully. You can now log in.' };
+  }
+
+  /** Legacy token link verification (kept for backward compatibility) */
   async verifyEmail(token: string) {
     const user = await this.prisma.user.findFirst({
       where: { emailVerificationToken: token },
@@ -695,19 +720,14 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: {
-        emailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationExpiry: null,
-      },
+      data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpiry: null },
     });
 
     return { message: 'Email verified successfully. You can now log in.' };
   }
 
   /**
-   * Resend a verification email.
-   * Generates a new token and sends a new email.
+   * Resend a verification OTP.
    */
   async resendVerification(email: string) {
     const user = await this.prisma.user.findUnique({
@@ -716,27 +736,25 @@ export class AuthService {
 
     // Always return success to prevent user enumeration
     if (!user || user.emailVerified) {
-      return { message: 'If your account exists and is unverified, a new verification email has been sent.' };
+      return { message: 'If your account exists and is unverified, a new code has been sent.' };
     }
 
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    const otp = this.generateOtp();
+    const verificationExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 min
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { emailVerificationToken: verificationToken, emailVerificationExpiry: verificationExpiry },
+      data: { emailVerificationToken: otp, emailVerificationExpiry: verificationExpiry },
     });
 
-    const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
-    const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
-
     if (this.isSmtpConfigured()) {
-      this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
-        this.logger.error(`Failed to resend verification email: ${err.message}`);
-        this.logger.warn(`[VERIFY FALLBACK] ${user.email} → ${verifyUrl}`);
+      this.mailService.sendEmailVerificationEmail(user.email, otp, {
+        firstName: user.firstName,
+      }).catch((err) => {
+        this.logger.error(`Failed to resend verification OTP: ${err.message}`);
+        this.logger.warn(`[OTP FALLBACK] ${user.email} → ${otp}`);
       });
     } else {
-      // Auto-verify since SMTP is not configured
       await this.prisma.user.update({
         where: { id: user.id },
         data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpiry: null },
@@ -744,7 +762,12 @@ export class AuthService {
       this.logger.warn(`SMTP not configured. Auto-verified ${user.email} on resend`);
     }
 
-    return { message: 'If your account exists and is unverified, a new verification email has been sent.' };
+    return { message: 'If your account exists and is unverified, a new code has been sent.' };
+  }
+
+  /** Generate a 6-digit numeric OTP */
+  private generateOtp(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
   async forgotPassword(email: string) {

@@ -166,16 +166,40 @@ export class MailService {
     await this.send(to, 'Welcome!', html);
   }
 
-  async sendEmailVerificationEmail(to: string, verificationUrl: string): Promise<void> {
-    const html = this.baseTemplate(`
-      <h2 style="color: #333;">Verify Your Email</h2>
-      <p>Please verify your email address by clicking the button below.</p>
-      <p>This link expires in 24 hours.</p>
-      ${this.button('Verify Email', verificationUrl)}
-      <p style="color: #666; font-size: 14px;">If you didn't create an account, you can safely ignore this email.</p>
-      <p style="color: #666; font-size: 14px;">Or copy and paste this link: <br/>${verificationUrl}</p>
-    `);
-    await this.send(to, 'Verify Your Email', html);
+  async sendEmailVerificationEmail(
+    to: string,
+    otp: string,
+    branding?: { firstName?: string; companyName?: string; logoUrl?: string; primaryColor?: string },
+  ): Promise<void> {
+    const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
+    const greeting = branding?.firstName ? `Hi ${escapeHtml(branding.firstName)},` : 'Hello,';
+    const digits = otp.split('').map((d) =>
+      `<span style="display:inline-block;width:44px;height:56px;line-height:56px;text-align:center;font-size:28px;font-weight:700;color:#1f2937;background:#f3f4f6;border-radius:8px;margin:0 4px;">${d}</span>`
+    ).join('');
+
+    const html = this.brandedLetterheadTemplate(
+      `<p style="margin:0 0 8px;font-size:15px;">${greeting}</p>
+       <p style="margin:0 0 20px;font-size:15px;color:#374151;">
+         Use the verification code below to confirm your email address.
+         This code expires in <strong>15 minutes</strong>.
+       </p>
+       <div style="text-align:center;margin:28px 0;">
+         ${digits}
+       </div>
+       <p style="margin:24px 0 0;font-size:13px;color:#9ca3af;text-align:center;">
+         Enter this code on the verification page to activate your account.
+       </p>
+       <p style="margin:16px 0 0;font-size:13px;color:#9ca3af;text-align:center;">
+         If you didn't create an account, you can safely ignore this email.
+       </p>`,
+      `${appUrl}/auth/login`,
+      {
+        companyName: branding?.companyName,
+        logoUrl: branding?.logoUrl,
+        primaryColor: branding?.primaryColor,
+      },
+    );
+    await this.send(to, 'Your verification code', html);
   }
 
   // ============ Sale Emails ============
