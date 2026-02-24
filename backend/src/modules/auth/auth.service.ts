@@ -294,17 +294,27 @@ export class AuthService {
     // Generate referral code if user doesn't have one (legacy accounts)
     if (!user.referralCode) {
       const referralCode = `REF-${uuidv4().substring(0, 8).toUpperCase()}`;
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date(), referralCode },
-      });
-      user.referralCode = referralCode;
+      try {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date(), referralCode },
+        });
+        user.referralCode = referralCode;
+      } catch (err: any) {
+        // Non-critical: log and continue — missing column means schema needs migration
+        this.logger.warn(`Could not update lastLoginAt/referralCode (run migrate): ${err.message}`);
+      }
     } else {
       // Update last login
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date() },
-      });
+      try {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        });
+      } catch (err: any) {
+        // Non-critical: log and continue — missing column means schema needs migration
+        this.logger.warn(`Could not update lastLoginAt (run migrate): ${err.message}`);
+      }
     }
 
     const tokens = await this.generateTokens(user, companyId);
@@ -333,10 +343,15 @@ export class AuthService {
 
       return user;
     } catch (err: any) {
-      // If the DB hasn't been migrated yet (column not found), treat as invalid
-      // credentials rather than crashing with 500. Admin should run bootstrap/migrate.
-      if (err?.message?.includes('does not exist') || err?.code === 'P2010') {
-        this.logger.error(`DB schema mismatch in validateUser — run bootstrap/migrate: ${err.message}`);
+      const msg: string = err?.message || '';
+      // Schema mismatch — column/table missing, admin should run migrate
+      if (msg.includes('does not exist') || err?.code === 'P2010') {
+        this.logger.error(`DB schema mismatch in validateUser — run bootstrap/migrate: ${msg}`);
+        return null;
+      }
+      // Datasource URL invalid (env var missing or wrong format) — surface as 401 not 500
+      if (msg.includes('URL must start with') || msg.includes('Error validating datasource')) {
+        this.logger.error(`Datasource URL misconfigured in validateUser: ${msg}`);
         return null;
       }
       throw err;

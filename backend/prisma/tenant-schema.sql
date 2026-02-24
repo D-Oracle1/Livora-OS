@@ -2018,3 +2018,14 @@ ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "emailVerificationExpiry" TIMESTAMP
 CREATE UNIQUE INDEX IF NOT EXISTS "users_emailVerificationToken_key"
   ON "users"("emailVerificationToken")
   WHERE "emailVerificationToken" IS NOT NULL;
+
+-- ============================================================
+-- Login tracking + referral system (added 2026-02)
+-- ============================================================
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "lastLoginAt" TIMESTAMP(3);
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "referralCode" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "referredBy" TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS "users_referralCode_key"
+  ON "users"("referralCode")
+  WHERE "referralCode" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "users_referralCode_idx" ON "users"("referralCode");
