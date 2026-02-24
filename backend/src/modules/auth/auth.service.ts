@@ -291,19 +291,29 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
+    try {
+      const user = await this.usersService.findByEmail(email);
 
-    if (!user) {
-      return null;
+      if (!user) {
+        return null;
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+
+      if (!isPasswordValid) {
+        return null;
+      }
+
+      return user;
+    } catch (err: any) {
+      // If the DB hasn't been migrated yet (column not found), treat as invalid
+      // credentials rather than crashing with 500. Admin should run bootstrap/migrate.
+      if (err?.message?.includes('does not exist') || err?.code === 'P2010') {
+        this.logger.error(`DB schema mismatch in validateUser — run bootstrap/migrate: ${err.message}`);
+        return null;
+      }
+      throw err;
     }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return null;
-    }
-
-    return user;
   }
 
   /**

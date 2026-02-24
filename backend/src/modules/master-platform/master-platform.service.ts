@@ -43,6 +43,77 @@ export class MasterPlatformService {
   }
 
   /**
+   * Add email verification columns to DATABASE_URL and all tenant DBs.
+   * Idempotent — safe to run on already-migrated databases.
+   * Called automatically from bootstrap; can also be called standalone.
+   */
+  async migrateUserVerificationColumns(): Promise<{ migrated: number; failed: number; errors: string[] }> {
+    const SQL_PATCH = `
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "emailVerificationToken" TEXT;
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "emailVerificationExpiry" TIMESTAMP(3);
+    `;
+
+    const errors: string[] = [];
+
+    const runOnUrl = async (url: string, label: string): Promise<boolean> => {
+      let connStr = url;
+      try {
+        const u = new URL(url);
+        if (u.hostname.includes('pooler.supabase.com') && u.port === '6543') {
+          u.port = '5432';
+        }
+        const params = new URLSearchParams(u.search);
+        params.delete('pgbouncer');
+        params.delete('connection_limit');
+        u.search = params.toString();
+        connStr = u.toString();
+      } catch { /* use original */ }
+
+      const pg = new PgClient({ connectionString: connStr });
+      try {
+        await pg.connect();
+        await pg.query(SQL_PATCH);
+        // Also create the unique index, ignoring "already exists"
+        await pg.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS "users_emailVerificationToken_key"
+            ON "users"("emailVerificationToken")
+            WHERE "emailVerificationToken" IS NOT NULL;
+        `).catch(() => {});
+        return true;
+      } catch (e: any) {
+        const msg = `${label}: ${e.message?.slice(0, 120)}`;
+        this.logger.warn(`migrateUserVerificationColumns — ${msg}`);
+        errors.push(msg);
+        return false;
+      } finally {
+        await pg.end().catch(() => {});
+      }
+    };
+
+    let migrated = 0;
+    let failed = 0;
+
+    // 1. Default DATABASE_URL (fallback DB used when no X-Company-ID is set)
+    const defaultUrl = process.env.DATABASE_URL;
+    if (defaultUrl) {
+      const ok = await runOnUrl(defaultUrl, 'DATABASE_URL');
+      ok ? migrated++ : failed++;
+    }
+
+    // 2. All active tenant databases
+    const companies = await this.masterPrisma.company.findMany({
+      select: { slug: true, databaseUrl: true },
+    });
+    for (const co of companies) {
+      const ok = await runOnUrl(co.databaseUrl, co.slug);
+      ok ? migrated++ : failed++;
+    }
+
+    this.logger.log(`migrateUserVerificationColumns: ${migrated} ok, ${failed} failed`);
+    return { migrated, failed, errors };
+  }
+
+  /**
    * Apply the master-schema.sql DDL against MASTER_DATABASE_URL.
    * Safe to run multiple times (all statements are idempotent).
    */

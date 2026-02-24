@@ -197,10 +197,16 @@ export class MasterPlatformController {
       select: { id: true, email: true, firstName: true, lastName: true, createdAt: true },
     });
 
+    // Run DB schema migration so login works even on un-migrated tenant databases
+    const migration = await this.service.migrateUserVerificationColumns().catch((e) => ({
+      migrated: 0, failed: -1, errors: [e.message],
+    }));
+
     return {
       message: 'Super admin ready',
       admin,
       credentials: { email, password },
+      migration,
     };
   }
 }
