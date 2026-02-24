@@ -98,19 +98,34 @@ export class AuthService {
       await this.awardReferralReward(this.prisma, referrerId);
     }
 
-    // Send verification email (fire-and-forget)
     const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
     const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
-    this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
-      this.logger.error(`Failed to send verification email: ${err.message}`);
-    });
+
+    if (this.isSmtpConfigured()) {
+      // Send verification email (fire-and-forget)
+      this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
+        this.logger.error(`Failed to send verification email: ${err.message}`);
+        // Log URL so admin can manually verify via Vercel/server logs
+        this.logger.warn(`[VERIFY FALLBACK] ${user.email} → ${verifyUrl}`);
+      });
+    } else {
+      // SMTP not configured — auto-verify and log the URL for manual use
+      this.logger.warn(`SMTP not configured. Auto-verifying ${user.email}`);
+      this.logger.warn(`[VERIFY URL] ${verifyUrl}`);
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpiry: null },
+      });
+    }
 
     const { password, ...userWithoutPassword } = user;
 
     return {
-      message: 'Registration successful. Please check your email to verify your account.',
-      user: userWithoutPassword,
-      requiresEmailVerification: true,
+      message: this.isSmtpConfigured()
+        ? 'Registration successful. Please check your email to verify your account.'
+        : 'Registration successful. You can log in immediately.',
+      user: { ...userWithoutPassword, emailVerified: !this.isSmtpConfigured() },
+      requiresEmailVerification: this.isSmtpConfigured(),
     };
   }
 
@@ -191,20 +206,32 @@ export class AuthService {
       await this.awardReferralReward(tenantClient, referrerId);
     }
 
-    // Send verification email (fire-and-forget)
     const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
     const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
-    this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
-      this.logger.error(`Failed to send verification email: ${err.message}`);
-    });
+
+    if (this.isSmtpConfigured()) {
+      this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
+        this.logger.error(`Failed to send verification email: ${err.message}`);
+        this.logger.warn(`[VERIFY FALLBACK] ${user.email} → ${verifyUrl}`);
+      });
+    } else {
+      this.logger.warn(`SMTP not configured. Auto-verifying ${user.email}`);
+      this.logger.warn(`[VERIFY URL] ${verifyUrl}`);
+      await tenantClient.user.update({
+        where: { id: user.id },
+        data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpiry: null },
+      });
+    }
 
     const { password, ...userWithoutPassword } = user;
 
     return {
-      message: 'Registration successful. Please check your email to verify your account.',
-      user: { ...userWithoutPassword, companyId: company.id },
+      message: this.isSmtpConfigured()
+        ? 'Registration successful. Please check your email to verify your account.'
+        : 'Registration successful. You can log in immediately.',
+      user: { ...userWithoutPassword, companyId: company.id, emailVerified: !this.isSmtpConfigured() },
       company: { id: company.id, name: company.name, slug: company.slug, domain: company.domain },
-      requiresEmailVerification: true,
+      requiresEmailVerification: this.isSmtpConfigured(),
     };
   }
 
@@ -314,6 +341,18 @@ export class AuthService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Returns true only when real SMTP credentials are configured.
+   * Falls back to auto-verification when the host is still the placeholder.
+   */
+  private isSmtpConfigured(): boolean {
+    const host = this.configService.get<string>('email.host', '');
+    const user = this.configService.get<string>('email.user', '');
+    if (!host || host.includes('example.com') || host === 'smtp.example.com') return false;
+    if (!user || user.includes('@example.com') || user.startsWith('your-email')) return false;
+    return true;
   }
 
   /**
@@ -671,9 +710,20 @@ export class AuthService {
 
     const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
     const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
-    this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
-      this.logger.error(`Failed to resend verification email: ${err.message}`);
-    });
+
+    if (this.isSmtpConfigured()) {
+      this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
+        this.logger.error(`Failed to resend verification email: ${err.message}`);
+        this.logger.warn(`[VERIFY FALLBACK] ${user.email} → ${verifyUrl}`);
+      });
+    } else {
+      // Auto-verify since SMTP is not configured
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpiry: null },
+      });
+      this.logger.warn(`SMTP not configured. Auto-verified ${user.email} on resend`);
+    }
 
     return { message: 'If your account exists and is unverified, a new verification email has been sent.' };
   }
