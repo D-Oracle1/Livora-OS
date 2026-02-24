@@ -11,7 +11,7 @@ export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get()
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles('GENERAL_OVERSEER', 'SUPER_ADMIN')
   @NoAudit()
   async getLogs(
     @Query('userId') userId?: string,

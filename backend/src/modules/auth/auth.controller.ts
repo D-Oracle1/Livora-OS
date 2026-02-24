@@ -5,6 +5,7 @@ import {
   Body,
   UseGuards,
   Get,
+  Query,
   HttpCode,
   HttpStatus,
   Req,
@@ -89,6 +90,24 @@ export class AuthController {
       changePasswordDto.currentPassword,
       changePasswordDto.newPassword,
     );
+  }
+
+  @Get('verify-email')
+  @Public()
+  @ApiOperation({ summary: 'Verify email address using token from email link' })
+  @ApiResponse({ status: 200, description: 'Email verified successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  async verifyEmail(@Query('token') token: string) {
+    return this.authService.verifyEmail(token);
+  }
+
+  @Post('resend-verification')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend email verification link' })
+  @ApiResponse({ status: 200, description: 'Verification email sent if account exists and is unverified' })
+  async resendVerification(@Body('email') email: string) {
+    return this.authService.resendVerification(email);
   }
 
   @Post('forgot-password')

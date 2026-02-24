@@ -133,8 +133,8 @@ export default function RegisterPage() {
         throw new Error(errorData.message || 'Registration failed');
       }
 
-      toast.success('Account created successfully!');
-      router.push('/auth/login');
+      toast.success('Account created! Check your email to verify your address.');
+      router.push('/auth/verify-email');
     } catch (error: any) {
       toast.error(error.message || 'Registration failed');
     } finally {

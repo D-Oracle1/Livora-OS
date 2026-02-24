@@ -737,6 +737,89 @@ export class CompanyService {
   }
 
   /**
+   * Wipe all tenant data (tables truncated + blobs deleted) but keep the
+   * company record in the master DB so the tenant can start on a clean slate.
+   */
+  async resetTenantData(id: string): Promise<{ message: string; deletedBlobs: number }> {
+    const company = await this.masterPrisma.company.findUnique({
+      where: { id },
+      select: { id: true, name: true, slug: true, databaseUrl: true },
+    });
+    if (!company) throw new NotFoundException('Company not found');
+
+    // 1. Collect all Vercel Blob URLs from the tenant DB before truncation
+    const blobUrls: string[] = [];
+    try {
+      const tenantClient = await this.tenantPrisma.getClient(id);
+      const users = await tenantClient.user.findMany({
+        where: { avatar: { not: null } },
+        select: { avatar: true },
+      });
+      blobUrls.push(...users.map((u) => u.avatar!).filter(Boolean));
+
+      const props = await (tenantClient as any).property
+        .findMany({ select: { images: true } })
+        .catch(() => []);
+      for (const p of props) {
+        if (Array.isArray(p.images)) {
+          blobUrls.push(
+            ...p.images.filter((u: any) => typeof u === 'string' && u.startsWith('https://')),
+          );
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(`Blob collection skipped for ${id}: ${e.message}`);
+    }
+
+    // 2. Delete blobs
+    let deletedBlobs = 0;
+    for (const url of blobUrls) {
+      try {
+        await del(url);
+        deletedBlobs++;
+      } catch { /* ignore individual failures */ }
+    }
+
+    // 3. Truncate all tenant tables (CASCADE handles FK order)
+    try {
+      let connStr = company.databaseUrl;
+      try {
+        const u = new URL(company.databaseUrl);
+        if (u.hostname.includes('pooler.supabase.com') && u.port === '6543') {
+          u.port = '5432';
+        }
+        const params = new URLSearchParams(u.search);
+        params.delete('pgbouncer');
+        params.delete('connection_limit');
+        u.search = params.toString();
+        connStr = u.toString();
+      } catch { /* use original */ }
+
+      const pgClient = new PgClient({ connectionString: connStr });
+      await pgClient.connect();
+      try {
+        const res = await pgClient.query<{ tablename: string }>(
+          `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,
+        );
+        const tables = res.rows.map((r) => `"${r.tablename}"`).join(', ');
+        if (tables) {
+          await pgClient.query(`TRUNCATE TABLE ${tables} RESTART IDENTITY CASCADE`);
+        }
+      } finally {
+        await pgClient.end();
+      }
+    } catch (e: any) {
+      this.logger.warn(`Tenant table truncation failed for ${id}: ${e.message}`);
+    }
+
+    // 4. Evict cached client so next request provisions a fresh connection
+    await this.tenantPrisma.disconnectTenant(id).catch(() => {});
+
+    this.logger.log(`Tenant data reset: ${company.name} (${company.slug}). Blobs deleted: ${deletedBlobs}`);
+    return { message: `All data for "${company.name}" has been wiped. The company account is now empty.`, deletedBlobs };
+  }
+
+  /**
    * Permanently delete multiple companies in sequence.
    */
   async bulkPurgeTenants(ids: string[]): Promise<{ message: string; deleted: number; errors: number }> {

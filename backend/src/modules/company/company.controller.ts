@@ -230,6 +230,16 @@ export class CompanyController {
     return this.companyService.reprovisionTenant(id);
   }
 
+  @Post(':id/reset-data')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Wipe all tenant data (clean slate) — keeps the company record' })
+  @ApiResponse({ status: 200, description: 'Tenant data wiped' })
+  async resetTenantData(@Param('id') id: string) {
+    return this.companyService.resetTenantData(id);
+  }
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN')

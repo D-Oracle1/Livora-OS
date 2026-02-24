@@ -69,6 +69,10 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 12);
 
+    // Generate email verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
     const user = await this.prisma.user.create({
       data: {
         email: registerDto.email,
@@ -78,6 +82,9 @@ export class AuthService {
         phone: registerDto.phone,
         role: registerDto.role || UserRole.CLIENT,
         status: UserStatus.ACTIVE,
+        emailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpiry: verificationExpiry,
         referralCode: `REF-${uuidv4().substring(0, 8).toUpperCase()}`,
         referredBy: referrerId,
       },
@@ -91,13 +98,19 @@ export class AuthService {
       await this.awardReferralReward(this.prisma, referrerId);
     }
 
-    const tokens = await this.generateTokens(user, companyId);
+    // Send verification email (fire-and-forget)
+    const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
+    const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
+    this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
+      this.logger.error(`Failed to send verification email: ${err.message}`);
+    });
 
     const { password, ...userWithoutPassword } = user;
 
     return {
+      message: 'Registration successful. Please check your email to verify your account.',
       user: userWithoutPassword,
-      ...tokens,
+      requiresEmailVerification: true,
     };
   }
 
@@ -149,6 +162,10 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 12);
 
+    // Generate email verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
     const user = await tenantClient.user.create({
       data: {
         email: registerDto.email,
@@ -158,6 +175,9 @@ export class AuthService {
         phone: registerDto.phone,
         role,
         status: UserStatus.ACTIVE,
+        emailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpiry: verificationExpiry,
         referralCode: `REF-${uuidv4().substring(0, 8).toUpperCase()}`,
         referredBy: referrerId,
       },
@@ -171,14 +191,20 @@ export class AuthService {
       await this.awardReferralReward(tenantClient, referrerId);
     }
 
-    const tokens = await this.generateTokens(user, company.id);
+    // Send verification email (fire-and-forget)
+    const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
+    const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
+    this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
+      this.logger.error(`Failed to send verification email: ${err.message}`);
+    });
 
     const { password, ...userWithoutPassword } = user;
 
     return {
+      message: 'Registration successful. Please check your email to verify your account.',
       user: { ...userWithoutPassword, companyId: company.id },
       company: { id: company.id, name: company.name, slug: company.slug, domain: company.domain },
-      ...tokens,
+      requiresEmailVerification: true,
     };
   }
 
@@ -219,6 +245,10 @@ export class AuthService {
 
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Account is not active');
+    }
+
+    if (!user.emailVerified) {
+      throw new UnauthorizedException('EMAIL_NOT_VERIFIED');
     }
 
     // Block login if the tenant company has been deactivated
@@ -575,6 +605,67 @@ export class AuthService {
 
     const { password, ...safeAdmin } = admin;
     return { ...safeAdmin, role: 'SUPER_ADMIN', isSuperAdmin: true };
+  }
+
+  /**
+   * Verify email using the token sent during registration.
+   * Works for both standard and invite-code registrations.
+   * The token lookup goes through the request-scoped PrismaService (tenant or default DB).
+   */
+  async verifyEmail(token: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { emailVerificationToken: token },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired verification link');
+    }
+
+    if (user.emailVerificationExpiry && user.emailVerificationExpiry < new Date()) {
+      throw new BadRequestException('Verification link has expired. Please request a new one.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiry: null,
+      },
+    });
+
+    return { message: 'Email verified successfully. You can now log in.' };
+  }
+
+  /**
+   * Resend a verification email.
+   * Generates a new token and sends a new email.
+   */
+  async resendVerification(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    // Always return success to prevent user enumeration
+    if (!user || user.emailVerified) {
+      return { message: 'If your account exists and is unverified, a new verification email has been sent.' };
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerificationToken: verificationToken, emailVerificationExpiry: verificationExpiry },
+    });
+
+    const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
+    const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
+    this.mailService.sendEmailVerificationEmail(user.email, verifyUrl).catch((err) => {
+      this.logger.error(`Failed to resend verification email: ${err.message}`);
+    });
+
+    return { message: 'If your account exists and is unverified, a new verification email has been sent.' };
   }
 
   async forgotPassword(email: string) {

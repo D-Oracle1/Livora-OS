@@ -295,8 +295,10 @@ model User {
   avatar        String?
   role          UserRole   @default(CLIENT)
   status        UserStatus @default(PENDING)
-  emailVerified Boolean    @default(false)
-  lastLoginAt   DateTime?
+  emailVerified           Boolean   @default(false)
+  emailVerificationToken  String?   @unique
+  emailVerificationExpiry DateTime?
+  lastLoginAt             DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

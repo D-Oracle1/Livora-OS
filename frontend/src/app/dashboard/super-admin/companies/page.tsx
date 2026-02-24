@@ -100,6 +100,8 @@ export default function CompaniesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [migratingAll, setMigratingAll] = useState(false);
+  const [confirmResetData, setConfirmResetData] = useState(false);
+  const [resettingData, setResettingData] = useState(false);
   const frontendDomain = typeof window !== 'undefined' ? window.location.hostname : '';
   const [editLogoUploading, setEditLogoUploading] = useState(false);
   const branding = usePlatformBranding();
@@ -296,6 +298,21 @@ export default function CompaniesPage() {
       }
     } finally {
       setReprovisioning(false);
+    }
+  };
+
+  const handleResetData = async () => {
+    if (!showDetail) return;
+    setResettingData(true);
+    const toastId = toast.loading('Wiping tenant data… this may take a few seconds');
+    try {
+      await api.post(`/companies/${showDetail.id}/reset-data`, {});
+      toast.success('All tenant data wiped. Company starts on a clean slate.', { id: toastId });
+      setConfirmResetData(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Reset failed', { id: toastId });
+    } finally {
+      setResettingData(false);
     }
   };
 
@@ -1032,6 +1049,37 @@ export default function CompaniesPage() {
         </div>
       )}
 
+      {/* Reset tenant data confirmation */}
+      {confirmResetData && showDetail && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-base">Reset &quot;{showDetail.name}&quot; to clean slate?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  This will permanently delete all <strong>users, properties, sales, and uploaded files</strong> for this company.
+                  The company account itself will remain active. This action <strong>cannot be undone</strong>.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setConfirmResetData(false)}>Cancel</Button>
+              <Button
+                onClick={handleResetData}
+                disabled={resettingData}
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                {resettingData && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Reset All Data
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bulk delete confirmation */}
       {confirmBulkDelete && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
@@ -1135,6 +1183,17 @@ export default function CompaniesPage() {
                         >
                           {verifyingDNS && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
                           Verify DNS
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConfirmResetData(true)}
+                          disabled={resettingData}
+                          className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                          title="Wipe all tenant data and start on a clean slate (keeps company account)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                          Reset Data
                         </Button>
                       </div>
                     ) : (

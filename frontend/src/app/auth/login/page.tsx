@@ -119,7 +119,19 @@ export default function LoginPage() {
         router.push('/dashboard/client');
       }
     } catch (error: any) {
-      toast.error(error.message || 'Invalid credentials. Please ensure the backend is running.');
+      const msg: string = error.message || '';
+      if (msg === 'EMAIL_NOT_VERIFIED' || msg.toLowerCase().includes('verify your email')) {
+        toast.error('Please verify your email before logging in.', {
+          description: 'Check your inbox for the verification link.',
+          action: {
+            label: 'Resend',
+            onClick: () => window.location.assign('/auth/verify-email'),
+          },
+          duration: 8000,
+        });
+      } else {
+        toast.error(msg || 'Invalid credentials. Please ensure the backend is running.');
+      }
     } finally {
       setIsLoading(false);
     }

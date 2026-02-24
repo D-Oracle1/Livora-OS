@@ -2009,3 +2009,12 @@ DO $$ BEGIN
       ON DELETE SET NULL ON UPDATE CASCADE;
   END IF;
 END $$;
+
+-- ============================================================
+-- Email verification tokens (added 2026-02)
+-- ============================================================
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "emailVerificationToken" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "emailVerificationExpiry" TIMESTAMP(3);
+CREATE UNIQUE INDEX IF NOT EXISTS "users_emailVerificationToken_key"
+  ON "users"("emailVerificationToken")
+  WHERE "emailVerificationToken" IS NOT NULL;
