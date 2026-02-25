@@ -362,7 +362,6 @@ export function Sidebar({
           collapsed ? 'md:w-20' : 'md:w-64',
           isOpen && '!flex w-72',
         )}
-        style={role === 'super-admin' ? { backgroundColor: platformBranding.sidebarColor || '#ffffff' } : undefined}
       >
         {/* ── Logo row ── */}
         <div
