@@ -5,7 +5,6 @@ import { Sidebar, SidebarProps } from './sidebar';
 import { Header } from './header';
 import { cn } from '@/lib/utils';
 import { useBranding } from '@/hooks/use-branding';
-import { usePlatformBranding } from '@/hooks/use-platform-branding';
 
 interface DashboardShellProps {
   role: SidebarProps['role'];
@@ -64,21 +63,6 @@ export function DashboardShell({ role, children, extras }: DashboardShellProps) 
     style.textContent = `:root { --primary: ${hsl}; --ring: ${hsl}; }`;
   }, [branding.primaryColor, isSuperAdmin]);
 
-  // Inject super-admin card/base color CSS variables from platform branding
-  useEffect(() => {
-    if (!isSuperAdmin) return;
-    let style = document.getElementById('sa-theme') as HTMLStyleElement | null;
-    if (!style) {
-      style = document.createElement('style');
-      style.id = 'sa-theme';
-      document.head.appendChild(style);
-    }
-    const cardBg = platformBranding.cardColor || '#ffffff';
-    const baseBg = platformBranding.cardColor
-      ? `color-mix(in srgb, ${cardBg} 80%, #e2e8f0)`
-      : '#f0f4f8';
-    style.textContent = `:root { --neuo-card-bg: ${cardBg}; --neuo-base-bg: ${baseBg}; }`;
-  }, [platformBranding.cardColor, isSuperAdmin]);
 
   return (
     <div className={cn('min-h-screen', isSuperAdmin ? 'neuo-base' : 'bg-gray-50 dark:bg-gray-950')}>

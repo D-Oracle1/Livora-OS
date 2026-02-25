@@ -11,8 +11,6 @@ export interface PlatformBrandingData {
   primaryColor?: string;
   tagline?: string;
   favicon?: string;
-  sidebarColor?: string;
-  cardColor?: string;
 }
 
 // Module-level cache — survives component mounts within a page session

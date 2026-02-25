@@ -37,8 +37,6 @@ export default function SuperAdminSettings() {
     logo: '',
     favicon: '',
     primaryColor: '#f59e0b',
-    sidebarColor: '#ffffff',
-    cardColor: '#ffffff',
   });
   const [brandingLoading, setBrandingLoading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -394,44 +392,6 @@ export default function SuperAdminSettings() {
                 />
                 <div className="w-8 h-8 rounded-lg shadow-sm border border-gray-100" style={{ backgroundColor: accent }} />
               </div>
-            </div>
-            <div>
-              <label className={labelCls}>Sidebar Background Color</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={branding.sidebarColor || '#ffffff'}
-                  onChange={e => setBranding(b => ({ ...b, sidebarColor: e.target.value }))}
-                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer bg-transparent p-0.5"
-                />
-                <input
-                  value={branding.sidebarColor || '#ffffff'}
-                  onChange={e => setBranding(b => ({ ...b, sidebarColor: e.target.value }))}
-                  className={`${inputCls} w-32`}
-                  placeholder="#ffffff"
-                />
-                <div className="w-8 h-8 rounded-lg shadow-sm border border-gray-200" style={{ backgroundColor: branding.sidebarColor || '#ffffff' }} />
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Background color of the sidebar panel.</p>
-            </div>
-            <div>
-              <label className={labelCls}>Card Background Color</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={branding.cardColor || '#ffffff'}
-                  onChange={e => setBranding(b => ({ ...b, cardColor: e.target.value }))}
-                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer bg-transparent p-0.5"
-                />
-                <input
-                  value={branding.cardColor || '#ffffff'}
-                  onChange={e => setBranding(b => ({ ...b, cardColor: e.target.value }))}
-                  className={`${inputCls} w-32`}
-                  placeholder="#ffffff"
-                />
-                <div className="w-8 h-8 rounded-lg shadow-sm border border-gray-200" style={{ backgroundColor: branding.cardColor || '#ffffff' }} />
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Background color of dashboard stat cards and panels.</p>
             </div>
             <div>
               <label className={labelCls}>Favicon URL</label>
