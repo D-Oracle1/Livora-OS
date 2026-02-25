@@ -91,12 +91,11 @@ export default function HomePage() {
       const res = await fetch(`${API_BASE_URL}/api/v1/properties/listed?${params.toString()}`);
       if (res.ok) {
         const raw = await res.json();
-        const wrapped = raw?.data || raw;
-        const items = Array.isArray(wrapped) ? wrapped : (wrapped?.data || []);
-        const meta = wrapped?.meta;
+        const items = Array.isArray(raw) ? raw : (raw?.data || []);
+        const meta = raw?.meta;
         setProperties(items);
         setTotalPages(meta?.totalPages || 1);
-        setTotalCount(meta?.total || 0);
+        setTotalCount(meta?.total ?? items.length);
       }
     } catch {
       setProperties([]);
@@ -246,7 +245,7 @@ export default function HomePage() {
           ) : (
             <>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {properties.map((property: any) => {
+                {properties.slice(0, 6).map((property: any) => {
                   const TypeIcon = getTypeIcon(property.type);
                   return (
                     <Link key={property.id} href={`/properties/${property.id}`} className="group">
@@ -266,7 +265,7 @@ export default function HomePage() {
                           )}
                           <div className="absolute top-3 left-3">
                             <span className="px-3 py-1 rounded-full text-xs font-medium bg-accent text-white">
-                              {property.type.replace('_', ' ')}
+                              {property.type?.replace('_', ' ')}
                             </span>
                           </div>
                         </div>
@@ -386,29 +385,33 @@ export default function HomePage() {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {features.features.map((feature: any, index: number) => (
-                <div key={index} className="group bg-white dark:bg-primary-900 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-primary-800">
-                  {feature.image && (
-                    <div className="relative h-48 overflow-hidden">
-                      <Image
-                        src={feature.image?.startsWith('http') ? feature.image : getImageUrl(feature.image || '')}
-                        alt={feature.title}
-                        fill
-                        className="object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+              {features.features.slice(0, 3).map((feature: any, index: number) => {
+                const desc: string = feature.description || '';
+                const excerpt = desc.length > 120 ? desc.slice(0, 120) + '…' : desc;
+                return (
+                  <div key={index} className="group bg-white dark:bg-primary-900 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-primary-800">
+                    {feature.image && (
+                      <div className="relative h-48 overflow-hidden">
+                        <Image
+                          src={feature.image?.startsWith('http') ? feature.image : getImageUrl(feature.image || '')}
+                          alt={feature.title}
+                          fill
+                          className="object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                      </div>
+                    )}
+                    <div className="p-6">
+                      <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white group-hover:text-accent transition-colors">{feature.title}</h3>
+                      <p className="text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">{excerpt}</p>
+                      <Link href="/features" className="text-accent hover:text-accent-600 font-medium flex items-center gap-2 group/link">
+                        Read More
+                        <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
+                      </Link>
                     </div>
-                  )}
-                  <div className="p-6">
-                    <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white group-hover:text-accent transition-colors">{feature.title}</h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">{feature.description}</p>
-                    <Link href="/properties" className="text-accent hover:text-accent-600 font-medium flex items-center gap-2 group/link">
-                      Browse Properties
-                      <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
-                    </Link>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
@@ -447,8 +450,46 @@ export default function HomePage() {
         <section id="about" className="py-20 px-4 bg-white dark:bg-primary-950">
           <div className="container mx-auto">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="relative">
-                <div className="relative h-[500px] rounded-2xl overflow-hidden">
+              {/* Text — first on mobile, left on desktop */}
+              <div className="order-1">
+                <span className="text-accent font-semibold text-sm uppercase tracking-wider">{about.subtitle || 'About Us'}</span>
+                {about.title && (
+                  <h2 className="text-3xl md:text-4xl font-bold mt-2 mb-6 text-gray-900 dark:text-white leading-tight">{about.title}</h2>
+                )}
+                {(() => {
+                  const raw = about.content || '';
+                  const plain = raw.replace(/<[^>]+>/g, '').trim();
+                  const fallback = 'Your trusted partner in real estate. We are dedicated to helping you find the perfect property and providing exceptional service every step of the way.';
+                  const text = plain || fallback;
+                  const excerpt = text.length > 200 ? text.slice(0, 200) + '…' : text;
+                  return <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed text-base">{excerpt}</p>;
+                })()}
+                {about.items && about.items.length > 0 && (
+                  <div className="space-y-3 mb-8">
+                    {about.items.slice(0, 3).map((item: any, index: number) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-accent flex-shrink-0" />
+                        <span className="text-gray-700 dark:text-gray-300">{item.text || item}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-4">
+                  <Link href="/about">
+                    <Button size="lg" className="bg-accent hover:bg-accent-600 text-white shadow-accent">
+                      Learn More
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </Button>
+                  </Link>
+                  <Link href="/auth/register" className="text-accent hover:text-accent-600 font-medium flex items-center gap-2 group">
+                    Get Started
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+              </div>
+              {/* Image — second on mobile, right on desktop */}
+              <div className="order-2 relative">
+                <div className="relative h-[400px] sm:h-[500px] rounded-2xl overflow-hidden">
                   {about.image ? (
                     <Image
                       src={about.image?.startsWith('http') ? about.image : getImageUrl(about.image)}
@@ -457,39 +498,10 @@ export default function HomePage() {
                       className="object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20" />
+                    <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                      <Building2 className="w-24 h-24 text-primary/20" />
+                    </div>
                   )}
-                </div>
-              </div>
-              <div>
-                <span className="text-accent font-semibold text-sm uppercase tracking-wider">{about.subtitle || 'About Us'}</span>
-                {about.title && (
-                  <h2 className="text-3xl md:text-4xl font-bold mt-2 mb-6 text-gray-900 dark:text-white">{about.title}</h2>
-                )}
-                {about.content && (
-                  <div className="text-gray-600 dark:text-gray-400 mb-8 prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: about.content }} />
-                )}
-                {about.items && about.items.length > 0 && (
-                  <div className="space-y-4">
-                    {about.items.map((item: any, index: number) => (
-                      <div key={index} className="flex items-center gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-accent flex-shrink-0" />
-                        <span className="text-gray-700 dark:text-gray-300">{item.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="mt-8 flex items-center gap-4">
-                  <Link href="/auth/register">
-                    <Button size="lg" className="bg-accent hover:bg-accent-600 text-white shadow-accent">
-                      Get Started Today
-                      <ArrowRight className="w-5 h-5 ml-2" />
-                    </Button>
-                  </Link>
-                  <Link href="/about" className="text-accent hover:text-accent-600 font-medium flex items-center gap-2 group">
-                    Learn More
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </Link>
                 </div>
               </div>
             </div>

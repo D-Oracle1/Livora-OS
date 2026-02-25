@@ -64,31 +64,31 @@ export default function AboutPage() {
     <div className="min-h-screen bg-white dark:bg-primary-950">
       <PublicNavbar currentPage="/about" />
 
-      {/* Hero */}
-      <section className="relative pt-16 min-h-[60vh] flex items-center">
-        <div className="absolute inset-0">
-          {heroImage ? (
+      {/* Hero — always visible with primary gradient background */}
+      <section className="relative pt-16 min-h-[70vh] flex items-center bg-primary overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary-800 to-accent/30" />
+        {heroImage && (
+          <div className="absolute inset-0">
             <Image
               src={heroImage}
               alt="About us"
               fill
-              className="object-cover"
+              className="object-cover opacity-25"
               priority
             />
-          ) : (
-            <div className="w-full h-full bg-primary" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/95 via-primary/85 to-primary/70" />
-        </div>
+          </div>
+        )}
         <div className="container mx-auto px-4 relative z-10 py-20">
           <div className="max-w-2xl">
             <span className="text-accent font-semibold text-sm uppercase tracking-wider">{about.subtitle || 'About Us'}</span>
-            <h1 className="text-4xl md:text-5xl font-bold text-white mt-3 mb-6">{about.title || `About ${companyName}`}</h1>
-            {about.content ? (
-              <div className="text-lg text-white/80 max-w-xl prose prose-invert" dangerouslySetInnerHTML={{ __html: about.content }} />
-            ) : (
-              <p className="text-lg text-white/80 max-w-xl">Your trusted partner in real estate. We are dedicated to helping you find the perfect property and providing exceptional service every step of the way.</p>
-            )}
+            <h1 className="text-4xl md:text-5xl font-bold text-white mt-3 mb-6 leading-tight">{about.title || `About ${companyName}`}</h1>
+            {(() => {
+              const raw = about.content || '';
+              const plain = raw.replace(/<[^>]+>/g, '').trim();
+              const text = plain || 'Your trusted partner in real estate. We are dedicated to helping you find the perfect property and providing exceptional service every step of the way.';
+              const excerpt = text.length > 220 ? text.slice(0, 220) + '…' : text;
+              return <p className="text-lg text-white/80 max-w-xl leading-relaxed">{excerpt}</p>;
+            })()}
           </div>
         </div>
       </section>
@@ -97,17 +97,20 @@ export default function AboutPage() {
       {about.story && (
         <section className="py-20 px-4 bg-white dark:bg-primary-950">
           <div className="container mx-auto">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className={`grid gap-12 items-center ${about.storyImage ? 'lg:grid-cols-2' : ''}`}>
               <div>
                 <span className="text-accent font-semibold text-sm uppercase tracking-wider">Our Story</span>
-                <h2 className="text-3xl md:text-4xl font-bold mt-2 mb-6 text-gray-900 dark:text-white">
+                <h2 className="text-3xl md:text-4xl font-bold mt-2 mb-6 text-gray-900 dark:text-white leading-tight">
                   {about.storyTitle || 'Building Trust in Real Estate Since Day One'}
                 </h2>
-                <div className="text-gray-600 dark:text-gray-400 prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: about.story }} />
+                {(() => {
+                  const plain = about.story.replace(/<[^>]+>/g, '').trim();
+                  return <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-base">{plain}</p>;
+                })()}
               </div>
               {about.storyImage && (
-                <div className="relative">
-                  <div className="relative h-[450px] rounded-2xl overflow-hidden">
+                <div className="relative mt-8 lg:mt-0">
+                  <div className="relative h-[400px] rounded-2xl overflow-hidden">
                     <Image
                       src={about.storyImage.startsWith('http') ? about.storyImage : getImageUrl(about.storyImage)}
                       alt="Our story"
@@ -172,26 +175,24 @@ export default function AboutPage() {
       {about.items && about.items.length > 0 && (
         <section className="py-20 px-4 bg-white dark:bg-primary-950">
           <div className="container mx-auto">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="order-2 lg:order-1">
+            <div className={`grid gap-12 items-center ${about.whyChooseImage ? 'lg:grid-cols-2' : ''}`}>
+              <div className={about.whyChooseImage ? 'order-2 lg:order-1' : ''}>
                 <span className="text-accent font-semibold text-sm uppercase tracking-wider">Why Choose Us</span>
-                <h2 className="text-3xl md:text-4xl font-bold mt-2 mb-6 text-gray-900 dark:text-white">What Sets Us Apart</h2>
-                <div className="space-y-4">
+                <h2 className="text-3xl md:text-4xl font-bold mt-2 mb-6 text-gray-900 dark:text-white leading-tight">What Sets Us Apart</h2>
+                <div className="space-y-4 mb-8">
                   {about.items.map((item: any, index: number) => (
-                    <div key={index} className="flex items-center gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-accent flex-shrink-0" />
-                      <span className="text-gray-700 dark:text-gray-300">{item.text || item}</span>
+                    <div key={index} className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300 leading-relaxed">{item.text || item}</span>
                     </div>
                   ))}
                 </div>
-                <div className="mt-8">
-                  <Link href="/properties">
-                    <Button size="lg" className="bg-accent hover:bg-accent-600 text-white shadow-accent">
-                      Explore Properties
-                      <ArrowRight className="w-5 h-5 ml-2" />
-                    </Button>
-                  </Link>
-                </div>
+                <Link href="/properties">
+                  <Button size="lg" className="bg-accent hover:bg-accent-600 text-white shadow-accent">
+                    Explore Properties
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </Link>
               </div>
               {about.whyChooseImage && (
                 <div className="order-1 lg:order-2 relative h-[400px] rounded-2xl overflow-hidden">

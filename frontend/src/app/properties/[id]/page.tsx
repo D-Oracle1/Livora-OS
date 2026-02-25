@@ -12,7 +12,6 @@ import {
   Bath,
   Maximize,
   Calendar,
-  LandPlot,
   ArrowLeft,
   Phone,
   User,
@@ -22,8 +21,11 @@ import {
   Home,
 } from 'lucide-react';
 
+import { PublicNavbar } from '@/components/layout/public-navbar';
+import { PublicFooter } from '@/components/layout/public-footer';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 import { getToken } from '@/lib/auth-storage';
+import { getImageUrl } from '@/lib/api';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
 
@@ -31,6 +33,11 @@ function formatPrice(price: number): string {
   if (price >= 1000000000) return `₦${(price / 1000000000).toFixed(2)}B`;
   if (price >= 1000000) return `₦${(price / 1000000).toFixed(1)}M`;
   return `₦${price.toLocaleString()}`;
+}
+
+function resolveImageSrc(src: string): string {
+  if (!src) return '';
+  return src.startsWith('http') ? src : getImageUrl(src);
 }
 
 export default function PropertyDetailPage() {
@@ -88,50 +95,98 @@ export default function PropertyDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-primary text-white">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-bold">{companyName}</span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/auth/login">
-              <Button variant="ghost" className="text-white hover:text-accent hover:bg-white/10">Log in</Button>
-            </Link>
-            <Link href="/auth/register">
-              <Button className="bg-accent hover:bg-accent-600 text-white">Get Started</Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <PublicNavbar />
 
       {/* Breadcrumb */}
-      <div className="bg-white border-b">
+      <div className="bg-white border-b pt-16">
         <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-gray-500 flex-wrap">
             <Link href="/" className="hover:text-accent transition-colors">Home</Link>
             <span>/</span>
-            <Link href="/#properties" className="hover:text-accent transition-colors">Properties</Link>
+            <Link href="/properties" className="hover:text-accent transition-colors">Properties</Link>
             <span>/</span>
-            <span className="text-gray-900 font-medium">{property.title}</span>
+            <span className="text-gray-900 font-medium line-clamp-1">{property.title}</span>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - Details */}
-          <div className="lg:col-span-2 space-y-6">
+          {/* Right Column — Price & Agent (shows FIRST on mobile) */}
+          <div className="lg:col-span-1 lg:order-2">
+            <div className="bg-white rounded-2xl p-6 shadow-lg lg:sticky lg:top-24">
+              <div className="text-sm text-gray-500 mb-1">Listed Price</div>
+              <div className="text-3xl font-bold text-primary mb-1">
+                {formatPrice(Number(property.price))}
+              </div>
+              {property.pricePerSqm && (
+                <div className="text-sm text-gray-500 mb-4">
+                  {formatPrice(Number(property.pricePerSqm))} / plot
+                </div>
+              )}
+
+              {/* Agent Card */}
+              <div className="border-t border-gray-100 pt-4 mt-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    {property.realtor?.user?.avatar ? (
+                      <Image
+                        src={resolveImageSrc(property.realtor.user.avatar)}
+                        alt={realtorName}
+                        width={48}
+                        height={48}
+                        className="rounded-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-6 h-6 text-primary" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900">{realtorName}</div>
+                    <div className="text-sm text-gray-500">Property Agent</div>
+                  </div>
+                </div>
+                {property.realtor?.user?.phone && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+                    <Phone className="w-4 h-4 flex-shrink-0" />
+                    <span>{property.realtor.user.phone}</span>
+                  </div>
+                )}
+              </div>
+
+              {(() => {
+                const token = getToken();
+                const purchaseUrl = `/properties/${property.id}/purchase`;
+                const href = token
+                  ? purchaseUrl
+                  : `/auth/login?redirect=${encodeURIComponent(purchaseUrl)}`;
+                return (
+                  <>
+                    <Link href={href} className="block">
+                      <Button className="w-full bg-accent hover:bg-accent-600 text-white py-6 text-lg">
+                        Purchase Property
+                      </Button>
+                    </Link>
+                    {!token && (
+                      <p className="text-xs text-gray-400 text-center mt-3">
+                        Sign in or create an account to proceed
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Left Column — Details (shows SECOND on mobile) */}
+          <div className="lg:col-span-2 lg:order-1 space-y-6">
             {/* Image Gallery */}
             <div className="bg-white rounded-2xl overflow-hidden shadow-lg">
-              <div className="relative h-[400px] md:h-[500px]">
+              <div className="relative h-[280px] sm:h-[400px] md:h-[480px]">
                 {images.length > 0 ? (
                   <>
                     <Image
-                      src={images[activeImage]}
+                      src={resolveImageSrc(images[activeImage])}
                       alt={property.title}
                       fill
                       className="object-cover"
@@ -159,12 +214,16 @@ export default function PropertyDetailPage() {
                   </div>
                 )}
                 <div className="absolute top-4 left-4 flex gap-2">
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-accent text-white">
-                    {property.type?.replace('_', ' ')}
-                  </span>
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary text-white">
-                    {property.status}
-                  </span>
+                  {property.type && (
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-accent text-white">
+                      {property.type.replace('_', ' ')}
+                    </span>
+                  )}
+                  {property.status && (
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary text-white">
+                      {property.status}
+                    </span>
+                  )}
                 </div>
               </div>
               {images.length > 1 && (
@@ -177,7 +236,7 @@ export default function PropertyDetailPage() {
                         index === activeImage ? 'border-accent' : 'border-transparent opacity-60 hover:opacity-100'
                       }`}
                     >
-                      <Image src={img} alt={`View ${index + 1}`} fill className="object-cover" />
+                      <Image src={resolveImageSrc(img)} alt={`View ${index + 1}`} fill className="object-cover" />
                     </button>
                   ))}
                 </div>
@@ -186,11 +245,11 @@ export default function PropertyDetailPage() {
 
             {/* Property Info */}
             <div className="bg-white rounded-2xl p-6 shadow-lg">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 leading-tight">
                 {property.title}
               </h1>
-              <div className="flex items-center gap-2 text-gray-500 mb-6">
-                <MapPin className="w-4 h-4" />
+              <div className="flex items-center gap-2 text-gray-500 mb-6 flex-wrap">
+                <MapPin className="w-4 h-4 flex-shrink-0" />
                 <span>{property.address}, {property.city}, {property.state}</span>
               </div>
 
@@ -210,11 +269,13 @@ export default function PropertyDetailPage() {
                     <div className="text-xs text-gray-500">Bathrooms</div>
                   </div>
                 )}
-                <div className="bg-gray-50 rounded-xl p-4 text-center">
-                  <Maximize className="w-6 h-6 text-accent mx-auto mb-1" />
-                  <div className="text-lg font-bold text-gray-900">{Number(property.area).toLocaleString()}</div>
-                  <div className="text-xs text-gray-500">Sq Ft</div>
-                </div>
+                {property.area != null && (
+                  <div className="bg-gray-50 rounded-xl p-4 text-center">
+                    <Maximize className="w-6 h-6 text-accent mx-auto mb-1" />
+                    <div className="text-lg font-bold text-gray-900">{Number(property.area).toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">Sq Ft</div>
+                  </div>
+                )}
                 {property.yearBuilt && (
                   <div className="bg-gray-50 rounded-xl p-4 text-center">
                     <Calendar className="w-6 h-6 text-accent mx-auto mb-1" />
@@ -243,12 +304,14 @@ export default function PropertyDetailPage() {
               )}
 
               {/* Description */}
-              {property.description && (
-                <div className="mb-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3">Description</h2>
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Description</h2>
+                {property.description ? (
                   <p className="text-gray-600 leading-relaxed">{property.description}</p>
-                </div>
-              )}
+                ) : (
+                  <p className="text-gray-400 italic">No description available.</p>
+                )}
+              </div>
 
               {/* Features */}
               {property.features && property.features.length > 0 && (
@@ -257,7 +320,7 @@ export default function PropertyDetailPage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {property.features.map((feature: string, i: number) => (
                       <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                        <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
                         {feature}
                       </div>
                     ))}
@@ -266,90 +329,10 @@ export default function PropertyDetailPage() {
               )}
             </div>
           </div>
-
-          {/* Right Column - Price & Agent */}
-          <div className="space-y-6">
-            {/* Price Card */}
-            <div className="bg-white rounded-2xl p-6 shadow-lg sticky top-24">
-              <div className="text-sm text-gray-500 mb-1">Listed Price</div>
-              <div className="text-3xl font-bold text-primary mb-1">
-                {formatPrice(Number(property.price))}
-              </div>
-              {property.pricePerSqm && (
-                <div className="text-sm text-gray-500 mb-6">
-                  {formatPrice(Number(property.pricePerSqm))} / plot
-                </div>
-              )}
-
-              {/* Agent Card */}
-              <div className="border-t border-gray-100 pt-6 mt-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    {property.realtor?.user?.avatar ? (
-                      <Image
-                        src={property.realtor.user.avatar}
-                        alt={realtorName}
-                        width={48}
-                        height={48}
-                        className="rounded-full object-cover"
-                      />
-                    ) : (
-                      <User className="w-6 h-6 text-primary" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">{realtorName}</div>
-                    <div className="text-sm text-gray-500">Property Agent</div>
-                  </div>
-                </div>
-                {property.realtor?.user?.phone && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
-                    <Phone className="w-4 h-4" />
-                    <span>{property.realtor.user.phone}</span>
-                  </div>
-                )}
-              </div>
-
-              {(() => {
-                const token = getToken();
-                const purchaseUrl = `/properties/${property.id}/purchase`;
-                const href = token
-                  ? purchaseUrl
-                  : `/auth/login?redirect=${encodeURIComponent(purchaseUrl)}`;
-                return (
-                  <>
-                    <Link href={href}>
-                      <Button className="w-full bg-accent hover:bg-accent-600 text-white py-6 text-lg">
-                        Purchase Property
-                      </Button>
-                    </Link>
-                    {!token && (
-                      <p className="text-xs text-gray-400 text-center mt-3">
-                        Sign in or create an account to proceed
-                      </p>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="py-8 px-4 bg-primary mt-12">
-        <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-bold text-white">{companyName}</span>
-          </div>
-          <p className="text-sm text-white/70">
-            &copy; {new Date().getFullYear()} {companyName}. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }
