@@ -62,6 +62,11 @@ import { CommunicationModule } from './modules/communication/communication.modul
 // Engagement Feed
 import { EngagementModule } from './modules/engagement/engagement.module';
 
+// Accounting
+import { ExpenseCategoryModule } from './modules/expense-category/expense-category.module';
+import { ExpenseModule } from './modules/expense/expense.module';
+import { AccountingModule } from './modules/accounting/accounting.module';
+
 // Audit
 import { AuditModule } from './modules/audit/audit.module';
 
@@ -153,6 +158,11 @@ import { MasterPlatformModule } from './modules/master-platform/master-platform.
 
     // Engagement Feed
     EngagementModule,
+
+    // Accounting
+    ExpenseCategoryModule,
+    ExpenseModule,
+    AccountingModule,
 
     // Audit
     AuditModule,

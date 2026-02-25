@@ -172,6 +172,34 @@ enum AwardType {
   CLIENT_OF_MONTH
 }
 
+// ===========================================
+// ACCOUNTING ENUMS
+// ===========================================
+
+enum ExpenseCategoryType {
+  OPERATIONAL
+  CAPITAL
+  MARKETING
+  SALARY
+  UTILITY
+  TAX
+  OTHER
+}
+
+enum ExpensePaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  CHEQUE
+  OTHER
+}
+
+enum ExpenseApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum PaymentPlan {
   FULL
   INSTALLMENT
@@ -346,6 +374,11 @@ model User {
   postComments    PostComment[]
   postViews       PostView[]
   savedPosts      SavedPost[]
+
+  // Accounting
+  expensesCreated  Expense[]          @relation("ExpenseCreator")
+  expensesApproved Expense[]          @relation("ExpenseApprover")
+  expenseAuditLogs ExpenseAuditLog[]  @relation("ExpenseAuditLogs")
 
   @@index([email])
   @@index([role])
@@ -2025,4 +2058,68 @@ model ContentAnalytics {
   updatedAt              DateTime       @updatedAt
 
   @@map("content_analytics")
+}
+
+// ===========================================
+// ACCOUNTING MODELS
+// ===========================================
+
+model ExpenseCategory {
+  id          String              @id @default(uuid())
+  name        String
+  type        ExpenseCategoryType @default(OTHER)
+  description String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  expenses    Expense[]
+
+  @@index([type])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id              String                @id @default(uuid())
+  title           String
+  description     String?
+  categoryId      String
+  category        ExpenseCategory       @relation(fields: [categoryId], references: [id])
+  amount          Decimal               @db.Decimal(18, 2)
+  paymentMethod   ExpensePaymentMethod  @default(CASH)
+  expenseDate     DateTime
+  referenceNumber String?
+  receiptUrl      String?
+  createdById     String
+  createdBy       User                  @relation("ExpenseCreator", fields: [createdById], references: [id])
+  departmentId    String?
+  approvalStatus  ExpenseApprovalStatus @default(PENDING)
+  approvedById    String?
+  approvedBy      User?                 @relation("ExpenseApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+  deletedAt       DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  auditLogs       ExpenseAuditLog[]
+
+  @@index([categoryId])
+  @@index([createdById])
+  @@index([expenseDate])
+  @@index([approvalStatus])
+  @@index([deletedAt])
+  @@map("expenses")
+}
+
+model ExpenseAuditLog {
+  id        String   @id @default(uuid())
+  expenseId String
+  expense   Expense  @relation(fields: [expenseId], references: [id])
+  userId    String
+  user      User     @relation("ExpenseAuditLogs", fields: [userId], references: [id])
+  action    String
+  oldValues Json?
+  newValues Json?
+  createdAt DateTime @default(now())
+
+  @@index([expenseId])
+  @@map("expense_audit_logs")
 }

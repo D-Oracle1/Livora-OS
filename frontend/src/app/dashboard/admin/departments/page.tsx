@@ -87,6 +87,9 @@ const MODULE_CATEGORIES = [
       { key: 'tax', label: 'Tax Reports' },
       { key: 'analytics', label: 'Analytics' },
       { key: 'rankings', label: 'Rankings' },
+      { key: 'accounting', label: 'Accounting Overview' },
+      { key: 'expenses', label: 'Expense Management' },
+      { key: 'expense_categories', label: 'Expense Categories' },
     ],
   },
   {

@@ -41,6 +41,10 @@ import {
   Newspaper,
   Bookmark,
   Shield,
+  BookOpen,
+  Receipt,
+  Tag,
+  TrendingUp,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getImageUrl, api } from '@/lib/api';
@@ -167,6 +171,16 @@ const groupedNavigationConfig: Record<string, NavSection[]> = {
         { name: 'Commission', href: '/dashboard/admin/commission', icon: Calculator, moduleKey: 'commission' },
         { name: 'Tax Reports', href: '/dashboard/admin/tax', icon: FileText, moduleKey: 'tax' },
         { name: 'Rankings', href: '/dashboard/admin/rankings', icon: Crown, moduleKey: 'rankings' },
+      ],
+    },
+    {
+      label: 'Accounting',
+      items: [
+        { name: 'Overview', href: '/dashboard/admin/accounting', icon: BookOpen, moduleKey: 'accounting' },
+        { name: 'Expenses', href: '/dashboard/admin/accounting/expenses', icon: Receipt, moduleKey: 'expenses' },
+        { name: 'Categories', href: '/dashboard/admin/accounting/categories', icon: Tag, moduleKey: 'expense_categories' },
+        { name: 'Profit & Loss', href: '/dashboard/admin/accounting/profit-loss', icon: TrendingUp, moduleKey: 'accounting' },
+        { name: 'Reports', href: '/dashboard/admin/accounting/reports', icon: BarChart3, moduleKey: 'accounting' },
       ],
     },
     {
