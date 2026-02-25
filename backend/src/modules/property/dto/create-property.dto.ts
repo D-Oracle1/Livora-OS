@@ -41,6 +41,11 @@ export class CreatePropertyDto {
   @IsString()
   state: string;
 
+  @ApiPropertyOptional({ example: '10001' })
+  @IsOptional()
+  @IsString()
+  zipCode?: string;
+
   @ApiPropertyOptional({ example: 'USA' })
   @IsOptional()
   @IsString()

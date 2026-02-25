@@ -249,7 +249,7 @@ export class TenantPrismaService implements OnModuleDestroy {
         await client.query(stmt);
       } catch (err: any) {
         const msg: string = err.message || '';
-        if (!this.isIdempotentError(msg, err.code)) {
+        if (!this.isIdempotentError(msg, err.code, stmt)) {
           if (warned++ < 10) {
             this.logger.warn(`DDL warning (${schemaName}): ${msg.slice(0, 120)}`);
           }
@@ -259,14 +259,19 @@ export class TenantPrismaService implements OnModuleDestroy {
     this.logger.log(`Tenant schema provisioned (per-stmt): ${schemaName} (${statements.length} stmts)`);
   }
 
-  private isIdempotentError(msg: string, code?: string): boolean {
-    return (
-      msg.includes('already exists') ||
-      msg.includes('does not exist') ||
-      msg.includes('duplicate_object') ||
-      code === '42710' || // duplicate_object
-      code === '42704'    // undefined_object
-    );
+  private isIdempotentError(msg: string, code?: string, stmt?: string): boolean {
+    // Always swallow "already exists" — idempotent CREATE/ALTER ADD
+    if (msg.includes('already exists') || msg.includes('duplicate_object') || code === '42710') {
+      return true;
+    }
+    // "does not exist" is only safe to swallow for CREATE statements (e.g. DROP INDEX IF EXISTS).
+    // For ALTER statements it means the target table/column was not found — a real error that
+    // must be surfaced so it isn't silently skipped (leaving the schema out of sync).
+    if (msg.includes('does not exist') || code === '42704') {
+      const upper = stmt?.trimStart().toUpperCase() ?? '';
+      return upper.startsWith('CREATE') || upper.startsWith('DROP');
+    }
+    return false;
   }
 
   async disconnectTenant(companyId: string): Promise<void> {

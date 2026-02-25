@@ -1973,7 +1973,11 @@ ALTER TABLE "departments" ADD COLUMN IF NOT EXISTS "role" "UserRole" NOT NULL DE
 ALTER TABLE "departments" ADD COLUMN IF NOT EXISTS "allowedModules" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
 
 -- Make zipcode optional on properties (added 2026-02)
-ALTER TABLE "properties" ALTER COLUMN "zipCode" DROP NOT NULL;
+DO $$ BEGIN
+  ALTER TABLE "properties" ALTER COLUMN "zipCode" DROP NOT NULL;
+EXCEPTION WHEN others THEN
+  NULL; -- column already nullable, nothing to do
+END $$;
 
 -- ============================================================
 -- RBAC Roles system (added 2026-02-22)
@@ -2029,3 +2033,108 @@ CREATE UNIQUE INDEX IF NOT EXISTS "users_referralCode_key"
   ON "users"("referralCode")
   WHERE "referralCode" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "users_referralCode_idx" ON "users"("referralCode");
+
+-- ============================================================
+-- Accounting & Financial Reporting module (added 2026-02-26)
+-- ============================================================
+
+DO $$ BEGIN
+  CREATE TYPE "ExpenseCategoryType" AS ENUM ('OPERATIONAL', 'CAPITAL', 'MARKETING', 'SALARY', 'UTILITY', 'TAX', 'OTHER');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ExpensePaymentMethod" AS ENUM ('CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'OTHER');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ExpenseApprovalStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "expense_categories" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "type" "ExpenseCategoryType" NOT NULL DEFAULT 'OTHER',
+    "description" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "expense_categories_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "expenses" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "categoryId" TEXT NOT NULL,
+    "amount" DECIMAL(18,2) NOT NULL,
+    "paymentMethod" "ExpensePaymentMethod" NOT NULL DEFAULT 'CASH',
+    "expenseDate" TIMESTAMP(3) NOT NULL,
+    "referenceNumber" TEXT,
+    "receiptUrl" TEXT,
+    "createdById" TEXT NOT NULL,
+    "departmentId" TEXT,
+    "approvalStatus" "ExpenseApprovalStatus" NOT NULL DEFAULT 'PENDING',
+    "approvedById" TEXT,
+    "approvedAt" TIMESTAMP(3),
+    "rejectionReason" TEXT,
+    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "expenses_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "expense_audit_logs" (
+    "id" TEXT NOT NULL,
+    "expenseId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "oldValues" JSONB,
+    "newValues" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "expense_audit_logs_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "expense_categories_type_idx" ON "expense_categories"("type");
+CREATE INDEX IF NOT EXISTS "expenses_categoryId_idx" ON "expenses"("categoryId");
+CREATE INDEX IF NOT EXISTS "expenses_createdById_idx" ON "expenses"("createdById");
+CREATE INDEX IF NOT EXISTS "expenses_expenseDate_idx" ON "expenses"("expenseDate");
+CREATE INDEX IF NOT EXISTS "expenses_approvalStatus_idx" ON "expenses"("approvalStatus");
+CREATE INDEX IF NOT EXISTS "expenses_deletedAt_idx" ON "expenses"("deletedAt");
+CREATE INDEX IF NOT EXISTS "expense_audit_logs_expenseId_idx" ON "expense_audit_logs"("expenseId");
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'expenses_categoryId_fkey') THEN
+    ALTER TABLE "expenses" ADD CONSTRAINT "expenses_categoryId_fkey"
+      FOREIGN KEY ("categoryId") REFERENCES "expense_categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'expenses_createdById_fkey') THEN
+    ALTER TABLE "expenses" ADD CONSTRAINT "expenses_createdById_fkey"
+      FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'expenses_approvedById_fkey') THEN
+    ALTER TABLE "expenses" ADD CONSTRAINT "expenses_approvedById_fkey"
+      FOREIGN KEY ("approvedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'expense_audit_logs_expenseId_fkey') THEN
+    ALTER TABLE "expense_audit_logs" ADD CONSTRAINT "expense_audit_logs_expenseId_fkey"
+      FOREIGN KEY ("expenseId") REFERENCES "expenses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'expense_audit_logs_userId_fkey') THEN
+    ALTER TABLE "expense_audit_logs" ADD CONSTRAINT "expense_audit_logs_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
