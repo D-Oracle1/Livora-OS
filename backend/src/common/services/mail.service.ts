@@ -204,7 +204,7 @@ export class MailService {
         primaryColor: branding?.primaryColor,
       },
     );
-    await this.send(to, 'Your verification code', html);
+    await this.send(to, 'Your verification code', html, undefined, branding?.companyName);
   }
 
   // ============ Sale Emails ============
