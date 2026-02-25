@@ -160,7 +160,7 @@ export default function PropertyDetailPage() {
                 )}
                 <div className="absolute top-4 left-4 flex gap-2">
                   <span className="px-3 py-1 rounded-full text-xs font-medium bg-accent text-white">
-                    {property.type.replace('_', ' ')}
+                    {property.type?.replace('_', ' ')}
                   </span>
                   <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary text-white">
                     {property.status}
