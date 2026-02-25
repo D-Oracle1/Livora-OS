@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
+import { getToken } from '@/lib/auth-storage';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
 
@@ -309,14 +310,27 @@ export default function PropertyDetailPage() {
                 )}
               </div>
 
-              <Link href={`/auth/login?redirect=/properties/${property.id}`}>
-                <Button className="w-full bg-accent hover:bg-accent-600 text-white py-6 text-lg">
-                  Make an Inquiry
-                </Button>
-              </Link>
-              <p className="text-xs text-gray-400 text-center mt-3">
-                Log in or register to contact the agent
-              </p>
+              {(() => {
+                const token = getToken();
+                const purchaseUrl = `/properties/${property.id}/purchase`;
+                const href = token
+                  ? purchaseUrl
+                  : `/auth/login?redirect=${encodeURIComponent(purchaseUrl)}`;
+                return (
+                  <>
+                    <Link href={href}>
+                      <Button className="w-full bg-accent hover:bg-accent-600 text-white py-6 text-lg">
+                        Purchase Property
+                      </Button>
+                    </Link>
+                    {!token && (
+                      <p className="text-xs text-gray-400 text-center mt-3">
+                        Sign in or create an account to proceed
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

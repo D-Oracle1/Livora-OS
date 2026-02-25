@@ -24,9 +24,6 @@ import {
   Mail,
   MapPin,
   Clock,
-  BedDouble,
-  Bath,
-  Maximize,
   LandPlot,
   Loader2,
 } from 'lucide-react';
@@ -39,13 +36,6 @@ const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 const ICON_MAP: Record<string, any> = {
   Users, Building2, TrendingUp, Award, BarChart3, MessageSquare, Shield, Zap, Star, Search,
 };
-
-function formatPrice(price: number): string {
-  if (price >= 1000000000) return `₦${(price / 1000000000).toFixed(1)}B`;
-  if (price >= 1000000) return `₦${(price / 1000000).toFixed(0)}M`;
-  if (price >= 1000) return `₦${(price / 1000).toFixed(0)}K`;
-  return `₦${price.toLocaleString()}`;
-}
 
 function getTypeIcon(type: string) {
   switch (type) {
@@ -279,16 +269,6 @@ export default function HomePage() {
                               {property.type.replace('_', ' ')}
                             </span>
                           </div>
-                          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                            <div className="text-xl font-bold text-white">
-                              {formatPrice(Number(property.price))}
-                            </div>
-                            {property.pricePerSqm && (
-                              <div className="text-xs text-white/80">
-                                {formatPrice(Number(property.pricePerSqm))}/plot
-                              </div>
-                            )}
-                          </div>
                         </div>
                         <div className="p-5">
                           <h3 className="font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-accent transition-colors line-clamp-1">
@@ -297,24 +277,6 @@ export default function HomePage() {
                           <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400 text-sm mb-3">
                             <MapPin className="w-3.5 h-3.5" />
                             <span className="line-clamp-1">{property.city}, {property.state}</span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 pt-3 border-t border-gray-100 dark:border-primary-700">
-                            {property.bedrooms != null && (
-                              <div className="flex items-center gap-1">
-                                <BedDouble className="w-4 h-4" />
-                                <span>{property.bedrooms} Beds</span>
-                              </div>
-                            )}
-                            {property.bathrooms != null && (
-                              <div className="flex items-center gap-1">
-                                <Bath className="w-4 h-4" />
-                                <span>{property.bathrooms} Baths</span>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-1">
-                              <Maximize className="w-4 h-4" />
-                              <span>{Number(property.area).toLocaleString()} sqft</span>
-                            </div>
                           </div>
                         </div>
                       </div>

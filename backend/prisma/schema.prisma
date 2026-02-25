@@ -172,6 +172,13 @@ enum AwardType {
   CLIENT_OF_MONTH
 }
 
+enum PurchaseEnquiryStatus {
+  PENDING
+  PAYMENT_SUBMITTED
+  APPROVED
+  REJECTED
+}
+
 // ===========================================
 // ACCOUNTING ENUMS
 // ===========================================
@@ -380,6 +387,9 @@ model User {
   expensesApproved Expense[]          @relation("ExpenseApprover")
   expenseAuditLogs ExpenseAuditLog[]  @relation("ExpenseAuditLogs")
 
+  // Purchase enquiries
+  purchaseEnquiries PurchaseEnquiry[]
+
   @@index([email])
   @@index([role])
   @@index([status])
@@ -540,6 +550,7 @@ model Property {
   documents              Document[]
   offers                 Offer[]
   priceHistory           PriceHistory[]
+  purchaseEnquiries      PurchaseEnquiry[]
 
   @@index([status])
   @@index([type])
@@ -815,6 +826,35 @@ model Offer {
   @@index([buyerId])
   @@index([status])
   @@map("offers")
+}
+
+model PurchaseEnquiry {
+  id                 String                @id @default(uuid())
+  propertyId         String
+  property           Property              @relation(fields: [propertyId], references: [id])
+  userId             String
+  user               User                  @relation(fields: [userId], references: [id])
+
+  fullName           String
+  phone              String
+  email              String
+  numPlots           Int
+  nin                String?
+  address            String
+  nextOfKin          String
+  occupation         String
+  message            String?
+
+  status             PurchaseEnquiryStatus @default(PENDING)
+  paymentSubmittedAt DateTime?
+
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([propertyId])
+  @@index([userId])
+  @@index([status])
+  @@map("purchase_enquiries")
 }
 
 model ChatRoom {

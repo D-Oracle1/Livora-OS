@@ -10,6 +10,7 @@ function VerifyEmailContent() {
   const router = useRouter();
   const params = useSearchParams();
   const emailParam = params.get('email') || '';
+  const redirectTo = params.get('redirect') || '';
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [email, setEmail] = useState(emailParam);
@@ -64,7 +65,8 @@ function VerifyEmailContent() {
       const data = await res.json();
       if (res.ok) {
         setStatus('success');
-        setTimeout(() => router.push('/auth/login'), 2500);
+        const loginUrl = `/auth/login${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`;
+        setTimeout(() => router.push(loginUrl), 2500);
       } else {
         setStatus('error');
         setErrorMsg(data.message || 'Invalid code. Please try again.');
@@ -107,7 +109,7 @@ function VerifyEmailContent() {
         </div>
         <h1 className="text-xl font-bold text-gray-800">Email Verified!</h1>
         <p className="text-sm text-gray-500">Your account is now active. Redirecting to login…</p>
-        <Link href="/auth/login" className="block text-sm text-blue-600 hover:underline">
+        <Link href={`/auth/login${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`} className="block text-sm text-blue-600 hover:underline">
           Go to Login
         </Link>
       </div>

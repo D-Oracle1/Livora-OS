@@ -62,6 +62,9 @@ import { CommunicationModule } from './modules/communication/communication.modul
 // Engagement Feed
 import { EngagementModule } from './modules/engagement/engagement.module';
 
+// Purchase Enquiries
+import { PurchaseModule } from './modules/purchase/purchase.module';
+
 // Accounting
 import { ExpenseCategoryModule } from './modules/expense-category/expense-category.module';
 import { ExpenseModule } from './modules/expense/expense.module';
@@ -123,6 +126,7 @@ import { MasterPlatformModule } from './modules/master-platform/master-platform.
     ClientModule,
     PropertyModule,
     SaleModule,
+    PurchaseModule,
     CommissionModule,
     TaxModule,
     LoyaltyModule,

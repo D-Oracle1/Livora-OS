@@ -25,6 +25,7 @@ export default function RegisterPage() {
   const companyName = getCompanyName(branding);
   const roleParam = searchParams.get('role');
   const refCode = searchParams.get('ref');
+  const redirectTo = searchParams.get('redirect');
   const isRealtorSignup = roleParam?.toLowerCase() === 'realtor';
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -134,7 +135,8 @@ export default function RegisterPage() {
       }
 
       toast.success('Account created! Check your email for your verification code.');
-      router.push(`/auth/verify-email?email=${encodeURIComponent(formData.email.toLowerCase().trim())}`);
+      const verifyUrl = `/auth/verify-email?email=${encodeURIComponent(formData.email.toLowerCase().trim())}${redirectTo ? `&redirect=${encodeURIComponent(redirectTo)}` : ''}`;
+      router.push(verifyUrl);
     } catch (error: any) {
       toast.error(error.message || 'Registration failed');
     } finally {

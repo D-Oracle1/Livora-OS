@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,8 @@ import { useBranding, getCompanyName } from '@/hooks/use-branding';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
   const branding = useBranding();
   const companyName = getCompanyName(branding);
 
@@ -36,10 +38,10 @@ export default function LoginPage() {
       } else if (role === 'staff') {
         router.replace('/dashboard/staff');
       } else {
-        router.replace('/dashboard/client');
+        router.replace(redirectTo && redirectTo.startsWith('/') ? redirectTo : '/dashboard/client');
       }
     }
-  }, [router]);
+  }, [router, redirectTo]);
 
   // Resolve tenant ID from custom domain on mount so the X-Company-ID header
   // is sent with the login request and subsequent API calls.
@@ -116,7 +118,7 @@ export default function LoginPage() {
       } else if (role === 'staff') {
         router.push('/dashboard/staff');
       } else {
-        router.push('/dashboard/client');
+        router.push(redirectTo && redirectTo.startsWith('/') ? redirectTo : '/dashboard/client');
       }
     } catch (error: any) {
       const msg: string = error.message || '';
@@ -264,7 +266,10 @@ export default function LoginPage() {
           </form>
           <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
             Don&apos;t have an account?{' '}
-            <Link href="/auth/register" className="text-primary hover:underline font-medium">
+            <Link
+              href={redirectTo ? `/auth/register?redirect=${encodeURIComponent(redirectTo)}` : '/auth/register'}
+              className="text-primary hover:underline font-medium"
+            >
               Sign up
             </Link>
           </div>

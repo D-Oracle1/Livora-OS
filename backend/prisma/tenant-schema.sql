@@ -2138,3 +2138,50 @@ DO $$ BEGIN
       FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
   END IF;
 END $$;
+
+-- =============================================
+-- PURCHASE ENQUIRIES (added 2026-02)
+-- =============================================
+
+DO $$ BEGIN
+  CREATE TYPE "PurchaseEnquiryStatus" AS ENUM ('PENDING','PAYMENT_SUBMITTED','APPROVED','REJECTED');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "purchase_enquiries" (
+  "id"                 TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "propertyId"         TEXT NOT NULL,
+  "userId"             TEXT NOT NULL,
+  "fullName"           TEXT NOT NULL,
+  "phone"              TEXT NOT NULL,
+  "email"              TEXT NOT NULL,
+  "numPlots"           INTEGER NOT NULL,
+  "nin"                TEXT,
+  "address"            TEXT NOT NULL,
+  "nextOfKin"          TEXT NOT NULL,
+  "occupation"         TEXT NOT NULL,
+  "message"            TEXT,
+  "status"             "PurchaseEnquiryStatus" NOT NULL DEFAULT 'PENDING',
+  "paymentSubmittedAt" TIMESTAMP(3),
+  "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "purchase_enquiries_pkey" PRIMARY KEY ("id")
+);
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'purchase_enquiries_propertyId_fkey') THEN
+    ALTER TABLE "purchase_enquiries" ADD CONSTRAINT "purchase_enquiries_propertyId_fkey"
+      FOREIGN KEY ("propertyId") REFERENCES "properties"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'purchase_enquiries_userId_fkey') THEN
+    ALTER TABLE "purchase_enquiries" ADD CONSTRAINT "purchase_enquiries_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS "purchase_enquiries_propertyId_idx" ON "purchase_enquiries"("propertyId");
+CREATE INDEX IF NOT EXISTS "purchase_enquiries_userId_idx" ON "purchase_enquiries"("userId");
+CREATE INDEX IF NOT EXISTS "purchase_enquiries_status_idx" ON "purchase_enquiries"("status");

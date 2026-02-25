@@ -19,6 +19,7 @@ import {
   Plus,
   Trash2,
   Upload,
+  Landmark,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,6 +46,7 @@ const TABS = [
   { id: 'cta', label: 'Call to Action', icon: Megaphone },
   { id: 'contact', label: 'Contact Info', icon: Phone },
   { id: 'footer', label: 'Footer', icon: LayoutDashboard },
+  { id: 'payment', label: 'Payment Info', icon: Landmark },
 ];
 
 export default function CmsPage() {
@@ -419,6 +421,56 @@ export default function CmsPage() {
             {renderDynamicList('Services', 'services', [
               { key: 'name', label: 'Service name' },
             ])}
+          </div>
+        );
+
+      case 'payment':
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              These details are shown to clients on the purchase flow so they know where to transfer payment.
+            </p>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Bank Name</label>
+              <Input
+                placeholder="e.g. First Bank of Nigeria"
+                value={sectionData.bankName || ''}
+                onChange={(e) => updateField('bankName', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Account Name</label>
+              <Input
+                placeholder="e.g. Easyland Properties Ltd"
+                value={sectionData.accountName || ''}
+                onChange={(e) => updateField('accountName', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Account Number</label>
+              <Input
+                placeholder="e.g. 0123456789"
+                value={sectionData.accountNumber || ''}
+                onChange={(e) => updateField('accountNumber', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Bank Branch (optional)</label>
+              <Input
+                placeholder="e.g. Ikeja Branch"
+                value={sectionData.bankBranch || ''}
+                onChange={(e) => updateField('bankBranch', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Additional Instructions (optional)</label>
+              <Textarea
+                placeholder="e.g. Use the property title as your payment reference."
+                rows={3}
+                value={sectionData.additionalInfo || ''}
+                onChange={(e) => updateField('additionalInfo', e.target.value)}
+              />
+            </div>
           </div>
         );
 

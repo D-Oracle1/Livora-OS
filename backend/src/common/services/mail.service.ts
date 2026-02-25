@@ -458,6 +458,32 @@ export class MailService {
     await this.send(to, 'Performance Review Scheduled', html, undefined, companyName);
   }
 
+  // ============ Purchase Enquiry Emails ============
+
+  async sendPurchasePaymentNotification(
+    to: string,
+    data: {
+      clientName: string;
+      propertyTitle: string;
+      numPlots: number;
+      phone: string;
+      email: string;
+    },
+    companyName?: string,
+  ): Promise<void> {
+    const html = this.baseTemplate(`
+      <h2 style="color:#333;">Payment Notification</h2>
+      <p><strong>${escapeHtml(data.clientName)}</strong> has submitted payment for <strong>${escapeHtml(data.propertyTitle)}</strong> and is awaiting confirmation.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0">
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Plots</td><td style="padding:8px;border:1px solid #ddd">${data.numPlots}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Phone</td><td style="padding:8px;border:1px solid #ddd">${escapeHtml(data.phone)}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #ddd">${escapeHtml(data.email)}</td></tr>
+      </table>
+      <p>Please log in to the admin dashboard to review and confirm this purchase.</p>
+    `);
+    await this.send(to, 'Payment Submitted — Action Required', html, undefined, companyName);
+  }
+
   // ============ Newsletter Emails ============
 
   async sendNewsletterEmail(
