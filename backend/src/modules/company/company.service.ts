@@ -227,7 +227,14 @@ export class CompanyService {
       });
       const current: Record<string, any> = existing ? (existing.value as any) : {};
       const merged: Record<string, any> = { ...current };
-      if (branding.name) merged.companyName = branding.name;
+      if (branding.name) {
+        merged.companyName = branding.name;
+        // Auto-derive shortName from company name so the tenant sidebar reflects name changes
+        const words = branding.name.trim().split(/\s+/);
+        merged.shortName = words.length > 1
+          ? words.map((w: string) => w[0]).join('').toUpperCase().slice(0, 4)
+          : branding.name.slice(0, 6);
+      }
       if (branding.logo !== undefined) merged.logo = branding.logo;
       if (branding.primaryColor) merged.primaryColor = branding.primaryColor;
 

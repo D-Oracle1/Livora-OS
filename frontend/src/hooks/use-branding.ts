@@ -103,7 +103,17 @@ export function getCompanyName(branding: BrandingData): string {
   return branding.companyName || 'RMS Platform';
 }
 
-/** Helper — short name with fallback */
+/** Helper — short name with fallback.
+ *  Priority: explicit shortName → first-word of companyName → 'RMS'
+ */
 export function getShortName(branding: BrandingData): string {
-  return branding.shortName || 'RMS';
+  if (branding.shortName) return branding.shortName;
+  if (branding.companyName) {
+    const words = branding.companyName.trim().split(/\s+/);
+    // Multi-word: use initials (up to 4 chars); single word: first 6 chars
+    return words.length > 1
+      ? words.map((w) => w[0]).join('').toUpperCase().slice(0, 4)
+      : branding.companyName.slice(0, 6);
+  }
+  return 'RMS';
 }

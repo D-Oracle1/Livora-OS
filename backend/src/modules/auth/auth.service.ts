@@ -748,8 +748,17 @@ export class AuthService {
     });
 
     if (this.isSmtpConfigured()) {
+      // Try to get tenant branding for personalised email
+      let brandingForResend: { companyName?: string; logoUrl?: string; primaryColor?: string } = {};
+      try {
+        const bs = await this.prisma.systemSetting.findUnique({ where: { key: 'cms_branding' } });
+        const v = (bs?.value as any) || {};
+        brandingForResend = { companyName: v.companyName, logoUrl: v.logo, primaryColor: v.primaryColor };
+      } catch { /* non-tenant context */ }
+
       this.mailService.sendEmailVerificationEmail(user.email, otp, {
         firstName: user.firstName,
+        ...brandingForResend,
       }).catch((err) => {
         this.logger.error(`Failed to resend verification OTP: ${err.message}`);
         this.logger.warn(`[OTP FALLBACK] ${user.email} → ${otp}`);
@@ -801,8 +810,19 @@ export class AuthService {
     const appUrl = this.configService.get<string>('appUrl', 'http://localhost:3000');
     const resetUrl = `${appUrl}/auth/reset-password?token=${rawToken}`;
 
+    // Try to get tenant company name to personalise the email
+    let companyName: string | undefined;
+    try {
+      const brandingSetting = await this.prisma.systemSetting.findUnique({
+        where: { key: 'cms_branding' },
+      });
+      companyName = (brandingSetting?.value as any)?.companyName;
+    } catch {
+      // Non-tenant context (super admin) — use default app name
+    }
+
     // Send email (fire-and-forget, don't block the response)
-    this.mailService.sendPasswordResetEmail(user.email, resetUrl).catch((err) => {
+    this.mailService.sendPasswordResetEmail(user.email, resetUrl, companyName).catch((err) => {
       this.logger.error(`Failed to send password reset email: ${err.message}`);
     });
 

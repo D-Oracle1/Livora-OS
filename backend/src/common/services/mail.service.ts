@@ -32,9 +32,10 @@ export class MailService {
     return this.configService.get<string>('appName', 'RMS Platform');
   }
 
-  private get fromAddress(): string {
+  private getFromAddress(companyName?: string): string {
+    const displayName = companyName || this.appName;
     const from = this.configService.get<string>('email.from', 'noreply@rms-platform.com');
-    return `"${this.appName}" <${from}>`;
+    return `"${displayName}" <${from}>`;
   }
 
   private baseTemplate(content: string): string {
@@ -63,12 +64,14 @@ export class MailService {
     subject: string,
     html: string,
     attachments?: Array<{ filename: string; href: string }>,
+    companyName?: string,
   ): Promise<void> {
+    const displayName = companyName || this.appName;
     try {
       await this.transporter.sendMail({
-        from: this.fromAddress,
+        from: this.getFromAddress(companyName),
         to,
-        subject: `${this.appName} - ${subject}`,
+        subject: `${displayName} - ${subject}`,
         html,
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       });
@@ -138,32 +141,34 @@ export class MailService {
 
   // ============ Authentication Emails ============
 
-  async sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
+  async sendPasswordResetEmail(to: string, resetUrl: string, companyName?: string): Promise<void> {
+    const name = companyName || this.appName;
     const html = this.baseTemplate(`
       <h2 style="color: #333;">Password Reset Request</h2>
-      <p>You requested a password reset for your ${this.appName} account.</p>
+      <p>You requested a password reset for your ${escapeHtml(name)} account.</p>
       <p>Click the button below to reset your password. This link expires in 1 hour.</p>
       ${this.button('Reset Password', resetUrl)}
       <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
       <p style="color: #666; font-size: 14px;">Or copy and paste this link: <br/>${resetUrl}</p>
     `);
-    await this.send(to, 'Password Reset Request', html);
+    await this.send(to, 'Password Reset Request', html, undefined, companyName);
   }
 
   async sendWelcomeEmail(to: string, data: {
     firstName: string;
     role: string;
     loginUrl: string;
-  }): Promise<void> {
+  }, companyName?: string): Promise<void> {
+    const name = companyName || this.appName;
     const html = this.baseTemplate(`
-      <h2 style="color: #333;">Welcome to ${this.appName}!</h2>
+      <h2 style="color: #333;">Welcome to ${escapeHtml(name)}!</h2>
       <p>Hi ${escapeHtml(data.firstName)},</p>
       <p>Your account has been created successfully as a <strong>${escapeHtml(data.role)}</strong>.</p>
       <p>You can now log in and start using the platform.</p>
       ${this.button('Log In to Your Account', data.loginUrl)}
       <p style="color: #666; font-size: 14px;">If you have any questions, feel free to reach out to your administrator.</p>
     `);
-    await this.send(to, 'Welcome!', html);
+    await this.send(to, 'Welcome!', html, undefined, companyName);
   }
 
   async sendEmailVerificationEmail(
@@ -209,7 +214,7 @@ export class MailService {
     salePrice: number;
     commissionAmount: number;
     clientName: string;
-  }): Promise<void> {
+  }, companyName?: string): Promise<void> {
     const html = this.baseTemplate(`
       <h2 style="color: #333;">Sale Confirmed!</h2>
       <p>Congratulations! Your sale has been approved.</p>
@@ -233,14 +238,14 @@ export class MailService {
       </table>
       <p style="color: #666; font-size: 14px;">Check your dashboard for full details.</p>
     `);
-    await this.send(to, 'Sale Confirmed', html);
+    await this.send(to, 'Sale Confirmed', html, undefined, companyName);
   }
 
   async sendSaleConfirmationToClient(to: string, data: {
     propertyTitle: string;
     salePrice: number;
     realtorName: string;
-  }): Promise<void> {
+  }, companyName?: string): Promise<void> {
     const html = this.baseTemplate(`
       <h2 style="color: #333;">Purchase Confirmed!</h2>
       <p>Your property purchase has been approved.</p>
@@ -260,7 +265,7 @@ export class MailService {
       </table>
       <p style="color: #666; font-size: 14px;">Log in to your dashboard to view documents and details.</p>
     `);
-    await this.send(to, 'Purchase Confirmed', html);
+    await this.send(to, 'Purchase Confirmed', html, undefined, companyName);
   }
 
   // ============ Commission Emails ============
@@ -269,7 +274,7 @@ export class MailService {
     amount: number;
     propertyTitle: string;
     paidDate: Date;
-  }): Promise<void> {
+  }, companyName?: string): Promise<void> {
     const dateStr = new Date(data.paidDate).toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric',
     });
@@ -291,7 +296,7 @@ export class MailService {
         </tr>
       </table>
     `);
-    await this.send(to, 'Commission Paid', html);
+    await this.send(to, 'Commission Paid', html, undefined, companyName);
   }
 
   // ============ Payment Emails ============
@@ -301,7 +306,7 @@ export class MailService {
     dueAmount: number;
     dueDate: Date;
     overdueBy?: number;
-  }): Promise<void> {
+  }, companyName?: string): Promise<void> {
     const dateStr = new Date(data.dueDate).toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric',
     });
@@ -328,7 +333,7 @@ export class MailService {
       </table>
       <p style="color: #666; font-size: 14px;">Please log in to your dashboard to make the payment.</p>
     `);
-    await this.send(to, 'Payment Reminder', html);
+    await this.send(to, 'Payment Reminder', html, undefined, companyName);
   }
 
   // ============ HR Emails ============
@@ -338,7 +343,7 @@ export class MailService {
     startDate: Date;
     endDate: Date;
     totalDays: number;
-  }): Promise<void> {
+  }, companyName?: string): Promise<void> {
     const start = new Date(data.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const end = new Date(data.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const html = this.baseTemplate(`
@@ -359,7 +364,7 @@ export class MailService {
         </tr>
       </table>
     `);
-    await this.send(to, 'Leave Approved', html);
+    await this.send(to, 'Leave Approved', html, undefined, companyName);
   }
 
   async sendLeaveRejectedEmail(to: string, data: {
@@ -367,7 +372,7 @@ export class MailService {
     startDate: Date;
     endDate: Date;
     reason: string;
-  }): Promise<void> {
+  }, companyName?: string): Promise<void> {
     const start = new Date(data.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const end = new Date(data.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const html = this.baseTemplate(`
@@ -389,7 +394,7 @@ export class MailService {
       </table>
       <p style="color: #666; font-size: 14px;">Please contact your manager for more details.</p>
     `);
-    await this.send(to, 'Leave Rejected', html);
+    await this.send(to, 'Leave Rejected', html, undefined, companyName);
   }
 
   async sendTaskAssignedEmail(to: string, data: {
@@ -397,7 +402,7 @@ export class MailService {
     description: string;
     dueDate?: Date;
     assignedBy: string;
-  }): Promise<void> {
+  }, companyName?: string): Promise<void> {
     const dueDateRow = data.dueDate
       ? `<tr>
           <td style="padding: 8px 0; color: #666;">Due Date</td>
@@ -420,7 +425,7 @@ export class MailService {
       </table>
       <p style="color: #666; font-size: 14px;">${escapeHtml(data.description)}</p>
     `);
-    await this.send(to, 'New Task Assigned', html);
+    await this.send(to, 'New Task Assigned', html, undefined, companyName);
   }
 
   async sendPerformanceReviewEmail(to: string, data: {
@@ -428,7 +433,7 @@ export class MailService {
     reviewerName: string;
     periodStart: Date;
     periodEnd: Date;
-  }): Promise<void> {
+  }, companyName?: string): Promise<void> {
     const start = new Date(data.periodStart).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const end = new Date(data.periodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const html = this.baseTemplate(`
@@ -450,7 +455,7 @@ export class MailService {
       </table>
       <p style="color: #666; font-size: 14px;">Please prepare any relevant materials before your review.</p>
     `);
-    await this.send(to, 'Performance Review Scheduled', html);
+    await this.send(to, 'Performance Review Scheduled', html, undefined, companyName);
   }
 
   // ============ Newsletter Emails ============

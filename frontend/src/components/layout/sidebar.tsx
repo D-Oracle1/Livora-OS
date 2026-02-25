@@ -355,20 +355,21 @@ export function Sidebar({
           'fixed left-0 top-0 z-50 h-screen flex flex-col',
           'transition-all duration-300 ease-in-out',
           role === 'super-admin'
-            ? 'bg-white border-r border-gray-100'
+            ? 'border-r border-black/[0.06]'
             : 'bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800',
-          role === 'super-admin' && 'shadow-[4px_0_20px_rgba(0,0,0,0.06)]',
+          role === 'super-admin' && 'shadow-[2px_0_12px_rgba(0,0,0,0.06)]',
           'hidden md:flex',
           collapsed ? 'md:w-20' : 'md:w-64',
           isOpen && '!flex w-72',
         )}
+        style={role === 'super-admin' ? { backgroundColor: platformBranding.sidebarColor || '#ffffff' } : undefined}
       >
         {/* ── Logo row ── */}
         <div
           className={cn(
             'h-16 flex items-center shrink-0 px-4',
             role === 'super-admin'
-              ? 'border-b border-gray-100'
+              ? 'border-b border-black/[0.06]'
               : 'border-b border-gray-100 dark:border-gray-800',
             collapsed ? 'justify-center' : 'justify-between',
           )}
@@ -454,7 +455,7 @@ export function Sidebar({
           className={cn(
             'py-4 shrink-0',
             role === 'super-admin'
-              ? 'border-b border-gray-100'
+              ? 'border-b border-black/[0.06]'
               : 'border-b border-gray-100 dark:border-gray-800',
             collapsed ? 'flex justify-center px-2' : 'px-4 flex items-center gap-3',
           )}
@@ -586,7 +587,7 @@ export function Sidebar({
                         role === 'super-admin'
                           ? active
                             ? ''
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                            : 'text-gray-500 hover:bg-black/[0.04] hover:text-gray-800'
                           : active
                             ? 'bg-primary/10 text-primary dark:bg-primary/15'
                             : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',

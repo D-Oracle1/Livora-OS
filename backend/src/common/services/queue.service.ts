@@ -107,36 +107,37 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private async processEmailJob(data: EmailJob): Promise<void> {
     const { type, to, data: payload } = data;
 
+    const companyName: string | undefined = payload?.companyName;
     switch (type) {
       case 'welcome':
-        await this.mailService.sendWelcomeEmail(to, payload);
+        await this.mailService.sendWelcomeEmail(to, payload, companyName);
         break;
       case 'verification':
         await this.mailService.sendEmailVerificationEmail(to, payload.verificationUrl);
         break;
       case 'sale_confirmation_realtor':
-        await this.mailService.sendSaleConfirmationToRealtor(to, payload);
+        await this.mailService.sendSaleConfirmationToRealtor(to, payload, companyName);
         break;
       case 'sale_confirmation_client':
-        await this.mailService.sendSaleConfirmationToClient(to, payload);
+        await this.mailService.sendSaleConfirmationToClient(to, payload, companyName);
         break;
       case 'commission_paid':
-        await this.mailService.sendCommissionPaidEmail(to, payload);
+        await this.mailService.sendCommissionPaidEmail(to, payload, companyName);
         break;
       case 'payment_reminder':
-        await this.mailService.sendPaymentReminderEmail(to, payload);
+        await this.mailService.sendPaymentReminderEmail(to, payload, companyName);
         break;
       case 'leave_approved':
-        await this.mailService.sendLeaveApprovedEmail(to, payload);
+        await this.mailService.sendLeaveApprovedEmail(to, payload, companyName);
         break;
       case 'leave_rejected':
-        await this.mailService.sendLeaveRejectedEmail(to, payload);
+        await this.mailService.sendLeaveRejectedEmail(to, payload, companyName);
         break;
       case 'task_assigned':
-        await this.mailService.sendTaskAssignedEmail(to, payload);
+        await this.mailService.sendTaskAssignedEmail(to, payload, companyName);
         break;
       case 'performance_review':
-        await this.mailService.sendPerformanceReviewEmail(to, payload);
+        await this.mailService.sendPerformanceReviewEmail(to, payload, companyName);
         break;
       case 'newsletter':
         await this.mailService.sendNewsletterEmail(to, payload.subject, payload.content, payload.unsubscribeUrl, {

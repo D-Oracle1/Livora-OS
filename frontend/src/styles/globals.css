@@ -93,42 +93,44 @@
     border: 1px solid rgba(255, 255, 255, 0.22);
   }
 
-  /* Super admin — neumorphic light */
+  /* Super admin — clean light cards (CSS-variable driven for dynamic theming) */
   .neuo-base {
-    background-color: #eef2f7;
+    background-color: var(--neuo-base-bg, #f0f4f8);
   }
 
   .neuo-card {
-    background: #eef2f7;
+    background: var(--neuo-card-bg, #ffffff);
     border-radius: 16px;
-    box-shadow: 6px 6px 14px #c8cdd6, -6px -6px 14px #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.05);
   }
 
   .neuo-card-sm {
-    background: #eef2f7;
+    background: var(--neuo-card-bg, #ffffff);
     border-radius: 12px;
-    box-shadow: 4px 4px 10px #c8cdd6, -4px -4px 10px #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.05);
   }
 
   .neuo-inset {
-    background: #eef2f7;
+    background: var(--neuo-base-bg, #f0f4f8);
     border-radius: 12px;
-    box-shadow: inset 4px 4px 8px #c8cdd6, inset -4px -4px 8px #ffffff;
+    box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.07), inset -2px -2px 5px rgba(255, 255, 255, 0.95);
   }
 
   .neuo-btn {
-    background: #eef2f7;
+    background: var(--neuo-base-bg, #f0f4f8);
     border-radius: 10px;
-    box-shadow: 4px 4px 8px #c8cdd6, -4px -4px 8px #ffffff;
+    box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.08), -2px -2px 6px rgba(255, 255, 255, 0.9);
     transition: box-shadow 0.2s, transform 0.1s;
   }
 
   .neuo-btn:hover {
-    box-shadow: 5px 5px 10px #c8cdd6, -5px -5px 10px #ffffff;
+    box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.1), -3px -3px 8px rgba(255, 255, 255, 0.95);
   }
 
   .neuo-btn:active {
-    box-shadow: inset 3px 3px 6px #c8cdd6, inset -3px -3px 6px #ffffff;
+    box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.08), inset -2px -2px 4px rgba(255, 255, 255, 0.9);
     transform: scale(0.98);
   }
 
