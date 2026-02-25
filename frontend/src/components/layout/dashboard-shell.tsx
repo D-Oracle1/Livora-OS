@@ -44,7 +44,6 @@ export function DashboardShell({ role, children, extras }: DashboardShellProps) 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const branding = useBranding();
-  const platformBranding = usePlatformBranding();
 
   const isSuperAdmin = role === 'super-admin';
 
