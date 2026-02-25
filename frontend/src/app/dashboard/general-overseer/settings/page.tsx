@@ -268,7 +268,7 @@ export default function GeneralOverseerSettingsPage() {
                   <div>
                     <h3 className="font-semibold">{profile.firstName} {profile.lastName}</h3>
                     <p className="text-sm text-muted-foreground">Oversight & Governance</p>
-                    <Badge className="mt-2">General Overseer</Badge>
+                    <Badge className="mt-2">MD</Badge>
                   </div>
                 </div>
 

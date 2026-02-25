@@ -141,7 +141,7 @@ const DEPARTMENT_ROLES = [
   { value: 'STAFF', label: 'Staff', description: 'Standard staff access' },
   { value: 'HR', label: 'HR', description: 'HR dashboard & people management' },
   { value: 'ADMIN', label: 'Admin', description: 'Full admin dashboard access' },
-  { value: 'GENERAL_OVERSEER', label: 'General Overseer', description: 'Oversight & executive access' },
+  { value: 'GENERAL_OVERSEER', label: 'MD', description: 'Oversight & executive access' },
   { value: 'REALTOR', label: 'Realtor', description: 'Property sales & commission access' },
 ];
 

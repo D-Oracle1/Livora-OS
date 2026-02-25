@@ -226,7 +226,7 @@ export default function GeneralOverseerDashboard() {
           Welcome back{userName ? `, ${userName}` : ''}
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          General Overseer &mdash; Full platform oversight and control
+          MD &mdash; Full platform oversight and control
         </p>
       </motion.div>
 

@@ -62,7 +62,7 @@ interface NewChatUser {
 
 const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
-  GENERAL_OVERSEER: 'General Overseer',
+  GENERAL_OVERSEER: 'MD',
   ADMIN: 'Admin',
   STAFF: 'Staff',
   REALTOR: 'Realtor',

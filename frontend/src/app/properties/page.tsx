@@ -81,12 +81,11 @@ export default function PropertiesPage() {
       const res = await fetch(`${API_BASE_URL}/api/v1/properties/listed?${params.toString()}`);
       if (res.ok) {
         const raw = await res.json();
-        const wrapped = raw?.data || raw;
-        const items = Array.isArray(wrapped) ? wrapped : (wrapped?.data || []);
-        const meta = wrapped?.meta;
+        const items = Array.isArray(raw) ? raw : (raw?.data || []);
+        const meta = raw?.meta;
         setProperties(items);
         setTotalPages(meta?.totalPages || 1);
-        setTotalCount(meta?.total || 0);
+        setTotalCount(meta?.total ?? items.length);
       }
     } catch {
       setProperties([]);
@@ -279,7 +278,7 @@ export default function PropertiesPage() {
                           )}
                           <div className="absolute top-3 left-3">
                             <span className="px-3 py-1 rounded-full text-xs font-medium bg-accent text-white">
-                              {property.type.replace('_', ' ')}
+                              {property.type?.replace('_', ' ')}
                             </span>
                           </div>
                         </div>
