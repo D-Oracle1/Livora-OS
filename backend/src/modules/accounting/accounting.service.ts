@@ -374,7 +374,7 @@ export class AccountingService {
         taxAmount: true,
         netAmount: true,
         paymentPlan: true,
-        property: { select: { title: true, type: true, location: true } },
+        property: { select: { title: true, type: true, address: true, city: true } },
         realtor: {
           select: {
             user: { select: { firstName: true, lastName: true, email: true } },
@@ -402,7 +402,7 @@ export class AccountingService {
         date: s.saleDate,
         property: s.property?.title ?? 'N/A',
         propertyType: s.property?.type,
-        location: s.property?.location ?? 'N/A',
+        location: s.property ? `${s.property.address}, ${s.property.city}` : 'N/A',
         realtor: s.realtor?.user
           ? `${s.realtor.user.firstName} ${s.realtor.user.lastName}`
           : 'N/A',
