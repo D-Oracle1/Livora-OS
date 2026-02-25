@@ -171,7 +171,24 @@ export class NewsletterService {
   }
 
   async sendBulkEmail(dto: SendNewsletterDto) {
-    const { subject, content, recipientType = 'SUBSCRIBERS', specificEmails, attachments, branding } = dto;
+    const { subject, content, recipientType = 'SUBSCRIBERS', specificEmails, attachments } = dto;
+
+    // Auto-resolve branding from tenant settings if not explicitly provided
+    let branding = dto.branding;
+    if (!branding?.companyName) {
+      try {
+        const setting = await this.prisma.systemSetting.findUnique({ where: { key: 'cms_branding' } });
+        if (setting?.value && typeof setting.value === 'object') {
+          const v = setting.value as any;
+          branding = {
+            companyName: v.companyName || branding?.companyName,
+            logoUrl: v.logo || branding?.logoUrl,
+            primaryColor: v.primaryColor || branding?.primaryColor,
+            address: branding?.address,
+          };
+        }
+      } catch { /* non-tenant context */ }
+    }
 
     const apiUrl = (this.configService.get<string>('API_URL') || 'http://localhost:4000').trim();
 

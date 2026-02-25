@@ -72,6 +72,16 @@ export class CampaignEmailService {
       const logEntry = await this.prisma.campaignLog.findUnique({ where: { idempotencyKey } });
       const trackingHtml = this.injectTracking(campaign.htmlContent, logEntry?.id || '', subscriber.unsubscribeToken);
 
+      // Resolve tenant branding for From name / subject prefix
+      let tenantBranding: { companyName?: string; logoUrl?: string; primaryColor?: string } = {};
+      try {
+        const setting = await this.prisma.systemSetting.findUnique({ where: { key: 'cms_branding' } });
+        if (setting?.value && typeof setting.value === 'object') {
+          const v = setting.value as any;
+          tenantBranding = { companyName: v.companyName, logoUrl: v.logo, primaryColor: v.primaryColor };
+        }
+      } catch { /* non-tenant context — leave branding empty */ }
+
       // Send via mail service
       const unsubscribeUrl = `${this.apiUrl}/api/v1/communication/unsubscribe/${subscriber.unsubscribeToken}`;
       await this.mailService.sendNewsletterEmail(
@@ -79,6 +89,7 @@ export class CampaignEmailService {
         campaign.subject,
         trackingHtml,
         unsubscribeUrl,
+        { branding: tenantBranding },
       );
 
       // Update log to SENT

@@ -489,6 +489,6 @@ export class MailService {
       href: a.url,
     }));
 
-    await this.send(to, subject, html, nodemailerAttachments);
+    await this.send(to, subject, html, nodemailerAttachments, options?.branding?.companyName);
   }
 }

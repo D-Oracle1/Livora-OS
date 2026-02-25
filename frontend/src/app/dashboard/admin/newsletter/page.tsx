@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { useBranding } from '@/hooks/use-branding';
 
 interface Recipient {
   email: string;
@@ -80,6 +81,8 @@ const RECIPIENT_TYPES: { value: RecipientType; label: string; description: strin
 ];
 
 export default function NewsletterPage() {
+  const tenantBranding = useBranding();
+
   // ── Main state ──────────────────────────────────────────────────────────────
   const [mainTab, setMainTab] = useState<MainTab>('compose');
 
@@ -173,6 +176,16 @@ export default function NewsletterPage() {
     fetchStats();
     fetchCounts();
   }, [fetchStats, fetchCounts]);
+
+  // Pre-populate branding from tenant settings (only when fields are still empty)
+  useEffect(() => {
+    setBranding((prev) => ({
+      logoUrl: prev.logoUrl || tenantBranding.logo || '',
+      companyName: prev.companyName || tenantBranding.companyName || '',
+      primaryColor: prev.primaryColor !== '#1e40af' ? prev.primaryColor : (tenantBranding.primaryColor || '#1e40af'),
+      address: prev.address,
+    }));
+  }, [tenantBranding.companyName, tenantBranding.logo, tenantBranding.primaryColor]);
 
   useEffect(() => {
     if (mainTab === 'lists') {
