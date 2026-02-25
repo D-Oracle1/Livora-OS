@@ -26,6 +26,7 @@ model Company {
   isActive      Boolean        @default(true)
   plan          String         @default("standard")
   maxUsers      Int            @default(50)
+  pwaSettings   Json?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   supportThread SupportThread?

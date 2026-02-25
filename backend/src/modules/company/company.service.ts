@@ -144,6 +144,7 @@ export class CompanyService {
           isActive: true,
           plan: true,
           maxUsers: true,
+          pwaSettings: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -303,6 +304,7 @@ export class CompanyService {
         domain: true,
         logo: true,
         primaryColor: true,
+        pwaSettings: true,
         isActive: true,
       },
     });
@@ -481,6 +483,32 @@ export class CompanyService {
     } catch {
       return { data: [], meta: { page, limit, total: 0, totalPages: 0 } };
     }
+  }
+
+  async deleteUser(companyId: string, userId: string) {
+    const company = await this.masterPrisma.company.findUnique({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Company not found');
+
+    try {
+      const client = await this.tenantPrisma.getClient(companyId);
+      await client.user.delete({ where: { id: userId } });
+      return { message: 'User deleted successfully' };
+    } catch (err: any) {
+      if (err?.code === 'P2025') throw new NotFoundException('User not found in this company');
+      throw err;
+    }
+  }
+
+  async updatePwaSettings(id: string, settings: Record<string, any>) {
+    const company = await this.masterPrisma.company.findUnique({ where: { id } });
+    if (!company) throw new NotFoundException('Company not found');
+
+    const updated = await this.masterPrisma.company.update({
+      where: { id },
+      data: { pwaSettings: settings },
+    });
+    const { databaseUrl: _, ...safe } = updated;
+    return safe;
   }
 
   async assignUserRole(companyId: string, userId: string, role: string) {

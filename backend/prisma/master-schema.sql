@@ -38,6 +38,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS "companies_domain_key" ON "companies"("domain"
 CREATE UNIQUE INDEX IF NOT EXISTS "companies_inviteCode_key" ON "companies"("inviteCode");
 CREATE INDEX IF NOT EXISTS "companies_domain_idx" ON "companies"("domain");
 CREATE INDEX IF NOT EXISTS "companies_inviteCode_idx" ON "companies"("inviteCode");
+-- PWA settings per tenant (added 2026-02)
+ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "pwaSettings" JSONB;
 
 -- support_threads
 CREATE TABLE IF NOT EXISTS "support_threads" (

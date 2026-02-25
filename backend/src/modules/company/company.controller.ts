@@ -210,6 +210,29 @@ export class CompanyController {
     return this.companyService.assignUserRole(id, userId, dto.role);
   }
 
+  @Delete(':id/users/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Delete a user from a tenant company' })
+  @ApiResponse({ status: 200, description: 'User deleted' })
+  async deleteUser(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.companyService.deleteUser(id, userId);
+  }
+
+  @Put(':id/pwa')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Update PWA settings for a tenant company' })
+  @ApiResponse({ status: 200, description: 'PWA settings updated' })
+  async updatePwaSettings(@Param('id') id: string, @Body() dto: Record<string, any>) {
+    return this.companyService.updatePwaSettings(id, dto);
+  }
+
   @Post('register-existing')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPER_ADMIN')

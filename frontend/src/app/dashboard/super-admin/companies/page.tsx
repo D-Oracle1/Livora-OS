@@ -45,6 +45,7 @@ interface Company {
   plan: string;
   maxUsers: number;
   createdAt: string;
+  pwaSettings?: Record<string, any>;
   stats?: { users: number; properties: number; sales: number };
 }
 
@@ -59,6 +60,17 @@ interface TenantUser {
 }
 
 const ASSIGNABLE_ROLES = ['ADMIN', 'GENERAL_OVERSEER', 'HR', 'REALTOR', 'CLIENT', 'STAFF'] as const;
+
+const PRESET_THEMES = [
+  { name: 'Blue', hex: '#3b82f6' },
+  { name: 'Indigo', hex: '#6366f1' },
+  { name: 'Purple', hex: '#8b5cf6' },
+  { name: 'Pink', hex: '#ec4899' },
+  { name: 'Red', hex: '#ef4444' },
+  { name: 'Orange', hex: '#f97316' },
+  { name: 'Green', hex: '#22c55e' },
+  { name: 'Teal', hex: '#14b8a6' },
+] as const;
 
 const roleBadgeColor: Record<string, string> = {
   ADMIN: 'bg-blue-100 text-blue-700',
@@ -78,7 +90,7 @@ export default function CompaniesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [createMode, setCreateMode] = useState<'new' | 'existing'>('new');
   const [showDetail, setShowDetail] = useState<Company | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'users'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'users' | 'pwa'>('info');
   const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [assigningRole, setAssigningRole] = useState<string | null>(null);
@@ -95,10 +107,17 @@ export default function CompaniesPage() {
   const [verifyingDNS, setVerifyingDNS] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmDeleteCompany, setConfirmDeleteCompany] = useState<Company | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [migratingAll, setMigratingAll] = useState(false);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<{ companyId: string; userId: string; name: string } | null>(null);
+  const [deletingUser, setDeletingUser] = useState<string | null>(null);
+  const [pwaData, setPwaData] = useState({ appName: '', shortName: '', description: '', themeColor: '#3b82f6', bgColor: '#ffffff', splashLogo: '', splashAnimation: 'none' });
+  const [pwaSaving, setPwaSaving] = useState(false);
+  const pwaLogoInputRef = useRef<HTMLInputElement>(null);
+  const [pwaLogoUploading, setPwaLogoUploading] = useState(false);
   const [confirmResetData, setConfirmResetData] = useState(false);
   const [resettingData, setResettingData] = useState(false);
   const frontendDomain = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -266,6 +285,15 @@ export default function CompaniesPage() {
         primaryColor: detail.primaryColor || '#3b82f6',
         maxUsers: detail.maxUsers || 50,
         plan: detail.plan || 'standard',
+      });
+      setPwaData({
+        appName: detail.pwaSettings?.appName || detail.name || '',
+        shortName: detail.pwaSettings?.shortName || '',
+        description: detail.pwaSettings?.description || '',
+        themeColor: detail.pwaSettings?.themeColor || detail.primaryColor || '#3b82f6',
+        bgColor: detail.pwaSettings?.bgColor || '#ffffff',
+        splashLogo: detail.pwaSettings?.splashLogo || '',
+        splashAnimation: detail.pwaSettings?.splashAnimation || 'none',
       });
     } catch {
       setShowDetail(company);
@@ -448,6 +476,7 @@ export default function CompaniesPage() {
 
   const handleDeleteCompany = async (company: Company) => {
     setConfirmDeleteCompany(null);
+    setDeleteConfirmText('');
     setDeletingId(company.id);
     try {
       await api.delete(`/companies/${company.id}`);
@@ -488,6 +517,55 @@ export default function CompaniesPage() {
       toast.error(error.message || 'Failed to update role');
     } finally {
       setAssigningRole(null);
+    }
+  };
+
+  const handleDeleteUser = async (companyId: string, userId: string) => {
+    setDeletingUser(userId);
+    try {
+      await api.delete(`/companies/${companyId}/users/${userId}`);
+      toast.success('User deleted');
+      setConfirmDeleteUser(null);
+      fetchTenantUsers(companyId);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete user');
+    } finally {
+      setDeletingUser(null);
+    }
+  };
+
+  const handleSavePwa = async () => {
+    if (!showDetail) return;
+    setPwaSaving(true);
+    try {
+      await api.put(`/companies/${showDetail.id}/pwa`, pwaData);
+      toast.success('PWA settings saved');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save PWA settings');
+    } finally {
+      setPwaSaving(false);
+    }
+  };
+
+  const handlePwaLogoUpload = async (file: File) => {
+    setPwaLogoUploading(true);
+    try {
+      const form = new FormData();
+      form.append('logo', file);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/upload/company-logo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken() || ''}` },
+        body: form,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const data = await res.json();
+      const url = (data?.data || data)?.url || (data?.data || data)?.path || '';
+      setPwaData((d) => ({ ...d, splashLogo: url }));
+      toast.success('Splash logo uploaded');
+    } catch {
+      toast.error('Failed to upload splash logo');
+    } finally {
+      setPwaLogoUploading(false);
     }
   };
 
@@ -666,7 +744,7 @@ export default function CompaniesPage() {
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleExportTenant(company)} title="Export tenant data" disabled={exportingCompany === company.id}>
                         {exportingCompany === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => setConfirmDeleteCompany(company)} title="Delete company" disabled={deletingId === company.id}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => { setConfirmDeleteCompany(company); setDeleteConfirmText(''); }} title="Delete company" disabled={deletingId === company.id}>
                         {deletingId === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                       </Button>
                     </div>
@@ -744,7 +822,7 @@ export default function CompaniesPage() {
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleExportTenant(company)} title="Export tenant data" disabled={exportingCompany === company.id}>
                     {exportingCompany === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => setConfirmDeleteCompany(company)} title="Delete company" disabled={deletingId === company.id}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => { setConfirmDeleteCompany(company); setDeleteConfirmText(''); }} title="Delete company" disabled={deletingId === company.id}>
                     {deletingId === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   </Button>
                 </div>
@@ -893,19 +971,28 @@ export default function CompaniesPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium">Primary Color</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="color"
-                          value={formData.primaryColor}
-                          onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                          className="w-10 h-10 rounded cursor-pointer border"
-                        />
-                        <Input
-                          value={formData.primaryColor}
-                          onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                          className="flex-1"
-                        />
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {PRESET_THEMES.map((t) => (
+                          <button
+                            key={t.hex}
+                            type="button"
+                            title={t.name}
+                            onClick={() => setFormData({ ...formData, primaryColor: t.hex })}
+                            className="w-7 h-7 rounded-full border-2 transition-all"
+                            style={{ backgroundColor: t.hex, borderColor: formData.primaryColor === t.hex ? '#111' : 'transparent' }}
+                          />
+                        ))}
+                        <label title="Custom color" className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 cursor-pointer overflow-hidden flex items-center justify-center">
+                          <input
+                            type="color"
+                            value={formData.primaryColor}
+                            onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                            className="opacity-0 absolute w-0 h-0"
+                          />
+                          <span className="text-gray-400 text-xs select-none">+</span>
+                        </label>
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">{formData.primaryColor}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium">Max Users</label>
@@ -981,19 +1068,28 @@ export default function CompaniesPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium">Primary Color</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="color"
-                          value={existingDbData.primaryColor}
-                          onChange={(e) => setExistingDbData({ ...existingDbData, primaryColor: e.target.value })}
-                          className="w-10 h-10 rounded cursor-pointer border"
-                        />
-                        <Input
-                          value={existingDbData.primaryColor}
-                          onChange={(e) => setExistingDbData({ ...existingDbData, primaryColor: e.target.value })}
-                          className="flex-1"
-                        />
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {PRESET_THEMES.map((t) => (
+                          <button
+                            key={t.hex}
+                            type="button"
+                            title={t.name}
+                            onClick={() => setExistingDbData({ ...existingDbData, primaryColor: t.hex })}
+                            className="w-7 h-7 rounded-full border-2 transition-all"
+                            style={{ backgroundColor: t.hex, borderColor: existingDbData.primaryColor === t.hex ? '#111' : 'transparent' }}
+                          />
+                        ))}
+                        <label title="Custom color" className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 cursor-pointer overflow-hidden flex items-center justify-center">
+                          <input
+                            type="color"
+                            value={existingDbData.primaryColor}
+                            onChange={(e) => setExistingDbData({ ...existingDbData, primaryColor: e.target.value })}
+                            className="opacity-0 absolute w-0 h-0"
+                          />
+                          <span className="text-gray-400 text-xs select-none">+</span>
+                        </label>
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">{existingDbData.primaryColor}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium">Max Users</label>
@@ -1037,9 +1133,22 @@ export default function CompaniesPage() {
                   </p>
                 </div>
               </div>
+              <div>
+                <label className="text-sm font-medium">Type <strong>{confirmDeleteCompany.name}</strong> to confirm</label>
+                <Input
+                  className="mt-1.5"
+                  placeholder={confirmDeleteCompany.name}
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                />
+              </div>
               <div className="flex justify-end gap-2 pt-1">
-                <Button variant="outline" onClick={() => setConfirmDeleteCompany(null)}>Cancel</Button>
-                <Button variant="destructive" onClick={() => handleDeleteCompany(confirmDeleteCompany)} disabled={!!deletingId}>
+                <Button variant="outline" onClick={() => { setConfirmDeleteCompany(null); setDeleteConfirmText(''); }}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleDeleteCompany(confirmDeleteCompany)}
+                  disabled={!!deletingId || deleteConfirmText !== confirmDeleteCompany.name}
+                >
                   {deletingId && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Delete Permanently
                 </Button>
@@ -1106,6 +1215,36 @@ export default function CompaniesPage() {
         </div>
       )}
 
+      {/* User delete confirmation */}
+      {confirmDeleteUser && (
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-base">Delete &quot;{confirmDeleteUser.name}&quot;?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  This will permanently remove the user from this tenant&apos;s database. This action <strong>cannot be undone</strong>.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setConfirmDeleteUser(null)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleDeleteUser(confirmDeleteUser.companyId, confirmDeleteUser.userId)}
+                disabled={!!deletingUser}
+              >
+                {deletingUser && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Delete User
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Company Detail Modal */}
       {showDetail && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -1145,6 +1284,16 @@ export default function CompaniesPage() {
                 }`}
               >
                 <Users className="w-4 h-4" /> Users & Roles
+              </button>
+              <button
+                onClick={() => setDetailTab('pwa')}
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  detailTab === 'pwa'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" /> PWA
               </button>
             </div>
 
@@ -1263,18 +1412,28 @@ export default function CompaniesPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-medium">Primary Color</label>
-                          <div className="flex gap-2 mt-1">
-                            <input
-                              type="color"
-                              value={editData.primaryColor}
-                              onChange={(e) => setEditData((d) => ({ ...d, primaryColor: e.target.value }))}
-                              className="w-10 h-10 rounded cursor-pointer border"
-                            />
-                            <Input
-                              value={editData.primaryColor}
-                              onChange={(e) => setEditData((d) => ({ ...d, primaryColor: e.target.value }))}
-                            />
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            {PRESET_THEMES.map((t) => (
+                              <button
+                                key={t.hex}
+                                type="button"
+                                title={t.name}
+                                onClick={() => setEditData((d) => ({ ...d, primaryColor: t.hex }))}
+                                className="w-7 h-7 rounded-full border-2 transition-all"
+                                style={{ backgroundColor: t.hex, borderColor: editData.primaryColor === t.hex ? '#111' : 'transparent' }}
+                              />
+                            ))}
+                            <label title="Custom color" className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 cursor-pointer overflow-hidden flex items-center justify-center">
+                              <input
+                                type="color"
+                                value={editData.primaryColor}
+                                onChange={(e) => setEditData((d) => ({ ...d, primaryColor: e.target.value }))}
+                                className="opacity-0 absolute w-0 h-0"
+                              />
+                              <span className="text-gray-400 text-xs select-none">+</span>
+                            </label>
                           </div>
+                          <p className="text-xs text-muted-foreground mt-1">{editData.primaryColor}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium">Max Users</label>
@@ -1414,6 +1573,87 @@ export default function CompaniesPage() {
                 </div>
               )}
 
+              {detailTab === 'pwa' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">Configure the Progressive Web App (PWA) manifest for this tenant.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">App Name</label>
+                      <Input className="mt-1" value={pwaData.appName} onChange={(e) => setPwaData((d) => ({ ...d, appName: e.target.value }))} placeholder="Acme Realty" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Short Name <span className="text-muted-foreground">(max 12)</span></label>
+                      <Input className="mt-1" maxLength={12} value={pwaData.shortName} onChange={(e) => setPwaData((d) => ({ ...d, shortName: e.target.value }))} placeholder="Acme" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Description</label>
+                    <textarea
+                      className="mt-1 w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                      rows={2}
+                      value={pwaData.description}
+                      onChange={(e) => setPwaData((d) => ({ ...d, description: e.target.value }))}
+                      placeholder="A real estate management system for Acme Realty"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Theme Color</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input type="color" value={pwaData.themeColor} onChange={(e) => setPwaData((d) => ({ ...d, themeColor: e.target.value }))} className="w-9 h-9 rounded cursor-pointer border" />
+                        <Input value={pwaData.themeColor} onChange={(e) => setPwaData((d) => ({ ...d, themeColor: e.target.value }))} className="flex-1" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Background Color</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input type="color" value={pwaData.bgColor} onChange={(e) => setPwaData((d) => ({ ...d, bgColor: e.target.value }))} className="w-9 h-9 rounded cursor-pointer border" />
+                        <Input value={pwaData.bgColor} onChange={(e) => setPwaData((d) => ({ ...d, bgColor: e.target.value }))} className="flex-1" />
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium block mb-1.5">Splash Logo</label>
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden shrink-0 bg-gray-50 dark:bg-gray-800">
+                        {pwaData.splashLogo ? (
+                          <img src={pwaData.splashLogo} alt="splash" className="w-full h-full object-contain" />
+                        ) : (
+                          <Building2 className="w-6 h-6 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <input ref={pwaLogoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePwaLogoUpload(f); }} />
+                        <Button type="button" variant="outline" size="sm" disabled={pwaLogoUploading} onClick={() => pwaLogoInputRef.current?.click()} className="w-full">
+                          {pwaLogoUploading ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Uploading...</> : <><Upload className="w-3.5 h-3.5 mr-1.5" /> Upload Splash Logo</>}
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WebP — 512×512 recommended</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Splash Animation</label>
+                    <select
+                      value={pwaData.splashAnimation}
+                      onChange={(e) => setPwaData((d) => ({ ...d, splashAnimation: e.target.value }))}
+                      className="mt-1 w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="none">None</option>
+                      <option value="fade">Fade</option>
+                      <option value="slide-up">Slide Up</option>
+                      <option value="zoom">Zoom</option>
+                      <option value="bounce">Bounce</option>
+                    </select>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <Button onClick={handleSavePwa} disabled={pwaSaving}>
+                      {pwaSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                      Save PWA Settings
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {detailTab === 'users' && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between mb-2">
@@ -1458,6 +1698,16 @@ export default function CompaniesPage() {
                               </select>
                               {assigningRole === user.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                             </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              title="Delete user"
+                              disabled={deletingUser === user.id}
+                              onClick={() => setConfirmDeleteUser({ companyId: showDetail.id, userId: user.id, name: `${user.firstName} ${user.lastName}` })}
+                            >
+                              {deletingUser === user.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                            </Button>
                           </div>
                         </div>
                       ))}
