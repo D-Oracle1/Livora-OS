@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { getToken, getUser } from '@/lib/auth-storage';
+import { api } from '@/lib/api';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
@@ -66,8 +67,7 @@ export default function PurchasePage() {
   // Fetch property details
   useEffect(() => {
     if (!propertyId) return;
-    fetch(`${API_BASE_URL}/api/v1/properties/listed/${propertyId}`)
-      .then((r) => (r.ok ? r.json() : null))
+    api.get(`/properties/listed/${propertyId}`)
       .then((res) => {
         const data = res?.data || res;
         setProperty(data);
@@ -78,8 +78,7 @@ export default function PurchasePage() {
 
   // Fetch CMS payment info
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/v1/cms/public/payment`)
-      .then((r) => (r.ok ? r.json() : null))
+    api.get('/cms/public/payment')
       .then((res) => {
         const data = res?.data || res;
         if (data && typeof data === 'object' && !Array.isArray(data)) {

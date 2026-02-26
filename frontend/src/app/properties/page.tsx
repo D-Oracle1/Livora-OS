@@ -18,7 +18,7 @@ import {
   X,
   ArrowRight,
 } from 'lucide-react';
-import { getImageUrl } from '@/lib/api';
+import { api, getImageUrl } from '@/lib/api';
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
 
@@ -78,15 +78,12 @@ export default function PropertiesPage() {
       if (range?.min !== undefined) params.append('minPrice', String(range.min));
       if (range?.max !== undefined) params.append('maxPrice', String(range.max));
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/properties/listed?${params.toString()}`);
-      if (res.ok) {
-        const raw = await res.json();
-        const items = Array.isArray(raw) ? raw : (raw?.data || []);
-        const meta = raw?.meta;
-        setProperties(items);
-        setTotalPages(meta?.totalPages || 1);
-        setTotalCount(meta?.total ?? items.length);
-      }
+      const raw = await api.get(`/properties/listed?${params.toString()}`);
+      const items = Array.isArray(raw) ? raw : (raw?.data || []);
+      const meta = raw?.meta;
+      setProperties(items);
+      setTotalPages(meta?.totalPages || 1);
+      setTotalCount(meta?.total ?? items.length);
     } catch {
       setProperties([]);
     } finally {

@@ -25,7 +25,7 @@ import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 import { getToken } from '@/lib/auth-storage';
-import { getImageUrl } from '@/lib/api';
+import { api, getImageUrl } from '@/lib/api';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
 
@@ -52,9 +52,8 @@ export default function PropertyDetailPage() {
   useEffect(() => {
     async function fetchProperty() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/properties/listed/${params.id}`);
-        if (!res.ok) throw new Error('Property not found');
-        const data = await res.json();
+        const res = await api.get(`/properties/listed/${params.id}`);
+        const data = res?.data || res;
         setProperty(data);
       } catch {
         setError('Property not found or no longer listed.');
