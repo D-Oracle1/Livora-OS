@@ -30,6 +30,7 @@ import {
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
 import { api, getImageUrl } from '@/lib/api';
+import { useTenantResolution } from '@/hooks/use-tenant-resolution';
 
 const ICON_MAP: Record<string, any> = {
   Users, Building2, TrendingUp, Award, BarChart3, MessageSquare, Shield, Zap, Star, Search,
@@ -51,9 +52,12 @@ export default function HomePage() {
   const [totalCount, setTotalCount] = useState(0);
   const [cms, setCms] = useState<Record<string, any> | null>(null);
   const [cmsLoading, setCmsLoading] = useState(true);
+  // Resolve tenant company ID from hostname (no-op if NEXT_PUBLIC_COMPANY_ID is set)
+  const { tenantReady } = useTenantResolution();
 
-  // Fetch CMS content
+  // Step 2: fetch CMS only after tenant ID is known
   useEffect(() => {
+    if (!tenantReady) return;
     api.get('/cms/public')
       .then((raw) => {
         const data = raw?.data || raw;
@@ -61,7 +65,7 @@ export default function HomePage() {
       })
       .catch(() => {})
       .finally(() => setCmsLoading(false));
-  }, []);
+  }, [tenantReady]);
 
   const companyName = cms?.branding?.companyName || 'Real Estate Management';
   const hero = cms?.hero || {};
@@ -99,8 +103,9 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    if (!tenantReady) return;
     fetchProperties(1);
-  }, [fetchProperties]);
+  }, [tenantReady, fetchProperties]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);

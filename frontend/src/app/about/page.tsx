@@ -24,6 +24,7 @@ import {
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
 import { api, getImageUrl } from '@/lib/api';
+import { useTenantResolution } from '@/hooks/use-tenant-resolution';
 
 const ICON_LIST = [Building2, Target, Users, ShieldCheck, Handshake, BarChart3, Eye, Heart, Gem, TrendingUp, Star];
 
@@ -35,8 +36,10 @@ function resolveImg(src: string) {
 export default function AboutPage() {
   const [cms, setCms] = useState<Record<string, any> | null>(null);
   const [cmsLoading, setCmsLoading] = useState(true);
+  const { tenantReady } = useTenantResolution();
 
   useEffect(() => {
+    if (!tenantReady) return;
     api.get('/cms/public')
       .then((raw) => {
         const data = raw?.data || raw;
@@ -44,7 +47,7 @@ export default function AboutPage() {
       })
       .catch(() => {})
       .finally(() => setCmsLoading(false));
-  }, []);
+  }, [tenantReady]);
 
   const companyName  = cms?.branding?.companyName || 'Our Company';
   const about        = cms?.about        || {};

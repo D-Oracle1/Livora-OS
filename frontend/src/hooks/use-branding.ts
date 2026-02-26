@@ -61,6 +61,19 @@ function fetchBranding(): Promise<void> {
 }
 
 /**
+ * Clears the branding cache and dispatches a 'branding-reset' event so all
+ * mounted useBranding() consumers re-fetch with the current tenant ID.
+ * Call this after setTenantId() to ensure branding reflects the resolved tenant.
+ */
+export function resetBrandingCache(): void {
+  cache.data = null;
+  cache.promise = null;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('branding-reset'));
+  }
+}
+
+/**
  * Returns true if branding data has already been loaded
  * (from localStorage sync read or from a completed API call).
  */
@@ -85,14 +98,22 @@ export function useBranding(): BrandingData {
   const [branding, setBranding] = useState<BrandingData>(cache.data || {});
 
   useEffect(() => {
+    const refetch = () => {
+      fetchBranding().then(() => {
+        if (cache.data) setBranding(cache.data);
+      });
+    };
+
     // If localStorage had data, use it immediately
     if (cache.data) {
       setBranding(cache.data);
     }
     // Always fetch fresh from API (stale-while-revalidate)
-    fetchBranding().then(() => {
-      if (cache.data) setBranding(cache.data);
-    });
+    refetch();
+
+    // Re-fetch when tenant ID is resolved after mount (e.g. dynamic hostname resolution)
+    window.addEventListener('branding-reset', refetch);
+    return () => window.removeEventListener('branding-reset', refetch);
   }, []);
 
   return branding;

@@ -26,8 +26,7 @@ import { PublicFooter } from '@/components/layout/public-footer';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 import { getToken } from '@/lib/auth-storage';
 import { api, getImageUrl } from '@/lib/api';
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
+import { useTenantResolution } from '@/hooks/use-tenant-resolution';
 
 function formatPrice(price: number): string {
   if (price >= 1000000000) return `₦${(price / 1000000000).toFixed(2)}B`;
@@ -42,6 +41,7 @@ function resolveImageSrc(src: string): string {
 
 export default function PropertyDetailPage() {
   const params = useParams();
+  const { tenantReady } = useTenantResolution();
   const branding = useBranding();
   const companyName = getCompanyName(branding);
   const [property, setProperty] = useState<any>(null);
@@ -50,6 +50,7 @@ export default function PropertyDetailPage() {
   const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
+    if (!tenantReady) return;
     async function fetchProperty() {
       try {
         const res = await api.get(`/properties/listed/${params.id}`);
@@ -62,7 +63,7 @@ export default function PropertyDetailPage() {
       }
     }
     if (params.id) fetchProperty();
-  }, [params.id]);
+  }, [tenantReady, params.id]);
 
   if (loading) {
     return (

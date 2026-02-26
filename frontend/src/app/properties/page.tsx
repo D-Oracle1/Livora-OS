@@ -19,10 +19,9 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { api, getImageUrl } from '@/lib/api';
+import { useTenantResolution } from '@/hooks/use-tenant-resolution';
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
 
 const PROPERTY_TYPES = [
   { value: '', label: 'All Types' },
@@ -55,6 +54,7 @@ function getTypeIcon(type: string) {
 }
 
 export default function PropertiesPage() {
+  const { tenantReady } = useTenantResolution();
   const [searchLocation, setSearchLocation] = useState('');
   const [propertyType, setPropertyType] = useState('');
   const [priceRange, setPriceRange] = useState('');
@@ -92,8 +92,9 @@ export default function PropertiesPage() {
   }, [searchLocation, propertyType, priceRange]);
 
   useEffect(() => {
+    if (!tenantReady) return;
     fetchProperties(1);
-  }, [fetchProperties]);
+  }, [tenantReady, fetchProperties]);
 
   const handleSearch = () => {
     setPage(1);
