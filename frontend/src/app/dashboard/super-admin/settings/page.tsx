@@ -40,7 +40,9 @@ export default function SuperAdminSettings() {
   });
   const [brandingLoading, setBrandingLoading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [faviconUploading, setFaviconUploading] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
+  const faviconRef = useRef<HTMLInputElement>(null);
 
   // Platform CMS
   const [cms, setCms] = useState({
@@ -179,6 +181,31 @@ export default function SuperAdminSettings() {
     finally {
       setLogoUploading(false);
       if (logoRef.current) logoRef.current.value = '';
+    }
+  };
+
+  const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFaviconUploading(true);
+    try {
+      const form = new FormData();
+      form.append('logo', file);
+      const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
+      const res = await fetch(`${API_BASE}/api/v1/upload/company-logo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: form,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const json = await res.json();
+      const url = (json?.data || json)?.url || (json?.data || json)?.path;
+      if (url) setBranding(b => ({ ...b, favicon: url }));
+      else toast.error('Upload failed');
+    } catch (e: any) { toast.error(e.message || 'Favicon upload failed'); }
+    finally {
+      setFaviconUploading(false);
+      if (faviconRef.current) faviconRef.current.value = '';
     }
   };
 
@@ -394,8 +421,29 @@ export default function SuperAdminSettings() {
               </div>
             </div>
             <div>
-              <label className={labelCls}>Favicon URL</label>
-              <input value={branding.favicon} onChange={e => setBranding(b => ({ ...b, favicon: e.target.value }))} className={inputCls} placeholder="https://example.com/favicon.ico" />
+              <label className={labelCls}>Favicon</label>
+              <div className="flex items-center gap-4">
+                {branding.favicon ? (
+                  <div className="relative">
+                    <img src={getImageUrl(branding.favicon)} alt="favicon" className="w-12 h-12 rounded-lg object-contain neuo-inset p-1" />
+                    <button onClick={() => setBranding(b => ({ ...b, favicon: '' }))} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow">
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-lg neuo-inset flex items-center justify-center">
+                    <Globe className="w-5 h-5 text-gray-400" />
+                  </div>
+                )}
+                <div>
+                  <input type="file" accept="image/x-icon,image/png,image/svg+xml,image/*" ref={faviconRef} onChange={handleFaviconUpload} className="hidden" />
+                  <button onClick={() => faviconRef.current?.click()} disabled={faviconUploading} className="neuo-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gray-600 disabled:opacity-50">
+                    {faviconUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    {branding.favicon ? 'Replace Favicon' : 'Upload Favicon'}
+                  </button>
+                  <p className="text-xs text-gray-400 mt-1.5">ICO, PNG, SVG. Recommended 32×32.</p>
+                </div>
+              </div>
             </div>
           </div>
 

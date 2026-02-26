@@ -38,7 +38,7 @@ export class TenantMiddleware implements NestMiddleware {
 
     // Check if this is the master domain
     if (this.isMasterDomain(domain)) {
-      // Bridge for cross-origin frontend: read X-Company-ID header
+      // 1. Explicit header takes priority (admin dashboard, api helper)
       const headerId = req.headers['x-company-id'] as string | undefined;
       if (headerId) {
         const co = await this.resolveCompanyById(headerId);
@@ -47,6 +47,24 @@ export class TenantMiddleware implements NestMiddleware {
           return next();
         }
       }
+
+      // 2. Fall back to Origin header — handles cross-origin requests from a
+      //    tenant frontend on a custom domain (e.g. vicsondigital.online) calling
+      //    the backend on *.vercel.app without an explicit X-Company-ID header.
+      const origin = req.headers['origin'] as string | undefined;
+      if (origin) {
+        try {
+          const originDomain = new URL(origin).hostname.replace(/^www\./, '').toLowerCase();
+          if (!this.isMasterDomain(originDomain)) {
+            const co = await this.resolveCompany(originDomain);
+            if (co?.isActive) {
+              req.tenant = { companyId: co.id, domain: co.domain, company: co };
+              return next();
+            }
+          }
+        } catch { /* malformed Origin — ignore */ }
+      }
+
       req.tenant = { companyId: null, domain, company: null };
       return next();
     }
