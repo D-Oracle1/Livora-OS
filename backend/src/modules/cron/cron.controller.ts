@@ -33,10 +33,11 @@ export class CronController {
     this.logger.log('Cron: master DB alive');
 
     // 2. Ping every active tenant DB so none of them pause on Supabase free tier
-    const companies = await this.masterPrisma.company.findMany({
-      where: { isActive: true, databaseUrl: { not: null } },
-      select: { id: true, slug: true },
+    const allCompanies = await this.masterPrisma.company.findMany({
+      where: { isActive: true },
+      select: { id: true, slug: true, databaseUrl: true },
     });
+    const companies = allCompanies.filter((co) => co.databaseUrl);
 
     const results: Record<string, string> = {};
     await Promise.allSettled(
