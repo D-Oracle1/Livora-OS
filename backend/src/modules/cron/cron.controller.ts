@@ -6,6 +6,7 @@ import { StaffRankingService } from '../ranking/staff-ranking.service';
 import { ClientRankingService } from '../ranking/client-ranking.service';
 import { SaleOverdueService } from '../sale/sale-overdue.service';
 import { MasterPrismaService } from '../../database/master-prisma.service';
+import { TenantPrismaService } from '../../database/tenant-prisma.service';
 
 @ApiTags('Cron')
 @Controller('cron')
@@ -19,14 +20,40 @@ export class CronController {
     private readonly clientRankingService: ClientRankingService,
     private readonly saleOverdueService: SaleOverdueService,
     private readonly masterPrisma: MasterPrismaService,
+    private readonly tenantPrisma: TenantPrismaService,
   ) {}
 
   @Get('keep-alive')
-  @ApiOperation({ summary: 'Keep Supabase project alive (runs a lightweight master DB query)' })
+  @ApiOperation({ summary: 'Keep all Supabase projects alive — pings master DB and all active tenant DBs' })
   async keepAlive() {
     this.logger.log('Cron: keep-alive ping');
+
+    // 1. Ping master DB
     await this.masterPrisma.$queryRaw`SELECT 1`;
-    return { success: true, job: 'keep-alive', ts: new Date().toISOString() };
+    this.logger.log('Cron: master DB alive');
+
+    // 2. Ping every active tenant DB so none of them pause on Supabase free tier
+    const companies = await this.masterPrisma.company.findMany({
+      where: { isActive: true, databaseUrl: { not: null } },
+      select: { id: true, slug: true },
+    });
+
+    const results: Record<string, string> = {};
+    await Promise.allSettled(
+      companies.map(async (co) => {
+        try {
+          const client = await this.tenantPrisma.getClient(co.id);
+          await (client as any).$queryRaw`SELECT 1`;
+          results[co.slug] = 'ok';
+          this.logger.log(`Cron: tenant DB alive — ${co.slug}`);
+        } catch (err: any) {
+          results[co.slug] = `error: ${err.message}`;
+          this.logger.warn(`Cron: tenant DB ping failed — ${co.slug}: ${err.message}`);
+        }
+      }),
+    );
+
+    return { success: true, job: 'keep-alive', master: 'ok', tenants: results, ts: new Date().toISOString() };
   }
 
   @Post('rankings/daily')
