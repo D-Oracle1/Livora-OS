@@ -18,12 +18,25 @@ import { MailService } from '../../common/services/mail.service';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.secret') || process.env.JWT_SECRET || 'rms-secret',
-        signOptions: {
-          expiresIn: configService.get<string>('jwt.expiresIn') || process.env.JWT_EXPIRES_IN || '7d',
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const rawExpiry =
+          configService.get<string>('jwt.expiresIn') ||
+          process.env.JWT_EXPIRES_IN ||
+          '7d';
+
+        // jsonwebtoken accepts a plain integer (seconds) or an ms-style string like
+        // "7d", "24h", "30m", "60s". Anything else (e.g. "undefined", "null",
+        // milliseconds like "604800000") throws at sign-time. Validate and fall back.
+        const isValidExpiry = (v: string) =>
+          /^\d+$/.test(v) || /^\d+\s*(s|m|h|d|w|y)$/i.test(v);
+
+        const expiresIn = isValidExpiry(rawExpiry) ? rawExpiry : '7d';
+
+        return {
+          secret: configService.get<string>('jwt.secret') || process.env.JWT_SECRET || 'rms-secret',
+          signOptions: { expiresIn },
+        };
+      },
       inject: [ConfigService],
     }),
   ],
