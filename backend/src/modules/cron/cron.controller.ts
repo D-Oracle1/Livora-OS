@@ -1,10 +1,11 @@
-import { Controller, Post, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Post, Get, UseGuards, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CronSecretGuard } from '../../common/guards/cron-secret.guard';
 import { RankingService } from '../ranking/ranking.service';
 import { StaffRankingService } from '../ranking/staff-ranking.service';
 import { ClientRankingService } from '../ranking/client-ranking.service';
 import { SaleOverdueService } from '../sale/sale-overdue.service';
+import { MasterPrismaService } from '../../database/master-prisma.service';
 
 @ApiTags('Cron')
 @Controller('cron')
@@ -17,7 +18,16 @@ export class CronController {
     private readonly staffRankingService: StaffRankingService,
     private readonly clientRankingService: ClientRankingService,
     private readonly saleOverdueService: SaleOverdueService,
+    private readonly masterPrisma: MasterPrismaService,
   ) {}
+
+  @Get('keep-alive')
+  @ApiOperation({ summary: 'Keep Supabase project alive (runs a lightweight master DB query)' })
+  async keepAlive() {
+    this.logger.log('Cron: keep-alive ping');
+    await this.masterPrisma.$queryRaw`SELECT 1`;
+    return { success: true, job: 'keep-alive', ts: new Date().toISOString() };
+  }
 
   @Post('rankings/daily')
   @ApiOperation({ summary: 'Trigger daily rankings update' })
