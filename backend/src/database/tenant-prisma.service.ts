@@ -157,7 +157,9 @@ export class TenantPrismaService implements OnModuleDestroy {
     const ddlConnStr = TenantPrismaService.pgConnString(masterUrl);
 
     // Step 1: create the PostgreSQL schema
-    const adminPg = new PgClient({ connectionString: ddlConnStr });
+    // Enable SSL for Supabase (required for pooler connections from Vercel)
+    const sslConfig = process.env.VERCEL ? { rejectUnauthorized: false } : undefined;
+    const adminPg = new PgClient({ connectionString: ddlConnStr, ssl: sslConfig });
     await adminPg.connect();
     try {
       await adminPg.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
@@ -169,7 +171,9 @@ export class TenantPrismaService implements OnModuleDestroy {
     }
 
     // Step 2: apply the full DDL into the tenant schema.
-    const sqlPath = join(process.cwd(), 'prisma', 'tenant-schema.sql');
+    // Use __dirname for reliable path resolution in both local and Vercel serverless.
+    // __dirname in dist/database/tenant-prisma.service.js → resolve up two levels to project root.
+    const sqlPath = join(__dirname, '..', '..', 'prisma', 'tenant-schema.sql');
     let sql: string;
     try {
       sql = readFileSync(sqlPath, 'utf8');
@@ -177,7 +181,7 @@ export class TenantPrismaService implements OnModuleDestroy {
       throw new Error(`tenant-schema.sql not found at ${sqlPath}`);
     }
 
-    const tenantPg = new PgClient({ connectionString: ddlConnStr });
+    const tenantPg = new PgClient({ connectionString: ddlConnStr, ssl: sslConfig });
     await tenantPg.connect();
     try {
       // Pin the search_path so all DDL lands in the right schema.

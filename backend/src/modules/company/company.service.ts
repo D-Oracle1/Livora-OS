@@ -662,10 +662,16 @@ export class CompanyService {
    * Idempotent — safe to run at any time without data loss.
    */
   async migrateAllTenants(): Promise<{ migrated: number; failed: number; results: { slug: string; ok: boolean; error?: string }[] }> {
-    const companies = await this.masterPrisma.company.findMany({
-      where: { isActive: true },
-      select: { id: true, slug: true },
-    });
+    let companies: { id: string; slug: string }[];
+    try {
+      companies = await this.masterPrisma.company.findMany({
+        where: { isActive: true },
+        select: { id: true, slug: true },
+      });
+    } catch (e: any) {
+      this.logger.error(`migrate-all: failed to list companies: ${e.message}`);
+      return { migrated: 0, failed: 0, results: [{ slug: '__list_error__', ok: false, error: e.message?.slice(0, 200) }] };
+    }
 
     const results: { slug: string; ok: boolean; error?: string }[] = [];
     let migrated = 0;
@@ -747,7 +753,7 @@ export class CompanyService {
         connStr = u.toString();
       } catch { /* use original */ }
 
-      const pgClient = new PgClient({ connectionString: connStr });
+      const pgClient = new PgClient({ connectionString: connStr, ssl: process.env.VERCEL ? { rejectUnauthorized: false } : undefined });
       await pgClient.connect();
       try {
         const res = await pgClient.query<{ tablename: string }>(
@@ -831,7 +837,7 @@ export class CompanyService {
         connStr = u.toString();
       } catch { /* use original */ }
 
-      const pgClient = new PgClient({ connectionString: connStr });
+      const pgClient = new PgClient({ connectionString: connStr, ssl: process.env.VERCEL ? { rejectUnauthorized: false } : undefined });
       await pgClient.connect();
       try {
         const res = await pgClient.query<{ tablename: string }>(
