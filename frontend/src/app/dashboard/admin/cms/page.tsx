@@ -279,23 +279,61 @@ export default function CmsPage() {
 
       case 'about':
         return (
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Title</label>
-              <Input value={sectionData.title || ''} onChange={(e) => updateField('title', e.target.value)} />
+          <div className="space-y-6">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-xs text-blue-700 dark:text-blue-400">Fields here map to the About Us page sections. Scroll down to find all editable areas.</p>
             </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Subtitle</label>
-              <Input value={sectionData.subtitle || ''} onChange={(e) => updateField('subtitle', e.target.value)} />
+
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm border-b pb-2">Hero & Intro</h3>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Page Title (hero heading)</label>
+                <Input value={sectionData.title || ''} onChange={(e) => updateField('title', e.target.value)} placeholder="About Our Company" />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Subtitle</label>
+                <Input value={sectionData.subtitle || ''} onChange={(e) => updateField('subtitle', e.target.value)} placeholder="About Us" />
+              </div>
+              {renderImageField('Hero / Main Image (left panel)', 'image')}
             </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Content</label>
-              <RichTextEditor content={sectionData.content || ''} onChange={(html) => updateField('content', html)} />
+
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm border-b pb-2">3-Column Intro Text</h3>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Bold Headline (col 1)</label>
+                <Input value={sectionData.storyTitle || ''} onChange={(e) => updateField('storyTitle', e.target.value)} placeholder="Where Trust Meets Real Estate" />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">First Paragraph + Read More (col 2)</label>
+                <RichTextEditor content={sectionData.content || ''} onChange={(html) => updateField('content', html)} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Second Paragraph (col 3)</label>
+                <Textarea rows={4} value={sectionData.story || ''} onChange={(e) => updateField('story', e.target.value)} placeholder="Our mission is to deliver unmatched value…" />
+              </div>
             </div>
-            {renderImageField('Section Image', 'image')}
-            {renderDynamicList('Bullet Points', 'items', [
-              { key: 'text', label: 'Bullet text' },
-            ])}
+
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm border-b pb-2">Split Image Panel</h3>
+              {renderImageField('Right Panel Image (top)', 'storyImage')}
+              <p className="text-xs text-muted-foreground">The left panel reuses the Hero image above. The right panel shows this image on top and the hero image again on the bottom.</p>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm border-b pb-2">Solutions / Services Section</h3>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Section Heading</label>
+                <Input value={sectionData.whyTitle || ''} onChange={(e) => updateField('whyTitle', e.target.value)} placeholder="We Provide Solutions For Your Real Estate Goals" />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Section Subtext</label>
+                <Textarea rows={2} value={sectionData.whySubtitle || ''} onChange={(e) => updateField('whySubtitle', e.target.value)} placeholder="Our expert team covers every aspect of real estate…" />
+              </div>
+              {renderDynamicList('Service Items (up to 6, shown in grid)', 'items', [
+                { key: 'title', label: 'Title' },
+                { key: 'description', label: 'Description', type: 'textarea' },
+              ])}
+            </div>
           </div>
         );
 
@@ -339,17 +377,31 @@ export default function CmsPage() {
       case 'stats':
         return renderDynamicList('Statistics', 'stats', [
           { key: 'value', label: 'Value (e.g. 10K+)' },
-          { key: 'label', label: 'Label' },
+          { key: 'label', label: 'Label (e.g. Happy Customers)' },
+          { key: 'description', label: 'Description (shown beside the number on About page)', type: 'textarea' },
         ]);
 
       case 'agents':
-        return renderDynamicList('Featured Agents', 'agents', [
-          { key: 'name', label: 'Name' },
-          { key: 'role', label: 'Role' },
-          { key: 'deals', label: 'Deals count' },
-          { key: 'rating', label: 'Rating (1-5)' },
-          { key: 'image', label: 'Image URL' },
-        ]);
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Team Section Subtitle</label>
+              <Textarea
+                rows={2}
+                value={sectionData.subtitle || ''}
+                onChange={(e) => updateField('subtitle', e.target.value)}
+                placeholder="Behind every successful transaction is a dedicated professional who genuinely cares…"
+              />
+            </div>
+            {renderDynamicList('Team Members (first 3 shown on About page)', 'agents', [
+              { key: 'name', label: 'Full Name' },
+              { key: 'role', label: 'Role / Title' },
+              { key: 'deals', label: 'Deals count' },
+              { key: 'rating', label: 'Rating (1-5)' },
+              { key: 'image', label: 'Photo URL' },
+            ])}
+          </div>
+        );
 
       case 'cta':
         return (
