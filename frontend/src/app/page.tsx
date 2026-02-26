@@ -29,9 +29,7 @@ import {
 } from 'lucide-react';
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
-import { getImageUrl } from '@/lib/api';
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
+import { api, getImageUrl } from '@/lib/api';
 
 const ICON_MAP: Record<string, any> = {
   Users, Building2, TrendingUp, Award, BarChart3, MessageSquare, Shield, Zap, Star, Search,
@@ -56,8 +54,7 @@ export default function HomePage() {
 
   // Fetch CMS content
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/v1/cms/public`)
-      .then((r) => r.ok ? r.json() : null)
+    api.get('/cms/public')
       .then((raw) => {
         const data = raw?.data || raw;
         if (data && typeof data === 'object') setCms(data);
@@ -88,15 +85,12 @@ export default function HomePage() {
       params.append('page', String(currentPage));
       params.append('limit', '12');
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/properties/listed?${params.toString()}`);
-      if (res.ok) {
-        const raw = await res.json();
-        const items = Array.isArray(raw) ? raw : (raw?.data || []);
-        const meta = raw?.meta;
-        setProperties(items);
-        setTotalPages(meta?.totalPages || 1);
-        setTotalCount(meta?.total ?? items.length);
-      }
+      const raw = await api.get(`/properties/listed?${params.toString()}`);
+      const items = Array.isArray(raw) ? raw : (raw?.data || []);
+      const meta = raw?.meta;
+      setProperties(items);
+      setTotalPages(meta?.totalPages || 1);
+      setTotalCount(meta?.total ?? items.length);
     } catch {
       setProperties([]);
     } finally {
