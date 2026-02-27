@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   Handshake,
   BarChart3,
-  Play,
   Home,
 } from 'lucide-react';
 import { PublicNavbar } from '@/components/layout/public-navbar';
@@ -64,8 +63,8 @@ export default function AboutPage() {
 
   const aboutText  = plainText(about.content || '');
   const storyText  = plainText(about.story   || mission.missionContent || '');
-  const excerpt1   = aboutText  ? (aboutText.length  > 280 ? aboutText.slice(0,  280) + '…' : aboutText)  : `${companyName} is dedicated to transforming the real estate experience by combining deep market expertise with genuine client care. We believe every property transaction is a milestone — and we treat it that way.`;
-  const excerpt2   = storyText  ? (storyText.length  > 280 ? storyText.slice(0,  280) + '…' : storyText)  : 'Our mission is to deliver unmatched value through transparent practices, innovative technology, and a passionate team committed to excellence in every interaction with our clients.';
+  const introParagraph = aboutText || `${companyName} is dedicated to transforming the real estate experience by combining deep market expertise with genuine client care. We believe every property transaction is a milestone — and we treat it that way. Our team of experienced professionals is committed to delivering unmatched value through transparent practices, innovative technology, and a passionate dedication to excellence in every interaction with our clients.`;
+  const introTitle = about.storyTitle || about.title || `${companyName} — Where Trust Meets Real Estate`;
 
   // Service/value items — prefer about.items, fall back to coreValues.values
   const serviceItems: any[] = (about.items?.length ? about.items : coreValues.values) || [];
@@ -106,46 +105,33 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── 2. INTRO — 3-COLUMN ────────────────────────────────────── */}
+      {/* ── 2. INTRO — SINGLE JUSTIFIED PARAGRAPH ──────────────────── */}
       <section className="py-20 px-4 bg-white">
-        <div className="container mx-auto">
-          <div className="grid md:grid-cols-3 gap-10 items-start">
-            {/* Col 1 — bold headline */}
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight">
-                {about.storyTitle || about.title || `${companyName} — Where Trust Meets Real Estate`}
-              </h2>
-            </div>
-            {/* Col 2 — first excerpt + read more */}
-            <div>
-              <p className="text-gray-600 leading-relaxed text-[15px]">{excerpt1}</p>
-              <Link href="/contact" className="inline-flex items-center gap-1 mt-5 text-accent font-semibold text-sm hover:gap-2 transition-all">
-                Read More <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-            {/* Col 3 — second excerpt */}
-            <div>
-              <p className="text-gray-600 leading-relaxed text-[15px]">{excerpt2}</p>
-            </div>
-          </div>
+        <div className="container mx-auto max-w-4xl">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight mb-6">
+            {introTitle}
+          </h2>
+          <p className="text-gray-600 leading-relaxed text-[15px] text-justify">
+            {introParagraph}
+          </p>
+          {storyText && storyText !== aboutText && (
+            <p className="text-gray-600 leading-relaxed text-[15px] text-justify mt-4">
+              {storyText}
+            </p>
+          )}
         </div>
       </section>
 
       {/* ── 3. SPLIT FULL-WIDTH IMAGES ─────────────────────────────── */}
       <section className="w-full flex flex-col md:flex-row h-[420px] md:h-[500px]">
-        {/* Left — large image with play overlay */}
+        {/* Left — large image */}
         <div className="relative flex-1 bg-primary/20">
           {heroImage ? (
             <Image src={heroImage} alt={companyName} fill className="object-cover" />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary to-primary/60" />
           )}
-          <div className="absolute inset-0 bg-black/30" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-white/90 hover:bg-white flex items-center justify-center cursor-pointer shadow-2xl transition-all hover:scale-110">
-              <Play className="w-6 h-6 text-primary ml-1" fill="currentColor" />
-            </div>
-          </div>
+          <div className="absolute inset-0 bg-black/20" />
         </div>
 
         {/* Right — two stacked images */}
