@@ -63,14 +63,14 @@ export default function ContactPage() {
 
   if (cmsLoading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-primary-950 flex items-center justify-center">
+      <div className="min-h-dvh bg-white dark:bg-primary-950 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-primary-950">
+    <div className="min-h-dvh bg-white dark:bg-primary-950">
       <PublicNavbar currentPage="/contact" />
 
       {/* Hero */}

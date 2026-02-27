@@ -60,8 +60,11 @@ export const viewport: Viewport = {
   ],
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5,
+  // Do NOT set maximumScale=1 — iOS 10+ ignores it and Safari flags it as
+  // an accessibility violation. Allow users to pinch-zoom freely.
+  minimumScale: 1,
   viewportFit: 'cover',
+  interactiveWidget: 'resizes-visual',
 };
 
 export default function RootLayout({

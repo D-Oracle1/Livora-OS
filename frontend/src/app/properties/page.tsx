@@ -119,7 +119,7 @@ export default function PropertiesPage() {
   const selectedPriceLabel = PRICE_RANGES.find(r => r.value === priceRange)?.label || 'Any Price';
 
   return (
-    <div className="min-h-screen bg-white dark:bg-primary-950">
+    <div className="min-h-dvh bg-white dark:bg-primary-950">
       <PublicNavbar currentPage="/properties" />
 
       {/* Hero */}

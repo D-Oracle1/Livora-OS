@@ -122,14 +122,14 @@ export default function HomePage() {
 
   if (cmsLoading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-primary-950 flex items-center justify-center">
+      <div className="min-h-dvh bg-white dark:bg-primary-950 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-primary-950">
+    <div className="min-h-dvh bg-white dark:bg-primary-950">
       <PublicNavbar currentPage="/" />
 
       {/* Hero Section */}

@@ -77,14 +77,14 @@ export default function AboutPage() {
 
   if (cmsLoading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-dvh bg-white flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-dvh bg-white">
       <PublicNavbar currentPage="/about" />
 
       {/* ── 1. HERO BANNER ─────────────────────────────────────────── */}
@@ -107,7 +107,7 @@ export default function AboutPage() {
 
       {/* ── 2. INTRO — SINGLE JUSTIFIED PARAGRAPH ──────────────────── */}
       <section className="py-20 px-4 bg-white">
-        <div className="container mx-auto max-w-4xl">
+        <div className="container mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight mb-6">
             {introTitle}
           </h2>
