@@ -81,6 +81,7 @@ interface SaleReportForm {
   paymentPlan: 'FULL' | 'INSTALLMENT';
   numberOfInstallments: string;
   firstPaymentAmount: string;
+  saleDate: string;
 }
 
 export default function RealtorPropertiesPage() {
@@ -111,6 +112,7 @@ export default function RealtorPropertiesPage() {
     paymentPlan: 'FULL',
     numberOfInstallments: '1',
     firstPaymentAmount: '',
+    saleDate: new Date().toISOString().split('T')[0],
   });
 
   useEffect(() => {
@@ -192,6 +194,7 @@ export default function RealtorPropertiesPage() {
       paymentPlan: 'FULL',
       numberOfInstallments: '1',
       firstPaymentAmount: '',
+      saleDate: new Date().toISOString().split('T')[0],
     });
     setIsReportSaleOpen(true);
   };
@@ -252,7 +255,7 @@ export default function RealtorPropertiesPage() {
         clientContact: saleForm.buyerPhone || undefined,
         propertyId: selectedProperty.id,
         saleValue: parseFloat(saleForm.totalAmount),
-        saleDate: new Date().toISOString().split('T')[0],
+        saleDate: saleForm.saleDate,
         notes: saleForm.notes || undefined,
         paymentPlan: saleForm.paymentPlan,
         paymentMethod: saleForm.paymentMethod || undefined,
@@ -574,6 +577,19 @@ export default function RealtorPropertiesPage() {
                 <DollarSign className="w-4 h-4" />
                 Sale Details
               </h4>
+
+              {/* Date of Sale */}
+              <div className="space-y-2">
+                <Label htmlFor="saleDate">Date of Sale *</Label>
+                <Input
+                  id="saleDate"
+                  type="date"
+                  max={new Date().toISOString().split('T')[0]}
+                  value={saleForm.saleDate}
+                  onChange={e => updateSaleForm('saleDate', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">You can backdate to when the sale actually occurred</p>
+              </div>
 
               {/* Payment Plan Toggle */}
               <div className="space-y-2">
