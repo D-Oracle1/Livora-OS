@@ -13,7 +13,7 @@
     "api/index.ts": {
       "maxDuration": 60,
       "memory": 1769,
-      "includeFiles": "{dist/**,node_modules/.prisma/**,node_modules/@prisma/engines/**,node_modules/pg/**,node_modules/pg-protocol/**,node_modules/pg-types/**,node_modules/pgpass/**,node_modules/pg-connection-string/**,node_modules/exceljs/**,node_modules/archiver/**,node_modules/@vercel/blob/**,node_modules/undici/**,prisma/**}"
+      "includeFiles": "{dist/**,node_modules/.prisma/**,node_modules/@prisma/engines/**,node_modules/pg*/**,node_modules/exceljs/**,node_modules/archiver/**,node_modules/@vercel/blob/**,node_modules/undici/**,prisma/**}"
     }
   },
   "headers": [
