@@ -269,7 +269,7 @@ export default function SuperAdminSettings() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1.5 neuo-inset rounded-2xl w-fit flex-wrap">
+      <div className="flex gap-1 p-1.5 neuo-inset rounded-2xl w-full sm:w-fit flex-wrap overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -404,20 +404,20 @@ export default function SuperAdminSettings() {
             </div>
             <div>
               <label className={labelCls}>Primary Accent Color</label>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <input
                   type="color"
                   value={branding.primaryColor || '#f59e0b'}
                   onChange={e => setBranding(b => ({ ...b, primaryColor: e.target.value }))}
-                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer bg-transparent p-0.5"
+                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer bg-transparent p-0.5 shrink-0"
                 />
                 <input
                   value={branding.primaryColor}
                   onChange={e => setBranding(b => ({ ...b, primaryColor: e.target.value }))}
-                  className={`${inputCls} w-32`}
+                  className={`${inputCls} w-32 shrink-0`}
                   placeholder="#f59e0b"
                 />
-                <div className="w-8 h-8 rounded-lg shadow-sm border border-gray-100" style={{ backgroundColor: accent }} />
+                <div className="w-8 h-8 rounded-lg shadow-sm border border-gray-100 shrink-0" style={{ backgroundColor: accent }} />
               </div>
             </div>
             <div>

@@ -708,10 +708,10 @@ export default function CompaniesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-6 text-sm">
-                    <div className="flex gap-4 text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <div className="flex gap-3 text-muted-foreground">
                       <span>{company.stats?.users || 0} users</span>
-                      <span>{company.stats?.properties || 0} properties</span>
+                      <span>{company.stats?.properties || 0} props</span>
                       <span>{company.stats?.sales || 0} sales</span>
                     </div>
 
@@ -731,7 +731,7 @@ export default function CompaniesPage() {
                       </Button>
                     </div>
 
-                    <div className="flex gap-1">
+                    <div className="flex flex-wrap gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => viewDetail(company)} title="View / Edit">
                         <Eye className="w-4 h-4" />
                       </Button>

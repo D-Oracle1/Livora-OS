@@ -219,7 +219,7 @@ export default function TaxPage() {
       {/* Header with Time Filter */}
       <div className="flex flex-wrap gap-4 justify-between items-center">
         <h1 className="text-2xl font-bold">Tax Management</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(['month', 'quarter', 'year', 'all'] as TimePeriod[]).map(p => (
             <Button
               key={p}

@@ -69,7 +69,7 @@ export default function GalleryPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-primary-950">
+    <div className="min-h-dvh bg-white dark:bg-primary-950">
       <PublicNavbar currentPage="/gallery" />
 
       {/* Hero */}

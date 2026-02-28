@@ -288,7 +288,7 @@ export default function CommissionPage() {
       {/* Time Period Filter */}
       <div className="flex flex-wrap gap-2 justify-between items-center">
         <h1 className="text-2xl font-bold">Commission Management</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={timePeriod === 'month' ? 'default' : 'outline'}
             size="sm"

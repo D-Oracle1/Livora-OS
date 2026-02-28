@@ -124,7 +124,7 @@ export default function PlatformPage() {
 
   return (
     <div
-      className="min-h-screen relative overflow-x-hidden"
+      className="min-h-dvh relative overflow-x-hidden"
       style={{ background: 'linear-gradient(135deg, #020c1b 0%, #0d2137 40%, #0a3d55 70%, #073b4c 100%)' }}
     >
       {/* Ambient blobs */}

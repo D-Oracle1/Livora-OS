@@ -67,7 +67,7 @@ export default function PropertyDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-dvh flex items-center justify-center bg-gray-50">
         <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     );
@@ -75,7 +75,7 @@ export default function PropertyDetailPage() {
 
   if (error || !property) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-dvh flex flex-col items-center justify-center bg-gray-50 px-4">
         <Building2 className="w-16 h-16 text-gray-300 mb-4" />
         <h1 className="text-2xl font-bold text-gray-700 mb-2">Property Not Found</h1>
         <p className="text-gray-500 mb-6">{error}</p>
@@ -94,7 +94,7 @@ export default function PropertyDetailPage() {
     : `${companyName} Agent`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-dvh bg-gray-50">
       <PublicNavbar />
 
       {/* Breadcrumb */}

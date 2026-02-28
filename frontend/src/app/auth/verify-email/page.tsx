@@ -200,7 +200,7 @@ function VerifyEmailContent() {
 
 export default function VerifyEmailPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white p-4">
+    <div className="min-h-dvh flex items-center justify-center bg-gradient-to-b from-gray-50 to-white p-4">
       <Suspense
         fallback={
           <div className="w-full max-w-md bg-white rounded-2xl shadow-md p-8 text-center">

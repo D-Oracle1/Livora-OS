@@ -451,7 +451,7 @@ export default function ClientsPage() {
               <Briefcase className="w-5 h-5 text-primary" />
               All Clients
             </CardTitle>
-            <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex flex-col md:flex-row flex-wrap gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -462,7 +462,7 @@ export default function ClientsPage() {
                 />
               </div>
               <select
-                className="px-3 py-2 border rounded-md text-sm"
+                className="w-full md:w-auto px-3 py-2 border rounded-md text-sm"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
               >

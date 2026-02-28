@@ -58,8 +58,8 @@ export default function AboutPage() {
   const heroImage    = resolveImg(about.image || '');
   const storyImage   = resolveImg(about.storyImage || '');
 
-  // Content helpers
-  const plainText = (html: string) => (html || '').replace(/<[^>]+>/g, '').trim();
+  // Content helpers — handle non-string CMS values defensively
+  const plainText = (html: any) => (typeof html === 'string' ? html : '').replace(/<[^>]+>/g, '').trim();
 
   const aboutText  = plainText(about.content || '');
   const storyText  = plainText(about.story   || mission.missionContent || '');
@@ -173,7 +173,7 @@ export default function AboutPage() {
             <div className="grid md:grid-cols-3 gap-x-8 gap-y-8">
               {serviceItems.slice(0, 6).map((item: any, i: number) => {
                 const Icon = ICON_LIST[i % ICON_LIST.length];
-                const label = item.title || item.text || item;
+                const label = item.title || item.text || (typeof item === 'string' ? item : '');
                 const desc  = item.description || '';
                 return (
                   <div key={i} className="flex items-start gap-4 group">
@@ -322,7 +322,7 @@ export default function AboutPage() {
                 ? teamMembers.slice(0, 3).map((member: any, i: number) => {
                     const photo = resolveImg(member.photo || member.avatar || '');
                     const name  = member.name  || `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'Team Member';
-                    const role  = member.role  || member.title || 'Property Consultant';
+                    const role  = (typeof member.role === 'string' ? member.role : member.role?.name) || member.title || 'Property Consultant';
                     return (
                       <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow group border border-gray-100">
                         <div className="relative h-56 bg-gray-100">

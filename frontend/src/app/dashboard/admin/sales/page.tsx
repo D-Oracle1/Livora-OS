@@ -381,7 +381,7 @@ export default function SalesPage() {
           <h1 className="text-2xl font-bold">Sales Management</h1>
           <p className="text-sm text-muted-foreground">Sales reported by realtors</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {['month', 'quarter', 'year', 'all'].map((p) => (
             <Button
               key={p}
@@ -469,9 +469,9 @@ export default function SalesPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <p className="text-lg font-bold text-[#0b5c46]">{formatCurrency(sale.amount)}</p>
-                      <div className="flex gap-1">
+                      <div className="flex flex-wrap gap-1">
                         <Button
                           size="sm"
                           variant="outline"

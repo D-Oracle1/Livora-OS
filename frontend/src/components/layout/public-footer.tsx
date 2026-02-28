@@ -49,14 +49,20 @@ export function PublicFooter({ cmsData }: { cmsData?: FooterData }) {
 
   const companyName = getCompanyName(branding);
   const logoUrl = branding.logo ? (branding.logo.startsWith('http') ? branding.logo : getImageUrl(branding.logo)) : '';
-  const description = cmsData?.description || `${companyName} — your trusted partner in real estate.`;
-  const quickLinks = cmsData?.quickLinks || [
+  const description = (typeof cmsData?.description === 'string' ? cmsData.description : null) || `${companyName} — your trusted partner in real estate.`;
+  const quickLinks: { label: string; href: string }[] = Array.isArray(cmsData?.quickLinks) ? cmsData.quickLinks.map((l: any) => ({
+    label: typeof l.label === 'string' ? l.label : l.label?.name || '',
+    href: l.href || '#',
+  })) : [
     { label: 'Home', href: '/' },
     { label: 'Properties', href: '/properties' },
     { label: 'About', href: '/about' },
     { label: 'Contact', href: '/contact' },
   ];
-  const services = cmsData?.services || [];
+  // Normalise: services can be string[] or {name:string}[]
+  const services: string[] = (cmsData?.services || []).map((s: any) =>
+    typeof s === 'string' ? s : (s?.name || s?.label || '')
+  ).filter(Boolean);
 
   return (
     <footer className="py-12 px-4 bg-primary dark:bg-primary-950 border-t border-primary-600">
@@ -93,8 +99,8 @@ export function PublicFooter({ cmsData }: { cmsData?: FooterData }) {
             <div>
               <h4 className="font-semibold text-white mb-4">Services</h4>
               <ul className="space-y-2">
-                {services.map((service) => (
-                  <li key={service}>
+                {services.map((service, i) => (
+                  <li key={i}>
                     <Link href="#" className="text-white/70 hover:text-accent transition-colors text-sm">
                       {service}
                     </Link>

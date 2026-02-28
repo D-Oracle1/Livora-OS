@@ -146,7 +146,7 @@ export default function PurchasePage() {
 
   if (loadingProperty) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     );
@@ -154,7 +154,7 @@ export default function PurchasePage() {
 
   if (!property) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4">
         <Building2 className="w-12 h-12 text-gray-300" />
         <p className="text-gray-500">Property not found.</p>
         <Link href="/properties"><Button variant="outline">Back to Properties</Button></Link>
@@ -165,7 +165,7 @@ export default function PurchasePage() {
   const stepLabels = ['Purchase Form', 'Payment Details', 'Confirmation'];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-primary-950">
+    <div className="min-h-dvh bg-gray-50 dark:bg-primary-950">
       {/* Header */}
       <div className="bg-white dark:bg-primary-900 border-b border-gray-200 dark:border-primary-800">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
