@@ -1123,6 +1123,7 @@ model StaffProfile {
   // Compensation
   baseSalary      Decimal        @db.Decimal(15, 2)
   currency        String         @default("NGN")
+  isTaxable       Boolean        @default(true)
 
   // Leave balances
   annualLeaveBalance Int         @default(20)

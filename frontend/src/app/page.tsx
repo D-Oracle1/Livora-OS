@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -113,12 +113,40 @@ export default function HomePage() {
     document.getElementById('properties')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const heroImage = hero.backgroundImage
-    ? (hero.backgroundImage.startsWith('http') ? hero.backgroundImage : getImageUrl(hero.backgroundImage))
-    : '';
+  // Build carousel images list: prefer backgroundImages array, fall back to single backgroundImage
+  const rawCarouselImages: string[] = Array.isArray(hero.backgroundImages) && hero.backgroundImages.length > 0
+    ? hero.backgroundImages
+    : hero.backgroundImage
+      ? [hero.backgroundImage]
+      : [];
+  const carouselImages = rawCarouselImages.map((img: string) =>
+    img.startsWith('http') ? img : getImageUrl(img)
+  );
+
   const heroSideImage = hero.heroImage
     ? (hero.heroImage.startsWith('http') ? hero.heroImage : getImageUrl(hero.heroImage))
     : '';
+
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const carouselTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCarousel = useCallback(() => {
+    if (carouselImages.length <= 1) return;
+    carouselTimer.current = setInterval(() => {
+      setCarouselIndex(prev => (prev + 1) % carouselImages.length);
+    }, 5000);
+  }, [carouselImages.length]);
+
+  useEffect(() => {
+    startCarousel();
+    return () => { if (carouselTimer.current) clearInterval(carouselTimer.current); };
+  }, [startCarousel]);
+
+  const goToSlide = (idx: number) => {
+    setCarouselIndex(idx);
+    if (carouselTimer.current) clearInterval(carouselTimer.current);
+    startCarousel();
+  };
 
   if (cmsLoading) {
     return (
@@ -133,83 +161,110 @@ export default function HomePage() {
       <PublicNavbar currentPage="/" />
 
       {/* Hero Section */}
-      <Link href="/auth/register" className="block">
-        <section className="relative min-h-[90vh] flex items-center cursor-pointer group">
-          <div className="absolute inset-0">
-            {heroImage ? (
-              <Image
-                src={heroImage}
-                alt="Hero background"
-                fill
-                className="object-cover"
-                priority
-              />
-            ) : (
-              <div className="w-full h-full bg-primary" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/95 via-primary/85 to-primary/60" />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/60 to-transparent" />
-          </div>
-
-          <div className="container mx-auto px-4 relative z-10 pt-20">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-              {/* Left: Text Content */}
-              <div>
-                {hero.badgeText && (
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/20 border border-accent/40 text-accent text-sm font-medium mb-6">
-                    <Star className="w-4 h-4 fill-accent" />
-                    <span>{hero.badgeText}</span>
-                  </div>
-                )}
-
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white leading-tight">
-                  {heroTitle}
-                  <br />
-                  <span className="text-accent">{heroTitleAccent}</span>
-                </h1>
-                <p className="text-lg text-white/80 mb-10 max-w-xl">
-                  {heroSubtitle}
-                </p>
-
-                <div className="inline-flex items-center gap-3 bg-accent hover:bg-accent-600 text-white px-8 py-4 rounded-2xl text-lg font-semibold shadow-2xl transition-all group-hover:scale-105">
-                  Get Started
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </div>
-
-                {/* Stats */}
-                {hero.stats && hero.stats.length > 0 && (
-                  <div className="flex flex-wrap gap-8 md:gap-12 mt-12">
-                    {hero.stats.map((stat: any, i: number) => (
-                      <div key={i} className="flex items-center gap-8 md:gap-12">
-                        {i > 0 && <div className="w-px h-12 bg-white/30 hidden md:block -ml-8 md:-ml-12" />}
-                        <div>
-                          <div className="text-3xl md:text-4xl font-bold text-white">{stat.value}</div>
-                          <div className="text-white/70 text-sm">{stat.label}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+      <section className="relative min-h-[90vh] flex items-center">
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Carousel slides */}
+          {carouselImages.length > 0 ? (
+            carouselImages.map((src, idx) => (
+              <div
+                key={idx}
+                className="absolute inset-0 transition-opacity duration-1000"
+                style={{ opacity: idx === carouselIndex ? 1 : 0, zIndex: idx === carouselIndex ? 1 : 0 }}
+              >
+                <Image
+                  src={src}
+                  alt={`Hero slide ${idx + 1}`}
+                  fill
+                  className="object-cover"
+                  priority={idx === 0}
+                />
               </div>
+            ))
+          ) : (
+            <div className="w-full h-full bg-primary" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/95 via-primary/85 to-primary/60" style={{ zIndex: 2 }} />
+          <div className="absolute inset-0 bg-gradient-to-t from-primary/60 to-transparent" style={{ zIndex: 2 }} />
 
-              {/* Right: Hero Image */}
-              {heroSideImage && (
-                <div className="hidden lg:flex justify-center items-center">
-                  <div className="relative w-full max-w-lg aspect-square">
-                    <Image
-                      src={heroSideImage}
-                      alt="Hero"
-                      fill
-                      className="object-contain drop-shadow-2xl"
-                      priority
-                    />
-                  </div>
+          {/* Carousel dots */}
+          {carouselImages.length > 1 && (
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2" style={{ zIndex: 10 }}>
+              {carouselImages.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => goToSlide(idx)}
+                  className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                    idx === carouselIndex
+                      ? 'bg-white scale-125'
+                      : 'bg-white/50 hover:bg-white/80'
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="container mx-auto px-4 relative pt-20" style={{ zIndex: 5 }}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            {/* Left: Text Content */}
+            <div>
+              {hero.badgeText && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/20 border border-accent/40 text-accent text-sm font-medium mb-6">
+                  <Star className="w-4 h-4 fill-accent" />
+                  <span>{hero.badgeText}</span>
+                </div>
+              )}
+
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white leading-tight">
+                {heroTitle}
+                <br />
+                <span className="text-accent">{heroTitleAccent}</span>
+              </h1>
+              <p className="text-lg text-white/80 mb-10 max-w-xl">
+                {heroSubtitle}
+              </p>
+
+              <Link href="/auth/register">
+                <div className="inline-flex items-center gap-3 bg-accent hover:bg-accent-600 text-white px-8 py-4 rounded-2xl text-lg font-semibold shadow-2xl transition-all hover:scale-105">
+                  Get Started
+                  <ArrowRight className="w-5 h-5" />
+                </div>
+              </Link>
+
+              {/* Stats */}
+              {hero.stats && hero.stats.length > 0 && (
+                <div className="flex flex-wrap gap-8 md:gap-12 mt-12">
+                  {hero.stats.map((stat: any, i: number) => (
+                    <div key={i} className="flex items-center gap-8 md:gap-12">
+                      {i > 0 && <div className="w-px h-12 bg-white/30 hidden md:block -ml-8 md:-ml-12" />}
+                      <div>
+                        <div className="text-3xl md:text-4xl font-bold text-white">{stat.value}</div>
+                        <div className="text-white/70 text-sm">{stat.label}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
+
+            {/* Right: Hero Image */}
+            {heroSideImage && (
+              <div className="hidden lg:flex justify-center items-center">
+                <div className="relative w-full max-w-lg aspect-square">
+                  <Image
+                    src={heroSideImage}
+                    alt="Hero"
+                    fill
+                    className="object-contain drop-shadow-2xl"
+                    priority
+                  />
+                </div>
+              </div>
+            )}
           </div>
-        </section>
-      </Link>
+        </div>
+      </section>
 
       {/* Browse Properties Section */}
       <section id="properties" className="py-20 px-4 bg-white dark:bg-primary-950">
@@ -347,7 +402,7 @@ export default function HomePage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-accent transition-colors">{agent.name}</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{agent.role}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{typeof agent.role === 'string' ? agent.role : agent.role?.name || ''}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-primary-700">
@@ -386,7 +441,7 @@ export default function HomePage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {features.features.slice(0, 3).map((feature: any, index: number) => {
                 const desc: string = feature.description || '';
-                const excerpt = desc.length > 120 ? desc.slice(0, 120) + '…' : desc;
+                const excerpt = desc.length > 160 ? desc.slice(0, 160) + '…' : desc;
                 return (
                   <div key={index} className="group bg-white dark:bg-primary-900 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-primary-800">
                     {feature.image && (
@@ -460,15 +515,14 @@ export default function HomePage() {
                   const plain = raw.replace(/<[^>]+>/g, '').trim();
                   const fallback = 'Your trusted partner in real estate. We are dedicated to helping you find the perfect property and providing exceptional service every step of the way.';
                   const text = plain || fallback;
-                  const excerpt = text.length > 200 ? text.slice(0, 200) + '…' : text;
-                  return <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed text-base">{excerpt}</p>;
+                  return <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed text-base text-justify">{text}</p>;
                 })()}
                 {about.items && about.items.length > 0 && (
                   <div className="space-y-3 mb-8">
                     {about.items.slice(0, 3).map((item: any, index: number) => (
                       <div key={index} className="flex items-center gap-3">
                         <CheckCircle2 className="w-5 h-5 text-accent flex-shrink-0" />
-                        <span className="text-gray-700 dark:text-gray-300">{item.text || item}</span>
+                        <span className="text-gray-700 dark:text-gray-300">{item.text || item.title || (typeof item === 'string' ? item : '')}</span>
                       </div>
                     ))}
                   </div>
@@ -582,31 +636,22 @@ export default function HomePage() {
                   ))}
                 </div>
               </div>
-              <div className="bg-gray-50 dark:bg-primary-900 rounded-2xl p-8">
-                <form className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">First Name</label>
-                      <input type="text" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-primary-700 bg-white dark:bg-primary-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all" placeholder="John" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Last Name</label>
-                      <input type="text" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-primary-700 bg-white dark:bg-primary-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all" placeholder="Doe" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
-                    <input type="email" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-primary-700 bg-white dark:bg-primary-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all" placeholder="john@example.com" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Message</label>
-                    <textarea rows={4} className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-primary-700 bg-white dark:bg-primary-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all resize-none" placeholder="Your message..." />
-                  </div>
-                  <Button type="button" className="w-full bg-accent hover:bg-accent-600 text-white shadow-accent py-6">
-                    Send Message
+              <div className="bg-gray-50 dark:bg-primary-900 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-6 min-h-[300px]">
+                <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center">
+                  <Mail className="w-8 h-8 text-accent" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Send Us a Message</h3>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm max-w-xs mx-auto">
+                    Ready to connect? Visit our contact page to send us a message and we&apos;ll get back to you as soon as possible.
+                  </p>
+                </div>
+                <Link href="/contact">
+                  <Button size="lg" className="bg-accent hover:bg-accent-600 text-white shadow-accent">
+                    Go to Contact Page
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
-                </form>
+                </Link>
               </div>
             </div>
           </div>

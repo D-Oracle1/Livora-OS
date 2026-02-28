@@ -72,4 +72,9 @@ export class UpdateStaffDto {
   @IsOptional()
   @IsUUID()
   roleId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Whether this staff member is subject to income tax' })
+  @IsOptional()
+  @IsBoolean()
+  isTaxable?: boolean;
 }

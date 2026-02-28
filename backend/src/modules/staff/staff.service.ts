@@ -451,6 +451,7 @@ export class StaffService {
     if (updateStaffDto.annualLeaveBalance !== undefined) staffUpdate.annualLeaveBalance = updateStaffDto.annualLeaveBalance;
     if (updateStaffDto.sickLeaveBalance !== undefined) staffUpdate.sickLeaveBalance = updateStaffDto.sickLeaveBalance;
     if (updateStaffDto.roleId !== undefined) staffUpdate.roleId = updateStaffDto.roleId;
+    if (typeof updateStaffDto.isTaxable === 'boolean') staffUpdate.isTaxable = updateStaffDto.isTaxable;
 
     const result = await this.prisma.$transaction(async (prisma) => {
       if (Object.keys(userUpdate).length > 0) {

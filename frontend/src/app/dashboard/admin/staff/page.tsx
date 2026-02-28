@@ -22,6 +22,9 @@ import {
   Upload,
   FileSpreadsheet,
   Copy,
+  DollarSign,
+  ShieldCheck,
+  ShieldOff,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +64,7 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth-storage';
+import { Switch } from '@/components/ui/switch';
 
 interface StaffData {
   id: string;
@@ -73,6 +77,8 @@ interface StaffData {
   isActive: boolean;
   annualLeaveBalance: number;
   sickLeaveBalance: number;
+  baseSalary?: number | string | null;
+  isTaxable?: boolean;
   user: {
     id: string;
     email: string;
@@ -129,6 +135,7 @@ interface StaffFormData {
   departmentId: string;
   hireDate: string;
   baseSalary: string;
+  isTaxable: boolean;
 }
 
 const getPositionBadge = (position: string) => {
@@ -198,6 +205,12 @@ function AdminStaffPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState<any | null>(null);
+
+  // Salary update dialog
+  const [salaryDialogOpen, setSalaryDialogOpen] = useState(false);
+  const [salaryTarget, setSalaryTarget] = useState<StaffData | null>(null);
+  const [newSalary, setNewSalary] = useState('');
+
   const [formData, setFormData] = useState<StaffFormData>({
     firstName: '',
     lastName: '',
@@ -211,6 +224,7 @@ function AdminStaffPage() {
     departmentId: '',
     hireDate: new Date().toISOString().split('T')[0],
     baseSalary: '',
+    isTaxable: true,
   });
 
   const fetchStaff = useCallback(async () => {
@@ -330,6 +344,7 @@ function AdminStaffPage() {
         departmentId: '',
         hireDate: new Date().toISOString().split('T')[0],
         baseSalary: '',
+        isTaxable: true,
       });
       toast.success('Staff member added successfully!');
       fetchStaff();
@@ -345,7 +360,7 @@ function AdminStaffPage() {
 
     setActionLoading('edit');
     try {
-      await api.put(`/staff/${selectedStaff.id}`, {
+      const payload: any = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         phone: formData.phone,
@@ -353,13 +368,51 @@ function AdminStaffPage() {
         title: formData.title,
         employmentType: formData.employmentType,
         departmentId: formData.departmentId || undefined,
-      });
+        isTaxable: formData.isTaxable,
+      };
+      if (formData.baseSalary && !isNaN(Number(formData.baseSalary))) {
+        payload.baseSalary = Number(formData.baseSalary);
+      }
+      await api.put(`/staff/${selectedStaff.id}`, payload);
 
       setEditDialogOpen(false);
       toast.success('Staff member updated successfully!');
       fetchStaff();
     } catch (error: any) {
       toast.error(error.message || 'Failed to update staff member');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUpdateSalary = async () => {
+    if (!salaryTarget) return;
+    if (!newSalary || isNaN(Number(newSalary)) || Number(newSalary) <= 0) {
+      toast.error('Please enter a valid salary amount');
+      return;
+    }
+    setActionLoading('salary');
+    try {
+      await api.put(`/staff/${salaryTarget.id}`, { baseSalary: Number(newSalary) });
+      setSalaryDialogOpen(false);
+      toast.success('Salary updated successfully!');
+      fetchStaff();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update salary');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleToggleTax = async (member: StaffData) => {
+    setActionLoading(member.id + '-tax');
+    try {
+      const newVal = !(member.isTaxable ?? true);
+      await api.put(`/staff/${member.id}`, { isTaxable: newVal });
+      toast.success(`Tax ${newVal ? 'enabled' : 'exempted'} for ${member.user.firstName} ${member.user.lastName}`);
+      fetchStaff();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update tax status');
     } finally {
       setActionLoading(null);
     }
@@ -414,9 +467,16 @@ function AdminStaffPage() {
       employmentType: staffMember.employmentType,
       departmentId: staffMember.department?.id || '',
       hireDate: staffMember.hireDate?.split('T')[0] || '',
-      baseSalary: '',
+      baseSalary: staffMember.baseSalary != null ? String(Number(staffMember.baseSalary)) : '',
+      isTaxable: staffMember.isTaxable ?? true,
     });
     setEditDialogOpen(true);
+  };
+
+  const openSalaryDialog = (staffMember: StaffData) => {
+    setSalaryTarget(staffMember);
+    setNewSalary(staffMember.baseSalary != null ? String(Number(staffMember.baseSalary)) : '');
+    setSalaryDialogOpen(true);
   };
 
   const openViewDialog = (staffMember: StaffData) => {
@@ -540,7 +600,7 @@ function AdminStaffPage() {
           <h1 className="text-2xl font-bold">Staff Management</h1>
           <p className="text-muted-foreground">Manage all staff members and their roles</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="gap-2" onClick={fetchStaff} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -637,6 +697,8 @@ function AdminStaffPage() {
                   <TableHead>Position</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Salary</TableHead>
+                  <TableHead>Tax</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Hire Date</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -645,7 +707,7 @@ function AdminStaffPage() {
               <TableBody>
                 {staff.length === 0 && !loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No staff members found
                     </TableCell>
                   </TableRow>
@@ -681,12 +743,31 @@ function AdminStaffPage() {
                       <TableCell>
                         <span className="text-sm">{member.employmentType.replace('_', ' ')}</span>
                       </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          className="text-sm font-medium text-left hover:text-primary transition-colors"
+                          onClick={() => openSalaryDialog(member)}
+                          title="Click to update salary"
+                        >
+                          {member.baseSalary != null
+                            ? `₦${Number(member.baseSalary).toLocaleString()}`
+                            : <span className="text-muted-foreground">—</span>}
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        {(member.isTaxable ?? true) ? (
+                          <Badge className="bg-blue-100 text-blue-700 text-xs">Taxable</Badge>
+                        ) : (
+                          <Badge className="bg-gray-100 text-gray-500 text-xs">Exempt</Badge>
+                        )}
+                      </TableCell>
                       <TableCell>{getStatusBadge(member.user.status, member.isActive)}</TableCell>
                       <TableCell className="text-sm">{member.hireDate?.split('T')[0] || 'N/A'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={actionLoading === member.id}>
+                            <Button variant="ghost" size="icon" disabled={!!actionLoading && actionLoading === member.id}>
                               {actionLoading === member.id ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
@@ -702,6 +783,23 @@ function AdminStaffPage() {
                             <DropdownMenuItem onClick={() => openEditDialog(member)}>
                               <Edit className="w-4 h-4 mr-2" />
                               Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openSalaryDialog(member)}>
+                              <DollarSign className="w-4 h-4 mr-2" />
+                              Update Salary
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleToggleTax(member)}
+                              disabled={actionLoading === member.id + '-tax'}
+                            >
+                              {actionLoading === member.id + '-tax' ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (member.isTaxable ?? true) ? (
+                                <ShieldOff className="w-4 h-4 mr-2" />
+                              ) : (
+                                <ShieldCheck className="w-4 h-4 mr-2" />
+                              )}
+                              {(member.isTaxable ?? true) ? 'Exempt from Tax' : 'Enable Tax'}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openResetPassword(member)}>
                               <KeyRound className="w-4 h-4 mr-2" />
@@ -996,6 +1094,26 @@ function AdminStaffPage() {
                 ))}
               </select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-baseSalary">Base Salary (₦)</Label>
+              <Input
+                id="edit-baseSalary"
+                type="number"
+                value={formData.baseSalary}
+                onChange={(e) => setFormData({ ...formData, baseSalary: e.target.value })}
+                placeholder="e.g., 500000"
+              />
+            </div>
+            <div className="flex items-center justify-between py-2 px-3 border rounded-md">
+              <div>
+                <p className="text-sm font-medium">Subject to Income Tax</p>
+                <p className="text-xs text-muted-foreground">Toggle off to exempt this staff from payroll tax</p>
+              </div>
+              <Switch
+                checked={formData.isTaxable}
+                onCheckedChange={(val) => setFormData({ ...formData, isTaxable: val })}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
@@ -1123,6 +1241,46 @@ function AdminStaffPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Update Salary Dialog */}
+      <Dialog open={salaryDialogOpen} onOpenChange={(open) => { setSalaryDialogOpen(open); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Update Salary</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {salaryTarget && (
+              <p className="text-sm text-muted-foreground">
+                Updating salary for <span className="font-medium text-foreground">{salaryTarget.user.firstName} {salaryTarget.user.lastName}</span>
+              </p>
+            )}
+            {salaryTarget?.baseSalary != null && (
+              <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-sm">
+                <span className="text-muted-foreground">Current salary: </span>
+                <span className="font-semibold">₦{Number(salaryTarget.baseSalary).toLocaleString()}</span>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="new-salary">New Base Salary (₦) *</Label>
+              <Input
+                id="new-salary"
+                type="number"
+                value={newSalary}
+                onChange={(e) => setNewSalary(e.target.value)}
+                placeholder="e.g., 600000"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSalaryDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdateSalary} disabled={actionLoading === 'salary'}>
+              {actionLoading === 'salary' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Update Salary
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* View Staff Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="max-w-md">
@@ -1183,6 +1341,24 @@ function AdminStaffPage() {
                 <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <p className="text-sm text-muted-foreground">Direct Reports</p>
                   <p className="font-bold">{selectedStaff._count?.directReports || 0}</p>
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-sm text-muted-foreground">Base Salary</p>
+                  <p className="font-bold">
+                    {selectedStaff.baseSalary != null
+                      ? `₦${Number(selectedStaff.baseSalary).toLocaleString()}`
+                      : 'N/A'}
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-sm text-muted-foreground">Tax Status</p>
+                  <p className="font-bold">
+                    {(selectedStaff.isTaxable ?? true) ? (
+                      <span className="text-blue-600">Taxable</span>
+                    ) : (
+                      <span className="text-gray-500">Tax Exempt</span>
+                    )}
+                  </p>
                 </div>
               </div>
 
