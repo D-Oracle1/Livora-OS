@@ -284,7 +284,7 @@ export default function HomePage() {
                     <div
                       key={idx}
                       className="absolute inset-0 transition-opacity duration-700"
-                      style={{ opacity: idx === sideIndex ? 1 : 0 }}
+                      style={{ opacity: idx === sideIndex ? 1 : 0, zIndex: idx === sideIndex ? 1 : 0 }}
                     >
                       <Image
                         src={src}
