@@ -123,12 +123,21 @@ export default function HomePage() {
     img.startsWith('http') ? img : getImageUrl(img)
   );
 
-  const heroSideImage = hero.heroImage
-    ? (hero.heroImage.startsWith('http') ? hero.heroImage : getImageUrl(hero.heroImage))
-    : '';
+  // Right-side hero image carousel
+  const rawSideImages: string[] = Array.isArray(hero.heroImages) && hero.heroImages.length > 0
+    ? hero.heroImages
+    : hero.heroImage
+      ? [hero.heroImage]
+      : [];
+  const sideImages = rawSideImages.map((img: string) =>
+    img.startsWith('http') ? img : getImageUrl(img)
+  );
 
   const [carouselIndex, setCarouselIndex] = useState(0);
   const carouselTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [sideIndex, setSideIndex] = useState(0);
+  const sideTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startCarousel = useCallback(() => {
     if (carouselImages.length <= 1) return;
@@ -137,15 +146,33 @@ export default function HomePage() {
     }, 5000);
   }, [carouselImages.length]);
 
+  const startSideCarousel = useCallback(() => {
+    if (sideImages.length <= 1) return;
+    sideTimer.current = setInterval(() => {
+      setSideIndex(prev => (prev + 1) % sideImages.length);
+    }, 4000);
+  }, [sideImages.length]);
+
   useEffect(() => {
     startCarousel();
     return () => { if (carouselTimer.current) clearInterval(carouselTimer.current); };
   }, [startCarousel]);
 
+  useEffect(() => {
+    startSideCarousel();
+    return () => { if (sideTimer.current) clearInterval(sideTimer.current); };
+  }, [startSideCarousel]);
+
   const goToSlide = (idx: number) => {
     setCarouselIndex(idx);
     if (carouselTimer.current) clearInterval(carouselTimer.current);
     startCarousel();
+  };
+
+  const goToSideSlide = (idx: number) => {
+    setSideIndex(idx);
+    if (sideTimer.current) clearInterval(sideTimer.current);
+    startSideCarousel();
   };
 
   if (cmsLoading) {
@@ -248,17 +275,44 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Right: Hero Image */}
-            {heroSideImage && (
+            {/* Right: Hero Image Carousel */}
+            {sideImages.length > 0 && (
               <div className="hidden lg:flex justify-center items-center">
                 <div className="relative w-full max-w-lg aspect-square">
-                  <Image
-                    src={heroSideImage}
-                    alt="Hero"
-                    fill
-                    className="object-contain drop-shadow-2xl"
-                    priority
-                  />
+                  {/* Slides */}
+                  {sideImages.map((src, idx) => (
+                    <div
+                      key={idx}
+                      className="absolute inset-0 transition-opacity duration-700"
+                      style={{ opacity: idx === sideIndex ? 1 : 0 }}
+                    >
+                      <Image
+                        src={src}
+                        alt={`Hero image ${idx + 1}`}
+                        fill
+                        className="object-contain drop-shadow-2xl"
+                        priority={idx === 0}
+                      />
+                    </div>
+                  ))}
+
+                  {/* Dot navigation */}
+                  {sideImages.length > 1 && (
+                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+                      {sideImages.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => goToSideSlide(idx)}
+                          className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                            idx === sideIndex
+                              ? 'bg-white scale-125'
+                              : 'bg-white/40 hover:bg-white/70'
+                          }`}
+                          aria-label={`Go to image ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -134,6 +134,70 @@ export default function CmsPage() {
     </div>
   );
 
+  const handleSideCarouselImageAdd = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
+        if (urls && urls.length > 0) {
+          const existing: string[] = Array.isArray(sectionData.heroImages) ? sectionData.heroImages : [];
+          updateField('heroImages', [...existing, urls[0]]);
+          toast.success('Image added to side carousel');
+        }
+      } catch {
+        toast.error('Failed to upload image');
+      }
+    };
+    input.click();
+  };
+
+  const renderSideCarouselImages = () => {
+    const images: string[] = Array.isArray(sectionData.heroImages) ? sectionData.heroImages : [];
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium">Right-Side Carousel Images ({images.length})</label>
+          <Button variant="outline" size="sm" onClick={handleSideCarouselImageAdd} disabled={images.length >= 10}>
+            <Plus className="w-4 h-4 mr-1" /> Add Image
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">Add 2–10 images for the right-side carousel. Falls back to single Hero Image if empty.</p>
+        {images.length === 0 ? (
+          <div className="border-2 border-dashed rounded-lg p-4 text-center text-sm text-muted-foreground">
+            No side carousel images yet. Click Add Image to start.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {images.map((img: string, idx: number) => (
+              <div key={idx} className="relative group">
+                <img
+                  src={img.startsWith('http') ? img : getImageUrl(img)}
+                  alt={`Side slide ${idx + 1}`}
+                  className="w-full h-24 object-cover rounded-lg border"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                  <span className="text-white text-xs font-medium">#{idx + 1}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-900/40"
+                    onClick={() => updateField('heroImages', images.filter((_: string, i: number) => i !== idx))}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const handleCarouselImageAdd = async () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -334,7 +398,8 @@ export default function CmsPage() {
             </div>
             {renderCarouselImages()}
             {renderImageField('Fallback Background Image (single)', 'backgroundImage')}
-            {renderImageField('Hero Image (Right Side)', 'heroImage')}
+            {renderSideCarouselImages()}
+            {renderImageField('Fallback Hero Image — Right Side (single)', 'heroImage')}
             {renderDynamicList('Hero Stats', 'stats', [
               { key: 'value', label: 'Value (e.g. 200+)' },
               { key: 'label', label: 'Label (e.g. Premium Properties)' },
