@@ -7,6 +7,7 @@ import {
   Body,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { SaleService } from './sale.service';
@@ -31,14 +32,25 @@ export class SaleController {
   ) {}
 
   @Post()
-  @Roles('REALTOR')
+  @Roles('REALTOR', 'STAFF')
   @ApiOperation({ summary: 'Record a new sale' })
   @ApiResponse({ status: 201, description: 'Sale recorded successfully' })
   async create(
     @Body() createSaleDto: CreateSaleDto,
     @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
   ) {
-    return this.saleService.create(createSaleDto, userId);
+    if (role === 'STAFF') {
+      const staffProfile = await this.prisma.staffProfile.findUnique({
+        where: { userId },
+        include: { department: true },
+      });
+      if (!staffProfile || !staffProfile.department.name.toLowerCase().includes('sales')) {
+        throw new ForbiddenException('Only sales department staff can report sales');
+      }
+      // realtorId absent → company sale; no error needed
+    }
+    return this.saleService.create(createSaleDto, userId, role);
   }
 
   @Get()

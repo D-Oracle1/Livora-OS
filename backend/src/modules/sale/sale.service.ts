@@ -26,15 +26,32 @@ export class SaleService {
     private readonly clientService: ClientService,
   ) {}
 
-  async create(createSaleDto: CreateSaleDto, realtorUserId: string) {
-    // Get realtor profile
-    const realtorProfile = await this.prisma.realtorProfile.findUnique({
-      where: { userId: realtorUserId },
-      include: { user: true },
-    });
+  async create(createSaleDto: CreateSaleDto, realtorUserId: string, reporterRole: string = 'REALTOR') {
+    // Resolve realtor profile:
+    //   REALTOR  → always their own profile
+    //   STAFF + realtorId → attribute to that realtor
+    //   STAFF + no realtorId → company sale (no realtor)
+    let realtorProfile: any = null;
 
-    if (!realtorProfile) {
-      throw new BadRequestException('Realtor profile not found');
+    if (reporterRole === 'STAFF') {
+      if (createSaleDto.realtorId) {
+        realtorProfile = await this.prisma.realtorProfile.findUnique({
+          where: { id: createSaleDto.realtorId },
+          include: { user: true },
+        });
+        if (!realtorProfile) {
+          throw new BadRequestException('Selected realtor profile not found');
+        }
+      }
+      // No realtorId → company sale; realtorProfile stays null
+    } else {
+      realtorProfile = await this.prisma.realtorProfile.findUnique({
+        where: { userId: realtorUserId },
+        include: { user: true },
+      });
+      if (!realtorProfile) {
+        throw new BadRequestException('Realtor profile not found');
+      }
     }
 
     // Get or create client
@@ -50,7 +67,7 @@ export class SaleService {
         firstName: createSaleDto.clientName.split(' ')[0],
         lastName: createSaleDto.clientName.split(' ').slice(1).join(' ') || '',
         phone: createSaleDto.clientContact,
-        realtorId: realtorProfile.id,
+        realtorId: realtorProfile?.id,
       });
       clientProfile = result as any;
     }
@@ -59,9 +76,9 @@ export class SaleService {
       throw new BadRequestException('Failed to get or create client profile');
     }
 
-    // Get commission rate based on loyalty tier
-    const commissionRate = this.getCommissionRate(realtorProfile.loyaltyTier);
-    const taxRate = 0.15; // 15% tax
+    // Commission is only applicable when a realtor is credited
+    const commissionRate = realtorProfile ? this.getCommissionRate(realtorProfile.loyaltyTier) : 0;
+    const taxRate = realtorProfile ? 0.15 : 0;
 
     const isInstallment = createSaleDto.paymentPlan === 'INSTALLMENT';
     const totalSalePrice = Number(createSaleDto.saleValue);
@@ -85,7 +102,7 @@ export class SaleService {
     const sale = await this.prisma.sale.create({
       data: {
         propertyId: createSaleDto.propertyId,
-        realtorId: realtorProfile.id,
+        realtorId: realtorProfile?.id ?? null,
         clientId: clientProfile.id,
         salePrice: totalSalePrice,
         saleDate: new Date(createSaleDto.saleDate),
@@ -193,31 +210,38 @@ export class SaleService {
       data: { status: 'COMPLETED' },
     });
 
-    // Create commission record
-    await this.commissionService.create({
-      saleId: sale.id,
-      realtorId: sale.realtorId,
-      amount: Number(sale.commissionAmount),
-      rate: sale.commissionRate,
-    });
+    let points = 0;
 
-    // Create tax record
-    const now = new Date();
-    await this.taxService.create({
-      saleId: sale.id,
-      realtorId: sale.realtorId,
-      amount: Number(sale.taxAmount),
-      rate: sale.taxRate,
-      year: now.getFullYear(),
-      quarter: Math.floor(now.getMonth() / 3) + 1,
-    });
+    if (sale.realtorId) {
+      // Create commission record
+      await this.commissionService.create({
+        saleId: sale.id,
+        realtorId: sale.realtorId,
+        amount: Number(sale.commissionAmount),
+        rate: sale.commissionRate,
+      });
 
-    // Award loyalty points
-    const points = await this.loyaltyService.awardPoints({
-      realtorId: sale.realtorId,
-      saleId: sale.id,
-      saleValue: Number(sale.totalPaid),
-    });
+      // Create tax record
+      const now = new Date();
+      await this.taxService.create({
+        saleId: sale.id,
+        realtorId: sale.realtorId,
+        amount: Number(sale.taxAmount),
+        rate: sale.taxRate,
+        year: now.getFullYear(),
+        quarter: Math.floor(now.getMonth() / 3) + 1,
+      });
+
+      // Award loyalty points
+      points = await this.loyaltyService.awardPoints({
+        realtorId: sale.realtorId,
+        saleId: sale.id,
+        saleValue: Number(sale.totalPaid),
+      });
+
+      // Update realtor stats
+      await this.updateRealtorStats(sale.realtorId);
+    }
 
     // Update sale status and loyalty points
     const updatedSale = await this.prisma.sale.update({
@@ -234,22 +258,21 @@ export class SaleService {
       },
     });
 
-    // Update realtor stats
-    await this.updateRealtorStats(sale.realtorId);
-
     // Update client stats
     await this.updateClientStats(sale.clientId, Number(sale.totalPaid));
 
-    // Notify the realtor
-    await this.notificationService.create({
-      userId: sale.realtor.userId,
-      type: 'SALE',
-      title: 'Sale Approved',
-      message: `Your sale of ${sale.property.title} for ₦${Number(sale.salePrice).toLocaleString()} has been approved!`,
-      priority: 'HIGH',
-      data: { saleId: sale.id },
-      link: `/realtor/sales/${sale.id}`,
-    });
+    // Notify the realtor (only if one is credited)
+    if (sale.realtorId && sale.realtor) {
+      await this.notificationService.create({
+        userId: sale.realtor.userId,
+        type: 'SALE',
+        title: 'Sale Approved',
+        message: `Your sale of ${sale.property.title} for ₦${Number(sale.salePrice).toLocaleString()} has been approved!`,
+        priority: 'HIGH',
+        data: { saleId: sale.id },
+        link: `/realtor/sales/${sale.id}`,
+      });
+    }
 
     return updatedSale;
   }
@@ -287,16 +310,18 @@ export class SaleService {
       },
     });
 
-    // Notify the realtor
-    await this.notificationService.create({
-      userId: sale.realtor.userId,
-      type: 'SALE',
-      title: 'Sale Report Rejected',
-      message: `Your sale report for ${sale.property.title} has been rejected.${reason ? ` Reason: ${reason}` : ''}`,
-      priority: 'HIGH',
-      data: { saleId: sale.id },
-      link: `/realtor/sales/${sale.id}`,
-    });
+    // Notify the realtor (only if one is credited)
+    if (sale.realtorId && sale.realtor) {
+      await this.notificationService.create({
+        userId: sale.realtor.userId,
+        type: 'SALE',
+        title: 'Sale Report Rejected',
+        message: `Your sale report for ${sale.property.title} has been rejected.${reason ? ` Reason: ${reason}` : ''}`,
+        priority: 'HIGH',
+        data: { saleId: sale.id },
+        link: `/realtor/sales/${sale.id}`,
+      });
+    }
 
     return updatedSale;
   }
@@ -387,30 +412,34 @@ export class SaleService {
       });
     }
 
-    // Update commission record (increment the total amount)
-    await this.prisma.commission.updateMany({
-      where: { saleId },
-      data: { amount: { increment: commissionAmount } },
-    });
+    if (sale.realtorId) {
+      // Update commission record (increment the total amount)
+      await this.prisma.commission.updateMany({
+        where: { saleId },
+        data: { amount: { increment: commissionAmount } },
+      });
 
-    // Update tax record (increment the total amount)
-    await this.prisma.tax.updateMany({
-      where: { saleId },
-      data: { amount: { increment: taxAmount } },
-    });
+      // Update tax record (increment the total amount)
+      await this.prisma.tax.updateMany({
+        where: { saleId },
+        data: { amount: { increment: taxAmount } },
+      });
 
-    // Update realtor stats
-    await this.updateRealtorStats(sale.realtorId);
+      // Update realtor stats
+      await this.updateRealtorStats(sale.realtorId);
 
-    // Send notification
-    await this.notificationService.create({
-      userId: sale.realtor.userId,
-      type: 'SALE',
-      title: `Payment Received - ${sale.property.title}`,
-      message: `Payment #${lastPaymentNumber + 1} of ₦${paymentAmount.toLocaleString()} received. ${isFullyPaid ? 'Sale completed!' : `Remaining: ₦${newRemainingBalance.toLocaleString()}`}`,
-      priority: 'MEDIUM',
-      data: { saleId, paymentId: payment.id },
-    });
+      // Notify the credited realtor
+      if (sale.realtor) {
+        await this.notificationService.create({
+          userId: sale.realtor.userId,
+          type: 'SALE',
+          title: `Payment Received - ${sale.property.title}`,
+          message: `Payment #${lastPaymentNumber + 1} of ₦${paymentAmount.toLocaleString()} received. ${isFullyPaid ? 'Sale completed!' : `Remaining: ₦${newRemainingBalance.toLocaleString()}`}`,
+          priority: 'MEDIUM',
+          data: { saleId, paymentId: payment.id },
+        });
+      }
+    }
 
     return payment;
   }
@@ -512,12 +541,16 @@ export class SaleService {
       where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] } },
     });
 
+    const reporterName = realtor
+      ? `${realtor.user.firstName} ${realtor.user.lastName}`
+      : 'Sales team (company sale)';
+
     for (const admin of admins) {
       await this.notificationService.create({
         userId: admin.id,
         type: 'SALE',
         title: 'New Sale Report — Approval Required',
-        message: `${realtor.user.firstName} ${realtor.user.lastName} reported a sale of ${sale.property.title} for ₦${Number(sale.salePrice).toLocaleString()}. Please review and approve.`,
+        message: `${reporterName} reported a sale of ${sale.property.title} for ₦${Number(sale.salePrice).toLocaleString()}. Please review and approve.`,
         priority: 'HIGH',
         data: {
           saleId: sale.id,
@@ -525,7 +558,7 @@ export class SaleService {
           realtorId: sale.realtorId,
           propertyTitle: sale.property.title,
           salePrice: Number(sale.salePrice),
-          realtorName: `${realtor.user.firstName} ${realtor.user.lastName}`,
+          realtorName: realtor ? `${realtor.user.firstName} ${realtor.user.lastName}` : 'Company',
           clientName: sale.client?.user ? `${sale.client.user.firstName} ${sale.client.user.lastName}` : 'Unknown',
           paymentPlan: sale.paymentPlan,
         },

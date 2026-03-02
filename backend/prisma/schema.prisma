@@ -566,8 +566,8 @@ model Sale {
   // Parties
   propertyId      String
   property        Property      @relation(fields: [propertyId], references: [id])
-  realtorId       String
-  realtor         RealtorProfile @relation(fields: [realtorId], references: [id])
+  realtorId       String?
+  realtor         RealtorProfile? @relation(fields: [realtorId], references: [id])
   clientId        String
   client          ClientProfile @relation("ClientPurchases", fields: [clientId], references: [id])
 

@@ -105,9 +105,9 @@ export default function SalesPage() {
         buyerEmail: s.client?.user?.email || '',
         buyerPhone: s.client?.user?.phone || '',
         buyerAddress: s.property?.address || s.property?.city || '',
-        realtor: `${s.realtor?.user?.firstName || ''} ${s.realtor?.user?.lastName || ''}`.trim() || 'Unknown',
+        realtor: s.realtorId ? (`${s.realtor?.user?.firstName || ''} ${s.realtor?.user?.lastName || ''}`.trim() || 'Unknown') : 'Company',
         realtorEmail: s.realtor?.user?.email || '',
-        realtorTier: s.realtor?.loyaltyTier || 'BRONZE',
+        realtorTier: s.realtorId ? (s.realtor?.loyaltyTier || 'BRONZE') : '',
         amount: Number(s.salePrice) || 0,
         commission: Number(s.commissionAmount) || 0,
         plotsSold: 1,
@@ -593,7 +593,7 @@ export default function SalesPage() {
                           </Avatar>
                           <div className="min-w-0">
                             <p className="text-sm truncate">{sale.realtor}</p>
-                            <Badge className={`${getTierBgClass(sale.realtorTier)} text-[10px]`}>{sale.realtorTier}</Badge>
+                            {sale.realtorTier && <Badge className={`${getTierBgClass(sale.realtorTier)} text-[10px]`}>{sale.realtorTier}</Badge>}
                           </div>
                         </div>
                       </td>
@@ -896,8 +896,8 @@ export default function SalesPage() {
                     <div>
                       <p className="font-medium">{selectedSale.realtor}</p>
                       <div className="flex items-center gap-2">
-                        <Badge className={getTierBgClass(selectedSale.realtorTier)}>{selectedSale.realtorTier}</Badge>
-                        <span className="text-xs text-muted-foreground">{selectedSale.realtorEmail}</span>
+                        {selectedSale.realtorTier && <Badge className={getTierBgClass(selectedSale.realtorTier)}>{selectedSale.realtorTier}</Badge>}
+                        {selectedSale.realtorEmail && <span className="text-xs text-muted-foreground">{selectedSale.realtorEmail}</span>}
                       </div>
                     </div>
                   </div>

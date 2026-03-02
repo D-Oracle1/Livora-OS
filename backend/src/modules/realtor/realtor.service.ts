@@ -8,6 +8,16 @@ import { DashboardPeriod, getDateRange, groupSalesIntoChartBuckets } from '../..
 export class RealtorService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getDirectory() {
+    return this.prisma.realtorProfile.findMany({
+      select: {
+        id: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { user: { firstName: 'asc' } },
+    });
+  }
+
   async findAll(query: {
     page?: number;
     limit?: number;

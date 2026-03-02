@@ -116,6 +116,14 @@ export class RealtorController {
     return this.bulkImportService.importRealtors(file.buffer);
   }
 
+  @Get('directory')
+  @Roles('STAFF', 'ADMIN', 'SUPER_ADMIN', 'REALTOR')
+  @ApiOperation({ summary: 'Get slim realtor list for dropdowns' })
+  @ApiResponse({ status: 200, description: 'Realtor directory' })
+  async getDirectory() {
+    return this.realtorService.getDirectory();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get realtor by ID' })
   @ApiResponse({ status: 200, description: 'Realtor details' })

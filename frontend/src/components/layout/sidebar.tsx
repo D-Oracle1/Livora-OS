@@ -126,6 +126,7 @@ const navigationConfig: Record<string, NavItem[]> = {
   ],
   staff: [
     { name: 'Dashboard', href: '/dashboard/staff', icon: LayoutDashboard },
+    { name: 'Sales', href: '/dashboard/staff/sales', icon: DollarSign, moduleKey: 'sales' },
     { name: 'My Tasks', href: '/dashboard/staff/tasks', icon: CheckSquare, moduleKey: 'tasks' },
     { name: 'Attendance', href: '/dashboard/staff/attendance', icon: Clock, moduleKey: 'attendance' },
     { name: 'Leave', href: '/dashboard/staff/leave', icon: CalendarDays, moduleKey: 'leave' },
