@@ -62,10 +62,11 @@ export class RankingService {
         break;
     }
 
-    // Get sales data for the period
-    const salesData = await this.prisma.sale.groupBy({
+    // Get sales data for the period (exclude company sales with no realtor)
+    const rawSalesData = await this.prisma.sale.groupBy({
       by: ['realtorId'],
       where: {
+        realtorId: { not: null },
         status: SaleStatus.COMPLETED,
         saleDate: {
           gte: periodStart,
@@ -75,6 +76,9 @@ export class RankingService {
       _count: { id: true },
       _sum: { salePrice: true, commissionAmount: true },
     });
+    const salesData = rawSalesData.filter(
+      (s): s is typeof s & { realtorId: string } => s.realtorId !== null,
+    );
 
     // Calculate scores and sort
     const rankedData = salesData
@@ -270,9 +274,10 @@ export class RankingService {
     // Fallback: Calculate rankings in real-time from sales data
     this.logger.log(`No pre-calculated rankings found for ${period}, calculating from sales data...`);
 
-    const salesData = await this.prisma.sale.groupBy({
+    const rawSalesData = await this.prisma.sale.groupBy({
       by: ['realtorId'],
       where: {
+        realtorId: { not: null },
         status: SaleStatus.COMPLETED,
         saleDate: {
           gte: periodStart,
@@ -282,6 +287,10 @@ export class RankingService {
       _count: { id: true },
       _sum: { salePrice: true, commissionAmount: true },
     });
+    // Narrow type: realtorId is guaranteed non-null by the where filter above
+    const salesData = rawSalesData.filter(
+      (s): s is typeof s & { realtorId: string } => s.realtorId !== null,
+    );
 
     if (salesData.length === 0) {
       // No sales data, try to return all realtors with zero sales

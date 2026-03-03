@@ -500,7 +500,7 @@ export class AdminService {
     const salesForChart = salesWithPropertyInfo;
 
     // Get realtor details for top performers
-    const topRealtorIds = salesByRealtor.map((s) => s.realtorId);
+    const topRealtorIds = salesByRealtor.map((s) => s.realtorId).filter((id): id is string => id !== null);
     const topRealtors = await this.prisma.realtorProfile.findMany({
       where: { id: { in: topRealtorIds } },
       include: {

@@ -705,67 +705,69 @@ export class SaleService {
         },
       });
 
-      // Create commission record if not exists
-      const existingCommission = await this.prisma.commission.findUnique({
-        where: { saleId: sale.id },
-      });
+      if (sale.realtorId && sale.realtor) {
+        // Create commission record if not exists
+        const existingCommission = await this.prisma.commission.findUnique({
+          where: { saleId: sale.id },
+        });
 
-      if (!existingCommission) {
-        await this.commissionService.create({
-          saleId: sale.id,
-          realtorId: sale.realtorId,
-          amount: Number(sale.commissionAmount),
-          rate: sale.commissionRate,
+        if (!existingCommission) {
+          await this.commissionService.create({
+            saleId: sale.id,
+            realtorId: sale.realtorId,
+            amount: Number(sale.commissionAmount),
+            rate: sale.commissionRate,
+          });
+        }
+
+        // Create tax record if not exists
+        const existingTax = await this.prisma.tax.findUnique({
+          where: { saleId: sale.id },
+        });
+
+        if (!existingTax) {
+          const now = new Date();
+          await this.taxService.create({
+            saleId: sale.id,
+            realtorId: sale.realtorId,
+            amount: Number(sale.taxAmount),
+            rate: sale.taxRate,
+            year: now.getFullYear(),
+            quarter: Math.floor(now.getMonth() / 3) + 1,
+          });
+        }
+
+        // Award loyalty points if not already awarded
+        if (!sale.loyaltyPointsAwarded || sale.loyaltyPointsAwarded === 0) {
+          const points = await this.loyaltyService.awardPoints({
+            realtorId: sale.realtorId,
+            saleId: sale.id,
+            saleValue: Number(sale.salePrice),
+          });
+
+          await this.prisma.sale.update({
+            where: { id: sale.id },
+            data: { loyaltyPointsAwarded: points },
+          });
+        }
+
+        // Update realtor stats
+        await this.updateRealtorStats(sale.realtorId);
+
+        // Send confirmation notification to realtor
+        await this.notificationService.create({
+          userId: sale.realtor.userId,
+          type: 'SALE',
+          title: 'Sale Confirmed',
+          message: `Your sale of ${sale.property.title} has been confirmed!`,
+          priority: 'HIGH',
+          data: { saleId: sale.id },
+          link: `/realtor/sales/${sale.id}`,
         });
       }
-
-      // Create tax record if not exists
-      const existingTax = await this.prisma.tax.findUnique({
-        where: { saleId: sale.id },
-      });
-
-      if (!existingTax) {
-        const now = new Date();
-        await this.taxService.create({
-          saleId: sale.id,
-          realtorId: sale.realtorId,
-          amount: Number(sale.taxAmount),
-          rate: sale.taxRate,
-          year: now.getFullYear(),
-          quarter: Math.floor(now.getMonth() / 3) + 1,
-        });
-      }
-
-      // Award loyalty points if not already awarded
-      if (!sale.loyaltyPointsAwarded || sale.loyaltyPointsAwarded === 0) {
-        const points = await this.loyaltyService.awardPoints({
-          realtorId: sale.realtorId,
-          saleId: sale.id,
-          saleValue: Number(sale.salePrice),
-        });
-
-        await this.prisma.sale.update({
-          where: { id: sale.id },
-          data: { loyaltyPointsAwarded: points },
-        });
-      }
-
-      // Update realtor stats
-      await this.updateRealtorStats(sale.realtorId);
 
       // Update client stats
       await this.updateClientStats(sale.clientId, Number(sale.salePrice));
-
-      // Send confirmation notification
-      await this.notificationService.create({
-        userId: sale.realtor.userId,
-        type: 'SALE',
-        title: 'Sale Confirmed',
-        message: `Your sale of ${sale.property.title} has been confirmed!`,
-        priority: 'HIGH',
-        data: { saleId: sale.id },
-        link: `/realtor/sales/${sale.id}`,
-      });
     }
 
     // If cancelling a sale
@@ -792,16 +794,18 @@ export class SaleService {
         });
       }
 
-      // Notify realtor
-      await this.notificationService.create({
-        userId: sale.realtor.userId,
-        type: 'SALE',
-        title: 'Sale Cancelled',
-        message: `The sale of ${sale.property.title} has been cancelled.`,
-        priority: 'HIGH',
-        data: { saleId: sale.id },
-        link: `/realtor/sales/${sale.id}`,
-      });
+      // Notify realtor if one is assigned
+      if (sale.realtor) {
+        await this.notificationService.create({
+          userId: sale.realtor.userId,
+          type: 'SALE',
+          title: 'Sale Cancelled',
+          message: `The sale of ${sale.property.title} has been cancelled.`,
+          priority: 'HIGH',
+          data: { saleId: sale.id },
+          link: `/realtor/sales/${sale.id}`,
+        });
+      }
     }
 
     // Update the sale status

@@ -307,7 +307,7 @@ export class RealtorService {
       take: limit,
     });
 
-    const realtorIds = salesByRealtor.map((s) => s.realtorId);
+    const realtorIds = salesByRealtor.map((s) => s.realtorId).filter((id): id is string => id !== null);
     const realtors = await this.prisma.realtorProfile.findMany({
       where: { id: { in: realtorIds } },
       include: {

@@ -76,16 +76,18 @@ export class SaleOverdueService {
         });
       }
 
-      // Notify the realtor
-      await this.notificationService.create({
-        userId: sale.realtor.userId,
-        type: 'PAYMENT',
-        title: 'Client Payment Overdue',
-        message: `${clientName}'s payment for "${propertyTitle}" is ${overdueDays} day(s) overdue. Remaining: ₦${remainingBalance.toLocaleString()}`,
-        priority,
-        data: { saleId: sale.id, overdueDays },
-        link: `/realtor/sales`,
-      });
+      // Notify the realtor if one is assigned
+      if (sale.realtor) {
+        await this.notificationService.create({
+          userId: sale.realtor.userId,
+          type: 'PAYMENT',
+          title: 'Client Payment Overdue',
+          message: `${clientName}'s payment for "${propertyTitle}" is ${overdueDays} day(s) overdue. Remaining: ₦${remainingBalance.toLocaleString()}`,
+          priority,
+          data: { saleId: sale.id, overdueDays },
+          link: `/realtor/sales`,
+        });
+      }
 
       // Notify the client
       await this.notificationService.create({
