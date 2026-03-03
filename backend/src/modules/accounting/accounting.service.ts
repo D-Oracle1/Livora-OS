@@ -224,65 +224,57 @@ export class AccountingService {
 
   async getTrend(months = 12) {
     const now = new Date();
-    const result: Array<{
-      month: string;
-      year: number;
-      monthNum: number;
-      revenue: number;
-      commission: number;
-      tax: number;
-      expenses: number;
-      netProfit: number;
-    }> = [];
-
     const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-    for (let i = months - 1; i >= 0; i--) {
+    const monthRanges = Array.from({ length: months }, (_, idx) => {
+      const i = months - 1 - idx;
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const start = new Date(d.getFullYear(), d.getMonth(), 1);
       const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { d, start, end };
+    });
 
-      const [rev, comm, tax, exp] = await Promise.all([
-        this.prisma.sale.aggregate({
-          where: { status: 'COMPLETED', saleDate: { gte: start, lte: end } },
-          _sum: { salePrice: true },
+    return Promise.all(
+      monthRanges.map(({ d, start, end }) =>
+        Promise.all([
+          this.prisma.sale.aggregate({
+            where: { status: 'COMPLETED', saleDate: { gte: start, lte: end } },
+            _sum: { salePrice: true },
+          }),
+          this.prisma.commission.aggregate({
+            where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
+            _sum: { amount: true },
+          }),
+          this.prisma.tax.aggregate({
+            where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
+            _sum: { amount: true },
+          }),
+          this.prisma.expense.aggregate({
+            where: {
+              approvalStatus: 'APPROVED',
+              deletedAt: null,
+              expenseDate: { gte: start, lte: end },
+            },
+            _sum: { amount: true },
+          }),
+        ]).then(([rev, comm, tax, exp]) => {
+          const revenue = Number(rev._sum.salePrice ?? 0);
+          const commission = Number(comm._sum.amount ?? 0);
+          const taxes = Number(tax._sum.amount ?? 0);
+          const expenses = Number(exp._sum.amount ?? 0);
+          return {
+            month: MONTH_NAMES[d.getMonth()],
+            year: d.getFullYear(),
+            monthNum: d.getMonth() + 1,
+            revenue,
+            commission,
+            tax: taxes,
+            expenses,
+            netProfit: revenue - commission - taxes - expenses,
+          };
         }),
-        this.prisma.commission.aggregate({
-          where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
-          _sum: { amount: true },
-        }),
-        this.prisma.tax.aggregate({
-          where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
-          _sum: { amount: true },
-        }),
-        this.prisma.expense.aggregate({
-          where: {
-            approvalStatus: 'APPROVED',
-            deletedAt: null,
-            expenseDate: { gte: start, lte: end },
-          },
-          _sum: { amount: true },
-        }),
-      ]);
-
-      const revenue = Number(rev._sum.salePrice ?? 0);
-      const commission = Number(comm._sum.amount ?? 0);
-      const taxes = Number(tax._sum.amount ?? 0);
-      const expenses = Number(exp._sum.amount ?? 0);
-
-      result.push({
-        month: MONTH_NAMES[d.getMonth()],
-        year: d.getFullYear(),
-        monthNum: d.getMonth() + 1,
-        revenue,
-        commission,
-        tax: taxes,
-        expenses,
-        netProfit: revenue - commission - taxes - expenses,
-      });
-    }
-
-    return result;
+      ),
+    );
   }
 
   // ─── Expense Breakdown ───────────────────────────────────────────────────────
