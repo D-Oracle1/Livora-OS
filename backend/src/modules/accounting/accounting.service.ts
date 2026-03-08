@@ -91,27 +91,31 @@ export class AccountingService {
     const toNum = (v: Prisma.Decimal | null | undefined) => Number(v ?? 0);
 
     const totalRevenueMTD = toNum(revMTD._sum.salePrice);
-    const totalDeductionsMTD = toNum(commMTD._sum.amount) + toNum(taxMTD._sum.amount);
+    const totalCommissionMTD = toNum(commMTD._sum.amount);
+    const totalTaxMTD = toNum(taxMTD._sum.amount);
+    const totalDeductionsMTD = totalCommissionMTD + totalTaxMTD;
     const totalExpensesMTD = toNum(expMTD._sum.amount);
     const netProfitMTD = totalRevenueMTD - totalDeductionsMTD - totalExpensesMTD;
 
     const totalRevenueYTD = toNum(revYTD._sum.salePrice);
-    const totalDeductionsYTD = toNum(commYTD._sum.amount) + toNum(taxYTD._sum.amount);
+    const totalCommissionYTD = toNum(commYTD._sum.amount);
+    const totalTaxYTD = toNum(taxYTD._sum.amount);
+    const totalDeductionsYTD = totalCommissionYTD + totalTaxYTD;
     const totalExpensesYTD = toNum(expYTD._sum.amount);
     const netProfitYTD = totalRevenueYTD - totalDeductionsYTD - totalExpensesYTD;
 
     return {
       mtd: {
         totalRevenue: totalRevenueMTD,
-        totalCommission: toNum(commMTD._sum.amount),
-        totalTax: toNum(taxMTD._sum.amount),
+        totalCommission: totalCommissionMTD,
+        totalTax: totalTaxMTD,
         totalExpenses: totalExpensesMTD,
         netProfit: netProfitMTD,
       },
       ytd: {
         totalRevenue: totalRevenueYTD,
-        totalCommission: toNum(commYTD._sum.amount),
-        totalTax: toNum(taxYTD._sum.amount),
+        totalCommission: totalCommissionYTD,
+        totalTax: totalTaxYTD,
         totalExpenses: totalExpensesYTD,
         netProfit: netProfitYTD,
       },
@@ -443,6 +447,469 @@ export class AccountingService {
         net: Number(s.netAmount),
         paymentPlan: s.paymentPlan,
       })),
+    };
+  }
+
+  // ─── Balance Sheet ────────────────────────────────────────────────────────────
+
+  async getBalanceSheet(asOfDate?: string) {
+    const asOf = asOfDate ? new Date(asOfDate) : new Date();
+    const toNum = (v: any) => Number(v ?? 0);
+
+    const [
+      completedFullSales,
+      completedPayments,
+      inProgressSalesDetail,
+      unpaidCommissions,
+      pendingExpensesAgg,
+      taxLiabilities,
+    ] = await Promise.all([
+      // Cash from FULL payment completed sales
+      this.prisma.sale.aggregate({
+        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { lte: asOf } },
+        _sum: { salePrice: true },
+        _count: true,
+      }),
+      // Cash received from installment payments
+      this.prisma.payment.aggregate({
+        where: { status: 'COMPLETED', paymentDate: { lte: asOf } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      // IN_PROGRESS installment sales — compute outstanding receivables
+      this.prisma.sale.findMany({
+        where: { status: 'IN_PROGRESS', saleDate: { lte: asOf } },
+        select: {
+          salePrice: true,
+          payments: {
+            where: { status: 'COMPLETED' },
+            select: { amount: true },
+          },
+        },
+      }),
+      // Unpaid (PENDING) commissions
+      this.prisma.commission.aggregate({
+        where: { status: 'PENDING' },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      // Unapproved (PENDING) expenses
+      this.safeExpenseQuery(
+        () => this.prisma.expense.aggregate({
+          where: { approvalStatus: 'PENDING', deletedAt: null, expenseDate: { lte: asOf } },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        { _sum: { amount: null }, _count: 0 },
+      ),
+      // Tax collected from completed sales (payable to government)
+      this.prisma.tax.aggregate({
+        where: { sale: { status: 'COMPLETED', saleDate: { lte: asOf } } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    // Receivables = sum of outstanding balance on each in-progress sale
+    const receivables = inProgressSalesDetail.reduce((sum, s) => {
+      const paid = s.payments.reduce((p, pay) => p + toNum(pay.amount), 0);
+      return sum + (toNum(s.salePrice) - paid);
+    }, 0);
+
+    const cashFromFullSales = toNum(completedFullSales._sum.salePrice);
+    const cashFromInstallments = toNum(completedPayments._sum.amount);
+    const totalCash = cashFromFullSales + cashFromInstallments;
+    const totalAssets = totalCash + receivables;
+
+    const unpaidCommissionsTotal = toNum(unpaidCommissions._sum.amount);
+    const pendingExpensesTotal = toNum(pendingExpensesAgg._sum.amount);
+    const taxPayable = toNum(taxLiabilities._sum.amount);
+    const totalLiabilities = unpaidCommissionsTotal + pendingExpensesTotal + taxPayable;
+
+    const equity = totalAssets - totalLiabilities;
+
+    return {
+      asOf: asOf.toISOString(),
+      assets: {
+        cash: {
+          fromFullSales: cashFromFullSales,
+          fullSalesCount: toNum(completedFullSales._count),
+          fromInstallments: cashFromInstallments,
+          installmentPaymentsCount: toNum(completedPayments._count),
+          total: totalCash,
+        },
+        receivables: {
+          total: receivables,
+          count: inProgressSalesDetail.length,
+        },
+        total: totalAssets,
+      },
+      liabilities: {
+        unpaidCommissions: {
+          total: unpaidCommissionsTotal,
+          count: toNum(unpaidCommissions._count),
+        },
+        pendingExpenses: {
+          total: pendingExpensesTotal,
+          count: toNum(pendingExpensesAgg._count),
+        },
+        taxPayable: {
+          total: taxPayable,
+        },
+        total: totalLiabilities,
+      },
+      equity,
+    };
+  }
+
+  // ─── Cash Flow Statement ──────────────────────────────────────────────────────
+
+  async getCashFlow(startDate: string, endDate: string) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const toNum = (v: any) => Number(v ?? 0);
+
+    const [
+      installmentPayments,
+      fullSales,
+      commissionsPaid,
+      approvedExpenses,
+      taxesFromSales,
+    ] = await Promise.all([
+      // Inflow: installment payments received in period
+      this.prisma.payment.aggregate({
+        where: { status: 'COMPLETED', paymentDate: { gte: start, lte: end } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      // Inflow: full-payment sales completed in period
+      this.prisma.sale.aggregate({
+        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: start, lte: end } },
+        _sum: { salePrice: true },
+        _count: true,
+      }),
+      // Outflow: commissions actually paid out in period
+      this.prisma.commission.aggregate({
+        where: { status: 'PAID', paidAt: { gte: start, lte: end } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      // Outflow: approved expenses in period
+      this.safeExpenseQuery(
+        () => this.prisma.expense.aggregate({
+          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: start, lte: end } },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        { _sum: { amount: null }, _count: 0 },
+      ),
+      // Outflow: taxes on completed sales in period
+      this.prisma.tax.aggregate({
+        where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const installmentInflows = toNum(installmentPayments._sum.amount);
+    const fullSaleInflows = toNum(fullSales._sum.salePrice);
+    const totalInflows = installmentInflows + fullSaleInflows;
+
+    const commissionOutflows = toNum(commissionsPaid._sum.amount);
+    const expenseOutflows = toNum(approvedExpenses._sum.amount);
+    const taxOutflows = toNum(taxesFromSales._sum.amount);
+    const totalOutflows = commissionOutflows + expenseOutflows + taxOutflows;
+
+    const netCashFlow = totalInflows - totalOutflows;
+
+    return {
+      period: { startDate: start.toISOString(), endDate: end.toISOString() },
+      inflows: {
+        installmentPayments: {
+          total: installmentInflows,
+          count: toNum(installmentPayments._count),
+        },
+        fullPaymentSales: {
+          total: fullSaleInflows,
+          count: toNum(fullSales._count),
+        },
+        total: totalInflows,
+      },
+      outflows: {
+        commissions: {
+          total: commissionOutflows,
+          count: toNum(commissionsPaid._count),
+        },
+        expenses: {
+          total: expenseOutflows,
+          count: toNum(approvedExpenses._count),
+        },
+        taxes: {
+          total: taxOutflows,
+        },
+        total: totalOutflows,
+      },
+      netCashFlow,
+      isPositive: netCashFlow >= 0,
+    };
+  }
+
+  // ─── Anomaly Detection ────────────────────────────────────────────────────────
+
+  async getAnomalies() {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOf3MonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+    const anomalies: Array<{
+      type: string;
+      severity: 'CRITICAL' | 'WARNING' | 'INFO';
+      title: string;
+      message: string;
+      value?: number;
+    }> = [];
+
+    const toNum = (v: any) => Number(v ?? 0);
+
+    const [
+      currentMonthExp,
+      prev3MonthsExp,
+      lastMonthRevAgg,
+      lastMonthCommAgg,
+      lastMonthTaxAgg,
+      lastMonthExpAgg,
+      recentCommissions,
+      avgSaleAgg,
+    ] = await Promise.all([
+      // Current month expenses
+      this.safeExpenseQuery(
+        () => this.prisma.expense.aggregate({
+          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: startOfMonth } },
+          _sum: { amount: true },
+        }),
+        { _sum: { amount: null } },
+      ),
+      // Past 3 months expenses (for average)
+      this.safeExpenseQuery(
+        () => this.prisma.expense.aggregate({
+          where: {
+            approvalStatus: 'APPROVED',
+            deletedAt: null,
+            expenseDate: { gte: startOf3MonthsAgo, lt: startOfMonth },
+          },
+          _sum: { amount: true },
+        }),
+        { _sum: { amount: null } },
+      ),
+      // Last month revenue
+      this.prisma.sale.aggregate({
+        where: { status: 'COMPLETED', saleDate: { gte: startOfLastMonth, lte: endOfLastMonth } },
+        _sum: { salePrice: true },
+      }),
+      // Last month commissions
+      this.prisma.commission.aggregate({
+        where: { sale: { status: 'COMPLETED', saleDate: { gte: startOfLastMonth, lte: endOfLastMonth } } },
+        _sum: { amount: true },
+      }),
+      // Last month taxes
+      this.prisma.tax.aggregate({
+        where: { sale: { status: 'COMPLETED', saleDate: { gte: startOfLastMonth, lte: endOfLastMonth } } },
+        _sum: { amount: true },
+      }),
+      // Last month approved expenses
+      this.safeExpenseQuery(
+        () => this.prisma.expense.aggregate({
+          where: {
+            approvalStatus: 'APPROVED',
+            deletedAt: null,
+            expenseDate: { gte: startOfLastMonth, lte: endOfLastMonth },
+          },
+          _sum: { amount: true },
+        }),
+        { _sum: { amount: null } },
+      ),
+      // Recent commissions — check for unusually high rates (>50% of sale price)
+      this.prisma.commission.findMany({
+        where: { sale: { status: 'COMPLETED' } },
+        select: { id: true, amount: true, rate: true, sale: { select: { salePrice: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      // Average completed sale price (all time) for large-payment detection
+      this.prisma.sale.aggregate({
+        where: { status: 'COMPLETED' },
+        _avg: { salePrice: true },
+        _count: true,
+      }),
+    ]);
+
+    // 1. Expense spike: current month > 145% of 3-month average
+    const currentExp = toNum(currentMonthExp._sum.amount);
+    const prev3Avg = toNum(prev3MonthsExp._sum.amount) / 3;
+    if (prev3Avg > 0 && currentExp > prev3Avg * 1.45) {
+      const pct = Math.round(((currentExp - prev3Avg) / prev3Avg) * 100);
+      anomalies.push({
+        type: 'EXPENSE_SPIKE',
+        severity: 'WARNING',
+        title: 'Expense Spike Detected',
+        message: `Expenses this month are ${pct}% above the 3-month average`,
+        value: currentExp,
+      });
+    }
+
+    // 2. Negative profit last month
+    const lastRev = toNum(lastMonthRevAgg._sum.salePrice);
+    const lastProfit =
+      lastRev -
+      toNum(lastMonthCommAgg._sum.amount) -
+      toNum(lastMonthTaxAgg._sum.amount) -
+      toNum(lastMonthExpAgg._sum.amount);
+    if (lastRev > 0 && lastProfit < 0) {
+      anomalies.push({
+        type: 'NEGATIVE_PROFIT',
+        severity: 'CRITICAL',
+        title: 'Negative Profit Last Month',
+        message: `Last month resulted in a net loss`,
+        value: lastProfit,
+      });
+    }
+
+    // 3. Commission overpayment: commission amount > 50% of sale price
+    for (const comm of recentCommissions) {
+      const ratio = toNum(comm.amount) / toNum(comm.sale.salePrice);
+      if (ratio > 0.5) {
+        anomalies.push({
+          type: 'HIGH_COMMISSION',
+          severity: 'WARNING',
+          title: 'High Commission Rate',
+          message: `A commission of ${(ratio * 100).toFixed(1)}% of sale price was recorded — verify this is correct`,
+          value: toNum(comm.amount),
+        });
+        break; // Only report first occurrence
+      }
+    }
+
+    // 4. Unusually large single payment (> 3x average sale price)
+    const avgSalePrice = toNum(avgSaleAgg._avg?.salePrice);
+    if (avgSalePrice > 0) {
+      const largeSales = await this.prisma.sale.findMany({
+        where: {
+          status: 'COMPLETED',
+          saleDate: { gte: startOf3MonthsAgo },
+        },
+        select: { salePrice: true, saleDate: true, property: { select: { title: true } } },
+        orderBy: { salePrice: 'desc' },
+        take: 3,
+      });
+      for (const sale of largeSales) {
+        if (toNum(sale.salePrice) > avgSalePrice * 3) {
+          anomalies.push({
+            type: 'LARGE_TRANSACTION',
+            severity: 'INFO',
+            title: 'Unusually Large Transaction',
+            message: `A sale of ${(toNum(sale.salePrice) / 1_000_000).toFixed(2)}M was recorded — ${toNum(sale.salePrice) / avgSalePrice > 1 ? `${((toNum(sale.salePrice) / avgSalePrice - 1) * 100).toFixed(0)}% above average` : ''}`,
+            value: toNum(sale.salePrice),
+          });
+          break;
+        }
+      }
+    }
+
+    return {
+      anomalies,
+      count: anomalies.length,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  // ─── AI Financial Insights ────────────────────────────────────────────────────
+
+  async getInsights() {
+    const trendData = await this.getTrend(4); // Last 4 months
+
+    const insights: Array<{
+      type: 'POSITIVE' | 'NEGATIVE' | 'WARNING' | 'INFO' | 'NEUTRAL';
+      message: string;
+    }> = [];
+
+    if (trendData.length >= 2) {
+      const current = trendData[trendData.length - 1];
+      const previous = trendData[trendData.length - 2];
+
+      // 1. Month-over-month revenue change
+      if (previous.revenue > 0) {
+        const revChange = ((current.revenue - previous.revenue) / previous.revenue) * 100;
+        if (Math.abs(revChange) >= 5) {
+          insights.push({
+            type: revChange > 0 ? 'POSITIVE' : 'NEGATIVE',
+            message: `Sales ${revChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(revChange).toFixed(0)}% compared to last month`,
+          });
+        }
+      }
+
+      // 2. Commission ratio
+      if (current.revenue > 0) {
+        const commRatio = (current.commission / current.revenue) * 100;
+        insights.push({
+          type: commRatio > 35 ? 'WARNING' : 'NEUTRAL',
+          message: `Commission payouts represent ${commRatio.toFixed(0)}% of revenue this month`,
+        });
+      }
+
+      // 3. Net profit direction
+      if (current.netProfit > previous.netProfit && previous.netProfit >= 0) {
+        insights.push({
+          type: 'POSITIVE',
+          message: `Net profit improved in ${current.month} ${current.year}`,
+        });
+      } else if (current.netProfit < previous.netProfit && current.netProfit < 0) {
+        insights.push({
+          type: 'NEGATIVE',
+          message: `Net profit declined in ${current.month} ${current.year}`,
+        });
+      }
+    }
+
+    // 4. Expense trend direction (last 3 months)
+    if (trendData.length >= 3) {
+      const last3 = trendData.slice(-3);
+      const expIncreasing = last3.every((d, i) => i === 0 || d.expenses >= last3[i - 1].expenses);
+      const expDecreasing = last3.every((d, i) => i === 0 || d.expenses <= last3[i - 1].expenses);
+      if (expIncreasing && last3[2].expenses > 0) {
+        insights.push({
+          type: 'WARNING',
+          message: `Expenses are trending upward over the past 3 months`,
+        });
+      } else if (expDecreasing && last3[0].expenses > 0) {
+        insights.push({
+          type: 'POSITIVE',
+          message: `Expenses are trending downward — strong cost control`,
+        });
+      }
+    }
+
+    // 5. Top revenue property type (all-time)
+    const allSales = await this.prisma.sale.findMany({
+      where: { status: 'COMPLETED' },
+      select: { salePrice: true, property: { select: { type: true } } },
+      take: 500,
+    });
+    const byType: Record<string, number> = {};
+    for (const s of allSales) {
+      const t = s.property?.type ?? 'Unknown';
+      byType[t] = (byType[t] ?? 0) + Number(s.salePrice);
+    }
+    const topType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0];
+    if (topType) {
+      insights.push({
+        type: 'INFO',
+        message: `${topType[0]} properties generate the highest revenue overall`,
+      });
+    }
+
+    return {
+      insights,
+      generatedAt: new Date().toISOString(),
     };
   }
 }

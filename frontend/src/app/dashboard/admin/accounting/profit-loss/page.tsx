@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Printer, Download, FileSpreadsheet, Loader2, RefreshCw } from 'lucide-react';
+import { Printer, Download, FileSpreadsheet, Loader2, RefreshCw, Table } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -111,6 +111,45 @@ export default function ProfitLossPage() {
 
   // ─── CSV Export ───────────────────────────────────────────────────────────────
 
+  // ─── Excel Export ─────────────────────────────────────────────────────────────
+
+  const handleExcel = async () => {
+    if (!data) return;
+    try {
+      const XLSX = (await import('xlsx')).default;
+      const rows: any[][] = [
+        ['Profit & Loss Report'],
+        ['Company', branding.companyName ?? 'Company'],
+        ['Period', `${data.period?.startDate?.slice(0, 10)} to ${data.period?.endDate?.slice(0, 10)}`],
+        ['Generated', new Date().toLocaleDateString()],
+        [],
+        ['INCOME'],
+        ['Property Sales Revenue', data.revenue?.propertySales ?? 0],
+        ['Total Revenue', data.revenue?.total ?? 0],
+        [],
+        ['DEDUCTIONS'],
+        ['Commissions Paid', data.deductions?.commissions ?? 0],
+        ['Taxes', data.deductions?.taxes ?? 0],
+        ['Total Deductions', data.deductions?.total ?? 0],
+        [],
+        ['GROSS PROFIT', data.grossProfit ?? 0],
+        [],
+        ['EXPENSES'],
+        ...(data.expenses?.byCategory ?? []).map((c: any) => [c.categoryName, c.total]),
+        ['Total Expenses', data.expenses?.total ?? 0],
+        [],
+        ['NET PROFIT', data.netProfit ?? 0],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Profit & Loss');
+      XLSX.writeFile(wb, `profit-loss-${data.period?.startDate?.slice(0, 10)}-to-${data.period?.endDate?.slice(0, 10)}.xlsx`);
+      toast.success('Excel downloaded');
+    } catch {
+      toast.error('Failed to generate Excel');
+    }
+  };
+
   const handleCsv = () => {
     if (!data) return;
     const rows: string[][] = [
@@ -169,6 +208,9 @@ export default function ProfitLossPage() {
             </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={handlePdf}>
               <Download className="w-4 h-4" /> PDF
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleExcel}>
+              <Table className="w-4 h-4" /> Excel
             </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={handleCsv}>
               <FileSpreadsheet className="w-4 h-4" /> CSV

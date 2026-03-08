@@ -53,4 +53,29 @@ export class AccountingController {
     const end = endDate || new Date().toISOString();
     return this.service.getRevenueSummary(start, end);
   }
+
+  @Get('balance-sheet')
+  getBalanceSheet(@Query('asOf') asOf?: string) {
+    return this.service.getBalanceSheet(asOf);
+  }
+
+  @Get('cash-flow')
+  getCashFlow(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const start = startDate || new Date(new Date().getFullYear(), 0, 1).toISOString();
+    const end = endDate || new Date().toISOString();
+    return this.service.getCashFlow(start, end);
+  }
+
+  @Get('anomalies')
+  getAnomalies() {
+    return this.service.getAnomalies();
+  }
+
+  @Get('insights')
+  getInsights() {
+    return this.service.getInsights();
+  }
 }
