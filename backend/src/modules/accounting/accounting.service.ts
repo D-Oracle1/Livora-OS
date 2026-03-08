@@ -1,10 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AccountingService {
+  private readonly logger = new Logger(AccountingService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Run a Prisma expense query safely; returns fallback on table-not-found errors */
+  private async safeExpenseQuery<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+    try {
+      return await fn();
+    } catch (err: any) {
+      this.logger.error(`Expense query failed: ${err?.message ?? err}`);
+      return fallback;
+    }
+  }
 
   // ─── Dashboard Summary ───────────────────────────────────────────────────────
 
@@ -34,11 +46,14 @@ export class AccountingService {
         _sum: { amount: true },
       }),
       // Expenses MTD
-      this.prisma.expense.aggregate({
-        where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: startOfMonth } },
-        _sum: { amount: true },
-        _count: true,
-      }),
+      this.safeExpenseQuery(
+        () => this.prisma.expense.aggregate({
+          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: startOfMonth } },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        { _sum: { amount: null }, _count: 0 },
+      ),
       // Revenue YTD
       this.prisma.sale.aggregate({
         where: { status: 'COMPLETED', saleDate: { gte: startOfYear } },
@@ -55,16 +70,22 @@ export class AccountingService {
         _sum: { amount: true },
       }),
       // Expenses YTD
-      this.prisma.expense.aggregate({
-        where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: startOfYear } },
-        _sum: { amount: true },
-      }),
+      this.safeExpenseQuery(
+        () => this.prisma.expense.aggregate({
+          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: startOfYear } },
+          _sum: { amount: true },
+        }),
+        { _sum: { amount: null } },
+      ),
       // Pending expenses (not yet approved)
-      this.prisma.expense.aggregate({
-        where: { approvalStatus: 'PENDING', deletedAt: null },
-        _sum: { amount: true },
-        _count: true,
-      }),
+      this.safeExpenseQuery(
+        () => this.prisma.expense.aggregate({
+          where: { approvalStatus: 'PENDING', deletedAt: null },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        { _sum: { amount: null }, _count: 0 },
+      ),
     ]);
 
     const toNum = (v: Prisma.Decimal | null | undefined) => Number(v ?? 0);
@@ -129,19 +150,25 @@ export class AccountingService {
           _sum: { amount: true },
         }),
         // Total approved expenses
-        this.prisma.expense.aggregate({
-          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: saleDateFilter },
-          _sum: { amount: true },
-          _count: true,
-        }),
+        this.safeExpenseQuery(
+          () => this.prisma.expense.aggregate({
+            where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: saleDateFilter },
+            _sum: { amount: true },
+            _count: true,
+          }),
+          { _sum: { amount: null }, _count: 0 },
+        ),
         // Expenses grouped by category
-        this.prisma.expense.groupBy({
-          by: ['categoryId'],
-          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: saleDateFilter },
-          _sum: { amount: true },
-          _count: true,
-          orderBy: { _sum: { amount: 'desc' } },
-        }),
+        this.safeExpenseQuery(
+          () => this.prisma.expense.groupBy({
+            by: ['categoryId'],
+            where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: saleDateFilter },
+            _sum: { amount: true },
+            _count: true,
+            orderBy: { _sum: { amount: 'desc' } },
+          }),
+          [],
+        ),
         // Monthly sales breakdown
         this.prisma.sale.findMany({
           where: { status: 'COMPLETED', saleDate: saleDateFilter },
@@ -249,14 +276,17 @@ export class AccountingService {
             where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
             _sum: { amount: true },
           }),
-          this.prisma.expense.aggregate({
-            where: {
-              approvalStatus: 'APPROVED',
-              deletedAt: null,
-              expenseDate: { gte: start, lte: end },
-            },
-            _sum: { amount: true },
-          }),
+          this.safeExpenseQuery(
+            () => this.prisma.expense.aggregate({
+              where: {
+                approvalStatus: 'APPROVED',
+                deletedAt: null,
+                expenseDate: { gte: start, lte: end },
+              },
+              _sum: { amount: true },
+            }),
+            { _sum: { amount: null } },
+          ),
         ]).then(([rev, comm, tax, exp]) => {
           const revenue = Number(rev._sum.salePrice ?? 0);
           const commission = Number(comm._sum.amount ?? 0);
