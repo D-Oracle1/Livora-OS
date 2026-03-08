@@ -8,6 +8,7 @@ import { TaxService } from '../tax/tax.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { NotificationService } from '../notification/notification.service';
 import { ClientService } from '../client/client.service';
+import { SettingsService } from '../settings/settings.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
@@ -24,6 +25,7 @@ export class SaleService {
     private readonly notificationService: NotificationService,
     @Inject(forwardRef(() => ClientService))
     private readonly clientService: ClientService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async create(createSaleDto: CreateSaleDto, realtorUserId: string, reporterRole: string = 'REALTOR') {
@@ -33,7 +35,7 @@ export class SaleService {
     //   STAFF + no realtorId → company sale (no realtor)
     let realtorProfile: any = null;
 
-    if (reporterRole === 'STAFF') {
+    if (reporterRole === 'STAFF' || reporterRole === 'ADMIN' || reporterRole === 'SUPER_ADMIN') {
       if (createSaleDto.realtorId) {
         realtorProfile = await this.prisma.realtorProfile.findUnique({
           where: { id: createSaleDto.realtorId },
@@ -78,7 +80,8 @@ export class SaleService {
 
     // Commission is only applicable when a realtor is credited
     const commissionRate = realtorProfile ? this.getCommissionRate(realtorProfile.loyaltyTier) : 0;
-    const taxRate = realtorProfile ? 0.15 : 0;
+    // Tax rate is read from configurable settings; falls back to 15% if not configured
+    const taxRate = realtorProfile ? await this.settingsService.getMainTaxRate() : 0;
 
     const isInstallment = createSaleDto.paymentPlan === 'INSTALLMENT';
     const totalSalePrice = Number(createSaleDto.saleValue);
@@ -327,121 +330,142 @@ export class SaleService {
   }
 
   async recordPayment(saleId: string, dto: RecordPaymentDto) {
-    const sale = await this.prisma.sale.findUnique({
-      where: { id: saleId },
-      include: {
-        realtor: { include: { user: true } },
-        property: true,
-        payments: { orderBy: { paymentNumber: 'desc' }, take: 1 },
-      },
-    });
-
-    if (!sale) throw new NotFoundException('Sale not found');
-    if (sale.paymentPlan !== 'INSTALLMENT') {
+    // Pre-flight: verify the sale exists and is eligible before entering the transaction
+    const salePre = await this.prisma.sale.findUnique({ where: { id: saleId } });
+    if (!salePre) throw new NotFoundException('Sale not found');
+    if (salePre.paymentPlan !== 'INSTALLMENT') {
       throw new BadRequestException('This sale does not accept installment payments');
     }
-    if (sale.status === SaleStatus.COMPLETED) {
+    if (salePre.status === SaleStatus.COMPLETED) {
       throw new BadRequestException('This sale is already fully paid');
     }
-    if (sale.status === SaleStatus.CANCELLED) {
+    if (salePre.status === SaleStatus.CANCELLED) {
       throw new BadRequestException('This sale has been cancelled');
     }
 
-    const paymentAmount = Number(dto.amount);
-    const remainingBalance = Number(sale.remainingBalance);
-
-    if (paymentAmount > remainingBalance) {
-      throw new BadRequestException(
-        `Payment amount (${paymentAmount}) exceeds remaining balance (${remainingBalance})`,
-      );
-    }
-
-    // Calculate commission and tax for this payment
-    const commissionRate = sale.commissionRate;
-    const commissionAmount = paymentAmount * commissionRate;
-    const taxRate = sale.taxRate;
-    const taxAmount = commissionAmount * taxRate;
-    const netCommission = commissionAmount - taxAmount;
-
-    const lastPaymentNumber = sale.payments[0]?.paymentNumber || 0;
-    const newTotalPaid = Number(sale.totalPaid) + paymentAmount;
-    const newRemainingBalance = Number(sale.salePrice) - newTotalPaid;
-    const isFullyPaid = newRemainingBalance <= 0;
-
-    // Create the payment record
-    const payment = await this.prisma.payment.create({
-      data: {
-        saleId,
-        paymentNumber: lastPaymentNumber + 1,
-        amount: paymentAmount,
-        paymentDate: dto.paymentDate ? new Date(dto.paymentDate) : new Date(),
-        commissionRate,
-        commissionAmount,
-        taxRate,
-        taxAmount,
-        netCommission,
-        status: 'COMPLETED',
-        paymentMethod: dto.paymentMethod,
-        reference: dto.reference,
-        notes: dto.notes,
-      },
-    });
-
-    // Update sale running totals
-    await this.prisma.sale.update({
-      where: { id: saleId },
-      data: {
-        totalPaid: newTotalPaid,
-        remainingBalance: newRemainingBalance,
-        commissionAmount: { increment: commissionAmount },
-        taxAmount: { increment: taxAmount },
-        netAmount: { increment: netCommission },
-        status: isFullyPaid ? SaleStatus.COMPLETED : SaleStatus.IN_PROGRESS,
-        closingDate: isFullyPaid ? new Date() : undefined,
-        nextPaymentDue: isFullyPaid
-          ? null
-          : new Date(new Date(dto.paymentDate || new Date()).getTime() + 30 * 24 * 60 * 60 * 1000),
-      },
-    });
-
-    // If fully paid, mark property as SOLD (only if it was under contract for a full sale)
-    if (isFullyPaid && sale.property.status === PropertyStatus.UNDER_CONTRACT) {
-      await this.prisma.property.update({
-        where: { id: sale.propertyId },
-        data: { status: PropertyStatus.SOLD },
+    // All financial mutations run inside a single transaction to prevent concurrent
+    // payments from both passing the balance check and producing a negative balance.
+    const payment = await this.prisma.$transaction(async (tx) => {
+      // Re-fetch the sale inside the transaction with a fresh read
+      const sale = await tx.sale.findUnique({
+        where: { id: saleId },
+        include: {
+          realtor: { include: { user: true } },
+          property: true,
+          payments: { orderBy: { paymentNumber: 'desc' }, take: 1 },
+        },
       });
-    }
+
+      if (!sale) throw new NotFoundException('Sale not found');
+      if (sale.status === SaleStatus.COMPLETED) {
+        throw new BadRequestException('This sale is already fully paid');
+      }
+
+      const paymentAmount = Number(dto.amount);
+      const remainingBalance = Number(sale.remainingBalance);
+
+      if (paymentAmount <= 0) {
+        throw new BadRequestException('Payment amount must be greater than zero');
+      }
+      if (paymentAmount > remainingBalance) {
+        throw new BadRequestException(
+          `Payment amount (${paymentAmount}) exceeds remaining balance (${remainingBalance})`,
+        );
+      }
+
+      // Calculate commission and tax for this payment
+      const commissionRate = sale.commissionRate;
+      const commissionAmount = paymentAmount * commissionRate;
+      const taxRate = sale.taxRate;
+      const taxAmount = commissionAmount * taxRate;
+      const netCommission = commissionAmount - taxAmount;
+
+      const lastPaymentNumber = sale.payments[0]?.paymentNumber || 0;
+      const newTotalPaid = Number(sale.totalPaid) + paymentAmount;
+      const newRemainingBalance = Number(sale.salePrice) - newTotalPaid;
+      const isFullyPaid = newRemainingBalance <= 0;
+
+      // Create the payment record
+      const newPayment = await tx.payment.create({
+        data: {
+          saleId,
+          paymentNumber: lastPaymentNumber + 1,
+          amount: paymentAmount,
+          paymentDate: dto.paymentDate ? new Date(dto.paymentDate) : new Date(),
+          commissionRate,
+          commissionAmount,
+          taxRate,
+          taxAmount,
+          netCommission,
+          status: 'COMPLETED',
+          paymentMethod: dto.paymentMethod,
+          reference: dto.reference,
+          notes: dto.notes,
+        },
+      });
+
+      // Update sale running totals atomically
+      await tx.sale.update({
+        where: { id: saleId },
+        data: {
+          totalPaid: newTotalPaid,
+          remainingBalance: newRemainingBalance,
+          commissionAmount: { increment: commissionAmount },
+          taxAmount: { increment: taxAmount },
+          netAmount: { increment: netCommission },
+          status: isFullyPaid ? SaleStatus.COMPLETED : SaleStatus.IN_PROGRESS,
+          closingDate: isFullyPaid ? new Date() : undefined,
+          nextPaymentDue: isFullyPaid
+            ? null
+            : new Date(new Date(dto.paymentDate || new Date()).getTime() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      // If fully paid, mark property as SOLD
+      if (isFullyPaid && sale.property.status === PropertyStatus.UNDER_CONTRACT) {
+        await tx.property.update({
+          where: { id: sale.propertyId },
+          data: { status: PropertyStatus.SOLD },
+        });
+      }
+
+      if (sale.realtorId) {
+        await tx.commission.updateMany({
+          where: { saleId },
+          data: { amount: { increment: commissionAmount } },
+        });
+        await tx.tax.updateMany({
+          where: { saleId },
+          data: { amount: { increment: taxAmount } },
+        });
+      }
+
+      return { newPayment, sale, isFullyPaid, lastPaymentNumber, paymentAmount, newRemainingBalance };
+    });
+
+    // Post-transaction: non-critical side-effects (stats, notifications)
+    const { newPayment, sale, isFullyPaid, lastPaymentNumber, paymentAmount, newRemainingBalance } = payment;
 
     if (sale.realtorId) {
-      // Update commission record (increment the total amount)
-      await this.prisma.commission.updateMany({
-        where: { saleId },
-        data: { amount: { increment: commissionAmount } },
-      });
-
-      // Update tax record (increment the total amount)
-      await this.prisma.tax.updateMany({
-        where: { saleId },
-        data: { amount: { increment: taxAmount } },
-      });
-
-      // Update realtor stats
       await this.updateRealtorStats(sale.realtorId);
 
-      // Notify the credited realtor
       if (sale.realtor) {
-        await this.notificationService.create({
-          userId: sale.realtor.userId,
-          type: 'SALE',
-          title: `Payment Received - ${sale.property.title}`,
-          message: `Payment #${lastPaymentNumber + 1} of ₦${paymentAmount.toLocaleString()} received. ${isFullyPaid ? 'Sale completed!' : `Remaining: ₦${newRemainingBalance.toLocaleString()}`}`,
-          priority: 'MEDIUM',
-          data: { saleId, paymentId: payment.id },
-        });
+        try {
+          await this.notificationService.create({
+            userId: sale.realtor.userId,
+            type: 'SALE',
+            title: `Payment Received - ${sale.property.title}`,
+            message: `Payment #${lastPaymentNumber + 1} of ₦${paymentAmount.toLocaleString()} received. ${isFullyPaid ? 'Sale completed!' : `Remaining: ₦${newRemainingBalance.toLocaleString()}`}`,
+            priority: 'MEDIUM',
+            data: { saleId, paymentId: newPayment.id },
+          });
+        } catch {
+          // Notification is best-effort
+        }
       }
     }
 
-    return payment;
+    return newPayment;
   }
 
   async getPayments(saleId: string) {
@@ -693,8 +717,18 @@ export class SaleService {
       throw new NotFoundException('Sale not found');
     }
 
-    // If confirming a pending sale (changing to COMPLETED)
+    // If confirming a pending sale (changing to COMPLETED or IN_PROGRESS)
     if (status === SaleStatus.COMPLETED && sale.status === SaleStatus.PENDING) {
+      // Installment sales cannot jump directly to COMPLETED from PENDING —
+      // they must be approved first (which sets them to IN_PROGRESS) and then
+      // completed via recordPayment once fully paid.
+      if (sale.paymentPlan === PaymentPlan.INSTALLMENT) {
+        throw new BadRequestException(
+          'Installment sales must be approved via the /approve endpoint. ' +
+          'Use PATCH /:id/approve to move an installment sale to IN_PROGRESS.',
+        );
+      }
+
       // Update property status to SOLD
       await this.prisma.property.update({
         where: { id: sale.propertyId },

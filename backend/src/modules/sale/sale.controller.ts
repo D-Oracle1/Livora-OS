@@ -32,7 +32,7 @@ export class SaleController {
   ) {}
 
   @Post()
-  @Roles('REALTOR', 'STAFF')
+  @Roles('REALTOR', 'STAFF', 'ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Record a new sale' })
   @ApiResponse({ status: 201, description: 'Sale recorded successfully' })
   async create(
@@ -50,6 +50,7 @@ export class SaleController {
       }
       // realtorId absent → company sale; no error needed
     }
+    // ADMIN/SUPER_ADMIN: no department restriction — falls through to service
     return this.saleService.create(createSaleDto, userId, role);
   }
 
@@ -74,10 +75,10 @@ export class SaleController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    // Auto-scope to realtor's own data
-    if (role === 'REALTOR' && !realtorId) {
+    // REALTOR must always be scoped to their own profile — ignore any supplied realtorId
+    if (role === 'REALTOR') {
       const realtor = await this.prisma.realtorProfile.findUnique({ where: { userId } });
-      if (realtor) realtorId = realtor.id;
+      realtorId = realtor?.id;
     }
     const parsedPage = page !== undefined && !isNaN(Number(page)) ? Number(page) : undefined;
     const parsedLimit = limit !== undefined && !isNaN(Number(limit)) ? Number(limit) : undefined;

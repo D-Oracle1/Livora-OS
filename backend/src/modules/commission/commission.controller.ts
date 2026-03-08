@@ -6,6 +6,7 @@ import {
   Param,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CommissionService } from './commission.service';
@@ -44,10 +45,10 @@ export class CommissionController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    // Auto-scope to realtor's own data
-    if (role === 'REALTOR' && !realtorId) {
+    // REALTOR must always be scoped to their own profile — ignore any supplied realtorId
+    if (role === 'REALTOR') {
       const realtor = await this.prisma.realtorProfile.findUnique({ where: { userId } });
-      if (realtor) realtorId = realtor.id;
+      realtorId = realtor?.id;
     }
     return this.commissionService.findAll({
       page,
@@ -69,6 +70,7 @@ export class CommissionController {
   }
 
   @Get('calculate')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'REALTOR')
   @ApiOperation({ summary: 'Calculate commission for a sale' })
   @ApiQuery({ name: 'saleValue', required: true, type: Number })
   @ApiQuery({ name: 'tier', required: true, enum: LoyaltyTier })
@@ -81,10 +83,23 @@ export class CommissionController {
   }
 
   @Get(':id')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'REALTOR')
   @ApiOperation({ summary: 'Get commission by ID' })
   @ApiResponse({ status: 200, description: 'Commission details' })
-  async findOne(@Param('id') id: string) {
-    return this.commissionService.findById(id);
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    const commission = await this.commissionService.findById(id);
+    // REALTOR may only view their own commission records
+    if (role === 'REALTOR') {
+      const realtor = await this.prisma.realtorProfile.findUnique({ where: { userId } });
+      if (!realtor || commission.realtorId !== realtor.id) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+    return commission;
   }
 
   @Post(':id/pay')

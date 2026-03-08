@@ -252,6 +252,101 @@ export class PayrollService {
     });
   }
 
+  async recalculate(id: string) {
+    const record = await this.prisma.payrollRecord.findUnique({
+      where: { id },
+      include: {
+        staffProfile: {
+          select: { id: true, baseSalary: true, position: true },
+        },
+      },
+    });
+
+    if (!record) throw new NotFoundException('Payroll record not found');
+    if (record.status === PayrollStatus.APPROVED || record.status === PayrollStatus.PAID) {
+      throw new BadRequestException('Cannot recalculate approved or paid payroll');
+    }
+
+    const payrollSettings = await this.settingsService.getPayrollSettings();
+    const TAX_RATE = payrollSettings.enableTax ? payrollSettings.taxRate : 0;
+    const PENSION_RATE = payrollSettings.enablePension ? payrollSettings.pensionRate : 0;
+
+    // Preserve existing overtime and bonus
+    const overtime = Number(record.overtime);
+    const bonus = Number(record.bonus);
+
+    // Sum penalty deductions for this staff member in the pay period
+    const penalties = await this.prisma.penaltyRecord.findMany({
+      where: {
+        staffProfileId: record.staffProfileId,
+        isApplied: true,
+        isWaived: false,
+        createdAt: { gte: record.periodStart, lte: record.periodEnd },
+      },
+      select: { amount: true, type: true, description: true },
+    });
+    const penaltyTotal = penalties.reduce((sum, p) => sum + Number(p.amount), 0);
+    // Include the 1-based index so that penalties with identical type+description
+    // prefixes are stored as separate line items rather than overwriting each other.
+    const penaltyBreakdown = Object.fromEntries(
+      penalties.map((p, i) => [`${p.type}_${i + 1}_${p.description.slice(0, 20)}`, Number(p.amount)]),
+    );
+
+    // Resolve active allowances for this staff member's position
+    const staffPosition = record.staffProfile.position;
+    const allowanceConfigs = await this.prisma.allowanceConfig.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { positionLevels: { isEmpty: true } },
+          { positionLevels: { has: staffPosition } },
+        ],
+      },
+    });
+
+    const allowances: Record<string, number> = {};
+    let totalAllowances = 0;
+    for (const config of allowanceConfigs) {
+      const base = Number(record.baseSalary);
+      const value =
+        config.amountType === 'percentage'
+          ? base * (Number(config.amount) / 100)
+          : Number(config.amount);
+      allowances[config.name] = value;
+      totalAllowances += value;
+    }
+
+    const otherDeductions: Record<string, number> = penaltyTotal > 0 ? penaltyBreakdown : {};
+    const totalOtherDeductions = penaltyTotal;
+
+    const grossPay = Number(record.baseSalary) + overtime + bonus + totalAllowances;
+    const tax = grossPay * TAX_RATE;
+    const pension = grossPay * PENSION_RATE;
+    const totalDeductions = tax + pension + totalOtherDeductions;
+    const netPay = grossPay - totalDeductions;
+
+    return this.prisma.payrollRecord.update({
+      where: { id },
+      data: {
+        allowances,
+        otherDeductions,
+        grossPay,
+        tax,
+        pension,
+        totalDeductions,
+        netPay,
+      },
+      include: {
+        staffProfile: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+            department: { select: { name: true } },
+          },
+        },
+      },
+    });
+  }
+
   async approve(id: string, approverId: string, dto: ApprovePayrollDto) {
     const record = await this.prisma.payrollRecord.findUnique({
       where: { id },

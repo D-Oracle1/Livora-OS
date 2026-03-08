@@ -7,6 +7,7 @@ import { TaxModule } from '../tax/tax.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ClientModule } from '../client/client.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ClientModule } from '../client/client.module';
     forwardRef(() => LoyaltyModule),
     forwardRef(() => NotificationModule),
     forwardRef(() => ClientModule),
+    SettingsModule,
   ],
   controllers: [SaleController],
   providers: [SaleService, SaleOverdueService],
