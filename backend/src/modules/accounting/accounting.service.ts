@@ -261,50 +261,55 @@ export class AccountingService {
       return { d, start, end };
     });
 
-    return Promise.all(
-      monthRanges.map(({ d, start, end }) =>
-        Promise.all([
-          this.prisma.sale.aggregate({
-            where: { status: 'COMPLETED', saleDate: { gte: start, lte: end } },
-            _sum: { salePrice: true },
-          }),
-          this.prisma.commission.aggregate({
-            where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
-            _sum: { amount: true },
-          }),
-          this.prisma.tax.aggregate({
-            where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
-            _sum: { amount: true },
-          }),
-          this.safeExpenseQuery(
-            () => this.prisma.expense.aggregate({
-              where: {
-                approvalStatus: 'APPROVED',
-                deletedAt: null,
-                expenseDate: { gte: start, lte: end },
-              },
-              _sum: { amount: true },
-            }),
-            { _sum: { amount: null } },
-          ),
-        ]).then(([rev, comm, tax, exp]) => {
-          const revenue = Number(rev._sum.salePrice ?? 0);
-          const commission = Number(comm._sum.amount ?? 0);
-          const taxes = Number(tax._sum.amount ?? 0);
-          const expenses = Number(exp._sum.amount ?? 0);
-          return {
-            month: MONTH_NAMES[d.getMonth()],
-            year: d.getFullYear(),
-            monthNum: d.getMonth() + 1,
-            revenue,
-            commission,
-            tax: taxes,
-            expenses,
-            netProfit: revenue - commission - taxes - expenses,
-          };
+    // Process months sequentially to avoid saturating the pgBouncer connection pool.
+    // Each iteration opens at most 4 parallel connections (one per query type).
+    const results: any[] = [];
+
+    for (const { d, start, end } of monthRanges) {
+      const [rev, comm, tax, exp] = await Promise.all([
+        this.prisma.sale.aggregate({
+          where: { status: 'COMPLETED', saleDate: { gte: start, lte: end } },
+          _sum: { salePrice: true },
         }),
-      ),
-    );
+        this.prisma.commission.aggregate({
+          where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
+          _sum: { amount: true },
+        }),
+        this.prisma.tax.aggregate({
+          where: { sale: { status: 'COMPLETED', saleDate: { gte: start, lte: end } } },
+          _sum: { amount: true },
+        }),
+        this.safeExpenseQuery(
+          () => this.prisma.expense.aggregate({
+            where: {
+              approvalStatus: 'APPROVED',
+              deletedAt: null,
+              expenseDate: { gte: start, lte: end },
+            },
+            _sum: { amount: true },
+          }),
+          { _sum: { amount: null } },
+        ),
+      ]);
+
+      const revenue = Number(rev._sum.salePrice ?? 0);
+      const commission = Number(comm._sum.amount ?? 0);
+      const taxes = Number(tax._sum.amount ?? 0);
+      const expenses = Number(exp._sum.amount ?? 0);
+
+      results.push({
+        month: MONTH_NAMES[d.getMonth()],
+        year: d.getFullYear(),
+        monthNum: d.getMonth() + 1,
+        revenue,
+        commission,
+        tax: taxes,
+        expenses,
+        netProfit: revenue - commission - taxes - expenses,
+      });
+    }
+
+    return results;
   }
 
   // ─── Expense Breakdown ───────────────────────────────────────────────────────

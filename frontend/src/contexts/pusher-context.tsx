@@ -50,10 +50,7 @@ export function PusherProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      warn('Skipping init: missing env vars', {
-        hasUrl: !!SUPABASE_URL,
-        hasKey: !!SUPABASE_ANON_KEY,
-      });
+      warn('Skipping init: missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY');
       return;
     }
 
