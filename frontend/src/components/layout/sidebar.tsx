@@ -45,6 +45,8 @@ import {
   Receipt,
   Tag,
   TrendingUp,
+  Scale,
+  Waves,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getImageUrl, api } from '@/lib/api';
@@ -181,6 +183,8 @@ const groupedNavigationConfig: Record<string, NavSection[]> = {
         { name: 'Expenses', href: '/dashboard/admin/accounting/expenses', icon: Receipt, moduleKey: 'expenses' },
         { name: 'Categories', href: '/dashboard/admin/accounting/categories', icon: Tag, moduleKey: 'expense_categories' },
         { name: 'Profit & Loss', href: '/dashboard/admin/accounting/profit-loss', icon: TrendingUp, moduleKey: 'accounting' },
+        { name: 'Balance Sheet', href: '/dashboard/admin/accounting/balance-sheet', icon: Scale, moduleKey: 'accounting' },
+        { name: 'Cash Flow', href: '/dashboard/admin/accounting/cash-flow', icon: Waves, moduleKey: 'accounting' },
         { name: 'Reports', href: '/dashboard/admin/accounting/reports', icon: BarChart3, moduleKey: 'accounting' },
       ],
     },
