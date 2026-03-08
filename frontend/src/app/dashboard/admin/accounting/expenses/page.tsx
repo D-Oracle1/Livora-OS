@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, Pencil, Trash2, Check, X, ChevronDown, Loader2, Upload, Eye } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, ChevronDown, Loader2, Upload, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -73,9 +73,9 @@ export default function ExpensesPage() {
         api.get<any>('/expenses/stats'),
       ]);
 
-      const expData = expRaw?.data ?? expRaw;
-      setExpenses(Array.isArray(expData?.data) ? expData.data : []);
-      setTotalPages(expData?.meta?.totalPages ?? 1);
+      // TransformInterceptor shape: { success, data: [...items], meta: { totalPages, ... } }
+      setExpenses(Array.isArray(expRaw?.data) ? expRaw.data : []);
+      setTotalPages(expRaw?.meta?.totalPages ?? 1);
       setCategories(Array.isArray(catRaw?.data ?? catRaw) ? (catRaw?.data ?? catRaw) : []);
       setStats(statRaw?.data ?? statRaw);
     } catch {
@@ -117,7 +117,7 @@ export default function ExpensesPage() {
       };
       if (dialog.mode === 'create') {
         await api.post('/expenses', payload);
-        toast.success('Expense added — pending approval');
+        toast.success('Expense recorded successfully');
       } else {
         await api.patch(`/expenses/${dialog.expense.id}`, payload);
         toast.success('Expense updated');
@@ -304,17 +304,7 @@ export default function ExpensesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          {exp.approvalStatus === 'PENDING' && (
-                            <>
-                              <button title="Approve" onClick={() => handleApprove(exp.id)} className="p-1.5 text-green-600 hover:bg-green-50 rounded">
-                                <Check className="w-4 h-4" />
-                              </button>
-                              <button title="Reject" onClick={() => { setRejectDialog({ open: true, id: exp.id }); setRejectReason(''); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded">
-                                <X className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                          <button title="Edit" onClick={() => openEdit(exp)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" disabled={exp.approvalStatus === 'APPROVED'}>
+                          <button title="Edit" onClick={() => openEdit(exp)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded">
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button title="Audit Log" onClick={() => openAuditLog(exp)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded">
