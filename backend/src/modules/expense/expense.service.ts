@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
@@ -12,6 +14,8 @@ import { ExpenseApprovalStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class ExpenseService {
+  private readonly logger = new Logger(ExpenseService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   // ─── Create ─────────────────────────────────────────────────────────────────
@@ -35,7 +39,10 @@ export class ExpenseService {
         receiptUrl: dto.receiptUrl,
         departmentId: dto.departmentId,
         createdById: userId,
-        approvalStatus: 'PENDING',
+        // Expenses are pre-approved on paper before being entered into the system.
+        approvalStatus: 'APPROVED',
+        approvedById: userId,
+        approvedAt: new Date(),
       },
       include: { category: true, createdBy: { select: { id: true, firstName: true, lastName: true, avatar: true } } },
     });
@@ -77,25 +84,30 @@ export class ExpenseService {
       if (query.endDate) where.expenseDate.lte = new Date(query.endDate);
     }
 
-    const [data, total] = await Promise.all([
-      this.prisma.expense.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { expenseDate: 'desc' },
-        include: {
-          category: true,
-          createdBy: { select: { id: true, firstName: true, lastName: true, avatar: true } },
-          approvedBy: { select: { id: true, firstName: true, lastName: true } },
-        },
-      }),
-      this.prisma.expense.count({ where }),
-    ]);
+    try {
+      const [data, total] = await Promise.all([
+        this.prisma.expense.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { expenseDate: 'desc' },
+          include: {
+            category: true,
+            createdBy: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+            approvedBy: { select: { id: true, firstName: true, lastName: true } },
+          },
+        }),
+        this.prisma.expense.count({ where }),
+      ]);
 
-    return {
-      data,
-      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+      return {
+        data,
+        meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      };
+    } catch (err: any) {
+      this.logger.error(`findAll expenses failed: ${err?.message ?? err}`);
+      throw new InternalServerErrorException(`Expense query failed: ${err?.message ?? 'Unknown error'}`);
+    }
   }
 
   // ─── Find One ────────────────────────────────────────────────────────────────
@@ -121,10 +133,6 @@ export class ExpenseService {
 
   async update(id: string, dto: UpdateExpenseDto, userId: string) {
     const expense = await this.findOneOrFail(id);
-
-    if (expense.approvalStatus === 'APPROVED') {
-      throw new ForbiddenException('Approved expenses cannot be edited. Reject it first.');
-    }
 
     const oldValues: Record<string, any> = {};
     const newValues: Record<string, any> = {};
@@ -158,7 +166,6 @@ export class ExpenseService {
         ...(dto.referenceNumber !== undefined && { referenceNumber: dto.referenceNumber }),
         ...(dto.receiptUrl !== undefined && { receiptUrl: dto.receiptUrl }),
         ...(dto.departmentId !== undefined && { departmentId: dto.departmentId }),
-        approvalStatus: 'PENDING', // Reset to pending on edit
       },
       include: { category: true },
     });
