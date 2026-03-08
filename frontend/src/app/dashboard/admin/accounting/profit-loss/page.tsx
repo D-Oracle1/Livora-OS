@@ -279,11 +279,16 @@ export default function ProfitLossPage() {
                 <p className="text-xs text-gray-400 mt-1">Generated: {new Date().toLocaleString()}</p>
               </div>
 
-              {/* Income */}
+              {/* Income — cash basis */}
               <section className="mb-6">
-                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Income</h3>
-                <PLRow label="Property Sales" value={data.revenue?.propertySales ?? 0} indent />
-                <PLRow label={`Sales Count: ${data.revenue?.salesCount ?? 0} transactions`} value={null} indent note />
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Income</h3>
+                <p className="text-xs text-gray-400 mb-3">Cash basis — revenue recognised when cash is received</p>
+                {(data.revenue?.fullPaymentSales ?? 0) > 0 && (
+                  <PLRow label={`Full Payment Sales (${data.revenue?.fullSalesCount ?? 0})`} value={data.revenue?.fullPaymentSales ?? 0} indent />
+                )}
+                {(data.revenue?.installmentPayments ?? 0) > 0 && (
+                  <PLRow label={`Instalment Payments Received (${data.revenue?.installmentPaymentsCount ?? 0})`} value={data.revenue?.installmentPayments ?? 0} indent />
+                )}
                 <PLDivider />
                 <PLRow label="Total Revenue" value={data.revenue?.total ?? 0} bold />
               </section>
@@ -329,18 +334,22 @@ export default function ProfitLossPage() {
                 </span>
               </div>
 
-              {/* Sales Detail (collapsible) */}
+              {/* Revenue Detail — cash basis: full sales + installment payments */}
               {(data.salesDetail ?? []).length > 0 && (
                 <section className="mt-8">
-                  <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Revenue Detail ({data.salesDetail.length} sales)</h3>
+                  <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">
+                    Revenue Detail ({data.salesDetail.length} transactions)
+                  </h3>
+                  <p className="text-xs text-gray-400 mb-3">Cash basis — full sales and installment payments received in period</p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs border border-gray-200 rounded">
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Date</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Type</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Property</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Realtor</th>
-                          <th className="text-right px-3 py-2 font-medium text-gray-600">Sale Price</th>
+                          <th className="text-right px-3 py-2 font-medium text-gray-600">Amount</th>
                           <th className="text-right px-3 py-2 font-medium text-gray-600">Commission</th>
                           <th className="text-right px-3 py-2 font-medium text-gray-600">Tax</th>
                         </tr>
@@ -349,7 +358,16 @@ export default function ProfitLossPage() {
                         {data.salesDetail.map((s: any) => (
                           <tr key={s.id} className="border-t border-gray-100">
                             <td className="px-3 py-2 text-gray-500">{new Date(s.date).toLocaleDateString()}</td>
-                            <td className="px-3 py-2 text-gray-700 max-w-[140px] truncate">{s.property}</td>
+                            <td className="px-3 py-2">
+                              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                s.type === 'INSTALLMENT_PAYMENT'
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-green-100 text-green-700'
+                              }`}>
+                                {s.type === 'INSTALLMENT_PAYMENT' ? 'Instalment' : 'Full Sale'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-gray-700 max-w-[130px] truncate">{s.property}</td>
                             <td className="px-3 py-2 text-gray-600">{s.realtor}</td>
                             <td className="px-3 py-2 text-right font-medium">{formatCurrency(s.salePrice)}</td>
                             <td className="px-3 py-2 text-right text-red-600">{formatCurrency(s.commission)}</td>
