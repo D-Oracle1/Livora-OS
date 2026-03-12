@@ -23,6 +23,8 @@ import {
   Download,
   Trash2,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,6 +95,8 @@ export default function CompaniesPage() {
   const [detailTab, setDetailTab] = useState<'info' | 'users' | 'pwa'>('info');
   const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [tenantUserPage, setTenantUserPage] = useState(1);
+  const [tenantUserMeta, setTenantUserMeta] = useState<{ total: number; totalPages: number }>({ total: 0, totalPages: 0 });
   const [assigningRole, setAssigningRole] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -382,11 +386,12 @@ export default function CompaniesPage() {
     }
   };
 
-  const fetchTenantUsers = useCallback(async (companyId: string) => {
+  const fetchTenantUsers = useCallback(async (companyId: string, page = 1) => {
     setUsersLoading(true);
     try {
-      const res = await api.get<any>(`/companies/${companyId}/users?limit=50`);
+      const res = await api.get<any>(`/companies/${companyId}/users?limit=20&page=${page}`);
       setTenantUsers(res.data || []);
+      setTenantUserMeta({ total: res.meta?.total || 0, totalPages: res.meta?.totalPages || 0 });
     } catch {
       toast.error('Failed to load users');
     } finally {
@@ -396,9 +401,14 @@ export default function CompaniesPage() {
 
   useEffect(() => {
     if (showDetail && detailTab === 'users') {
-      fetchTenantUsers(showDetail.id);
+      fetchTenantUsers(showDetail.id, tenantUserPage);
     }
-  }, [detailTab, showDetail, fetchTenantUsers]);
+  }, [detailTab, showDetail, fetchTenantUsers, tenantUserPage]);
+
+  // Reset user page when switching to a different company
+  useEffect(() => {
+    setTenantUserPage(1);
+  }, [showDetail?.id]);
 
   const handleExportTenant = async (company: Company) => {
     setExportingCompany(company.id);
@@ -512,7 +522,7 @@ export default function CompaniesPage() {
     try {
       await api.patch(`/companies/${showDetail.id}/users/${userId}/role`, { role: newRole });
       toast.success('Role updated successfully');
-      fetchTenantUsers(showDetail.id);
+      fetchTenantUsers(showDetail.id, tenantUserPage);
     } catch (error: any) {
       toast.error(error.message || 'Failed to update role');
     } finally {
@@ -526,7 +536,7 @@ export default function CompaniesPage() {
       await api.delete(`/companies/${companyId}/users/${userId}`);
       toast.success('User deleted');
       setConfirmDeleteUser(null);
-      fetchTenantUsers(companyId);
+      fetchTenantUsers(companyId, tenantUserPage);
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete user');
     } finally {
@@ -1657,8 +1667,10 @@ export default function CompaniesPage() {
               {detailTab === 'users' && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-muted-foreground">Assign roles to users in this tenant company</p>
-                    <Button variant="outline" size="sm" onClick={() => fetchTenantUsers(showDetail.id)}>
+                    <p className="text-sm text-muted-foreground">
+                      {tenantUserMeta.total > 0 ? `${tenantUserMeta.total} users` : 'Assign roles to users in this tenant company'}
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => fetchTenantUsers(showDetail.id, tenantUserPage)}>
                       <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
                     </Button>
                   </div>
@@ -1711,6 +1723,33 @@ export default function CompaniesPage() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Pagination */}
+                  {tenantUserMeta.totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-2">
+                      <p className="text-xs text-muted-foreground">
+                        Page {tenantUserPage} of {tenantUserMeta.totalPages}
+                      </p>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={tenantUserPage <= 1 || usersLoading}
+                          onClick={() => setTenantUserPage((p) => p - 1)}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={tenantUserPage >= tenantUserMeta.totalPages || usersLoading}
+                          onClick={() => setTenantUserPage((p) => p + 1)}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
