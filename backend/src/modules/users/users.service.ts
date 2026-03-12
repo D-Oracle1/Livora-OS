@@ -136,22 +136,38 @@ export class UsersService {
   async updateStatus(id: string, status: UserStatus) {
     const user = await this.prisma.user.findUnique({
       where: { id },
+      include: { staffProfile: { select: { id: true } } },
     });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    return this.prisma.user.update({
-      where: { id },
-      data: { status },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        status: true,
-      },
+    return this.prisma.$transaction(async (prisma) => {
+      const updated = await prisma.user.update({
+        where: { id },
+        data: { status },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+        },
+      });
+
+      // Sync staffProfile.isActive when changing status for a staff user
+      if (user.staffProfile) {
+        await prisma.staffProfile.update({
+          where: { id: user.staffProfile.id },
+          data: {
+            isActive: status === UserStatus.ACTIVE,
+            ...(status === UserStatus.ACTIVE ? { terminationDate: null } : {}),
+          },
+        });
+      }
+
+      return updated;
     });
   }
 
