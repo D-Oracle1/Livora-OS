@@ -187,13 +187,17 @@ export class CompanyController {
   @ApiOperation({ summary: 'List users of a tenant company' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'role', required: false, type: String })
   @ApiResponse({ status: 200, description: 'Paginated tenant users' })
   async getCompanyUsers(
     @Param('id') id: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('role') role?: string,
   ) {
-    return this.companyService.getCompanyUsers(id, { page, limit });
+    return this.companyService.getCompanyUsers(id, { page, limit, search, role });
   }
 
   @Patch(':id/users/:userId/role')

@@ -453,7 +453,7 @@ export class CompanyService {
 
   async getCompanyUsers(
     companyId: string,
-    query: { page?: number; limit?: number },
+    query: { page?: number; limit?: number; search?: string; role?: string },
   ) {
     const company = await this.masterPrisma.company.findUnique({
       where: { id: companyId },
@@ -466,8 +466,20 @@ export class CompanyService {
 
     try {
       const client = await this.tenantPrisma.getClient(companyId);
+
+      const where: any = {};
+      if (query.role) where.role = query.role;
+      if (query.search) {
+        where.OR = [
+          { firstName: { contains: query.search, mode: 'insensitive' } },
+          { lastName: { contains: query.search, mode: 'insensitive' } },
+          { email: { contains: query.search, mode: 'insensitive' } },
+        ];
+      }
+
       const [users, total] = await Promise.all([
         client.user.findMany({
+          where,
           skip,
           take: limit,
           orderBy: { createdAt: 'desc' },
@@ -481,7 +493,7 @@ export class CompanyService {
             createdAt: true,
           },
         }),
-        client.user.count(),
+        client.user.count({ where }),
       ]);
       return {
         data: users,
@@ -498,6 +510,53 @@ export class CompanyService {
 
     try {
       const client = await this.tenantPrisma.getClient(companyId);
+
+      // ── 1. Clean up non-cascading user-level relations ────────────────────
+      // Messages sent by this user
+      await client.message.deleteMany({ where: { senderId: userId } });
+      // Audit logs referencing this user
+      await client.auditLog.deleteMany({ where: { userId } });
+      // Monthly awards
+      await client.monthlyAward.deleteMany({ where: { userId } });
+      // Purchase enquiries
+      await client.purchaseEnquiry.deleteMany({ where: { userId } });
+      // Shared files uploaded by this user
+      await client.sharedFile.deleteMany({ where: { uploadedById: userId } });
+      // CMS pages authored by this user
+      await client.cmsPage.deleteMany({ where: { authorId: userId } });
+      // Engagement posts authored by this user (reactions/comments/views cascade from post)
+      await client.engagementPost.deleteMany({ where: { authorId: userId } });
+      // Expense audit logs
+      await client.expenseAuditLog.deleteMany({ where: { userId } });
+      // Nullify approvedBy on expenses (nullable field)
+      await client.expense.updateMany({ where: { approvedById: userId }, data: { approvedById: null } });
+      // Expenses created by this user (non-nullable FK — must remove before user delete)
+      await client.expense.deleteMany({ where: { createdById: userId } });
+
+      // ── 2. Clean up non-cascading StaffProfile relations ──────────────────
+      const staffProfile = await client.staffProfile.findUnique({ where: { userId } });
+      if (staffProfile) {
+        const spId = staffProfile.id;
+
+        // Unset department head role if this staff leads a department
+        await client.department.updateMany({ where: { headId: spId }, data: { headId: null } });
+
+        // Unlink direct reports so they don't reference a deleted profile
+        await client.staffProfile.updateMany({ where: { managerId: spId }, data: { managerId: null } });
+
+        // Delete non-cascading child records
+        await client.payrollRecord.deleteMany({ where: { staffProfileId: spId } });
+        await client.penaltyRecord.deleteMany({ where: { staffProfileId: spId } });
+        await client.staffRanking.deleteMany({ where: { staffProfileId: spId } });
+        await client.performanceReview.deleteMany({
+          where: { OR: [{ revieweeId: spId }, { reviewerId: spId }] },
+        });
+        // Tasks where this staff is the assignee must be deleted (non-nullable FK)
+        // Tasks where they are only the creator are preserved with creatorId nulled
+        await client.staffTask.updateMany({ where: { creatorId: spId }, data: { creatorId: null } });
+        await client.staffTask.deleteMany({ where: { assigneeId: spId } });
+      }
+
       await client.user.delete({ where: { id: userId } });
       return { message: 'User deleted successfully' };
     } catch (err: any) {

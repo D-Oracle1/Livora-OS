@@ -97,6 +97,8 @@ export default function CompaniesPage() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [tenantUserPage, setTenantUserPage] = useState(1);
   const [tenantUserMeta, setTenantUserMeta] = useState<{ total: number; totalPages: number }>({ total: 0, totalPages: 0 });
+  const [tenantUserSearch, setTenantUserSearch] = useState('');
+  const [tenantUserRole, setTenantUserRole] = useState('');
   const [assigningRole, setAssigningRole] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -386,10 +388,13 @@ export default function CompaniesPage() {
     }
   };
 
-  const fetchTenantUsers = useCallback(async (companyId: string, page = 1) => {
+  const fetchTenantUsers = useCallback(async (companyId: string, page = 1, search = '', role = '') => {
     setUsersLoading(true);
     try {
-      const res = await api.get<any>(`/companies/${companyId}/users?limit=20&page=${page}`);
+      const params = new URLSearchParams({ limit: '20', page: String(page) });
+      if (search) params.set('search', search);
+      if (role) params.set('role', role);
+      const res = await api.get<any>(`/companies/${companyId}/users?${params}`);
       setTenantUsers(res.data || []);
       setTenantUserMeta({ total: res.meta?.total || 0, totalPages: res.meta?.totalPages || 0 });
     } catch {
@@ -401,13 +406,15 @@ export default function CompaniesPage() {
 
   useEffect(() => {
     if (showDetail && detailTab === 'users') {
-      fetchTenantUsers(showDetail.id, tenantUserPage);
+      fetchTenantUsers(showDetail.id, tenantUserPage, tenantUserSearch, tenantUserRole);
     }
-  }, [detailTab, showDetail, fetchTenantUsers, tenantUserPage]);
+  }, [detailTab, showDetail, fetchTenantUsers, tenantUserPage, tenantUserSearch, tenantUserRole]);
 
-  // Reset user page when switching to a different company
+  // Reset filters/page when switching to a different company
   useEffect(() => {
     setTenantUserPage(1);
+    setTenantUserSearch('');
+    setTenantUserRole('');
   }, [showDetail?.id]);
 
   const handleExportTenant = async (company: Company) => {
@@ -522,7 +529,7 @@ export default function CompaniesPage() {
     try {
       await api.patch(`/companies/${showDetail.id}/users/${userId}/role`, { role: newRole });
       toast.success('Role updated successfully');
-      fetchTenantUsers(showDetail.id, tenantUserPage);
+      fetchTenantUsers(showDetail.id, tenantUserPage, tenantUserSearch, tenantUserRole);
     } catch (error: any) {
       toast.error(error.message || 'Failed to update role');
     } finally {
@@ -536,7 +543,7 @@ export default function CompaniesPage() {
       await api.delete(`/companies/${companyId}/users/${userId}`);
       toast.success('User deleted');
       setConfirmDeleteUser(null);
-      fetchTenantUsers(companyId, tenantUserPage);
+      fetchTenantUsers(companyId, tenantUserPage, tenantUserSearch, tenantUserRole);
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete user');
     } finally {
@@ -1670,9 +1677,33 @@ export default function CompaniesPage() {
                     <p className="text-sm text-muted-foreground">
                       {tenantUserMeta.total > 0 ? `${tenantUserMeta.total} users` : 'Assign roles to users in this tenant company'}
                     </p>
-                    <Button variant="outline" size="sm" onClick={() => fetchTenantUsers(showDetail.id, tenantUserPage)}>
+                    <Button variant="outline" size="sm" onClick={() => fetchTenantUsers(showDetail.id, tenantUserPage, tenantUserSearch, tenantUserRole)}>
                       <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
                     </Button>
+                  </div>
+
+                  {/* Search + Role Filter */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search by name or email..."
+                        value={tenantUserSearch}
+                        onChange={(e) => { setTenantUserSearch(e.target.value); setTenantUserPage(1); }}
+                        className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <select
+                      value={tenantUserRole}
+                      onChange={(e) => { setTenantUserRole(e.target.value); setTenantUserPage(1); }}
+                      className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="">All Roles</option>
+                      {ASSIGNABLE_ROLES.map((r) => (
+                        <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>
+                      ))}
+                    </select>
                   </div>
 
                   {usersLoading ? (
