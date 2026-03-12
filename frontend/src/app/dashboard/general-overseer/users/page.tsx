@@ -55,6 +55,7 @@ export default function UsersManagementPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -72,6 +73,7 @@ export default function UsersManagementPage() {
       params.append('limit', '20');
       if (search) params.append('search', search);
       if (roleFilter) params.append('role', roleFilter);
+      if (statusFilter) params.append('status', statusFilter);
 
       const res: any = await api.get(`/users?${params.toString()}`);
       const data = res?.data || res;
@@ -83,7 +85,7 @@ export default function UsersManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, roleFilter]);
+  }, [page, search, roleFilter, statusFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -146,6 +148,17 @@ export default function UsersManagementPage() {
                 {ROLES.map((r) => (
                   <SelectItem key={r} value={r}>{r}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v === 'ALL' ? '' : v); setPage(1); }}>
+              <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Status</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="INACTIVE">Inactive</SelectItem>
+                <SelectItem value="SUSPENDED">Suspended</SelectItem>
               </SelectContent>
             </Select>
           </div>

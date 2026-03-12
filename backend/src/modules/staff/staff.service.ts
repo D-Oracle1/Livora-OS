@@ -427,6 +427,11 @@ export class StaffService {
     if (updateStaffDto.lastName) userUpdate.lastName = updateStaffDto.lastName;
     if (updateStaffDto.phone) userUpdate.phone = updateStaffDto.phone;
 
+    // Sync user.status when isActive changes
+    if (typeof updateStaffDto.isActive === 'boolean') {
+      userUpdate.status = updateStaffDto.isActive ? UserStatus.ACTIVE : UserStatus.INACTIVE;
+    }
+
     // If department is changing, also update the user's role to match new department
     if (updateStaffDto.departmentId && updateStaffDto.departmentId !== staff.departmentId) {
       const newDept = await this.prisma.department.findUnique({
@@ -446,7 +451,11 @@ export class StaffService {
     if (updateStaffDto.departmentId) staffUpdate.departmentId = updateStaffDto.departmentId;
     if (updateStaffDto.managerId !== undefined) staffUpdate.managerId = updateStaffDto.managerId;
     if (updateStaffDto.baseSalary) staffUpdate.baseSalary = updateStaffDto.baseSalary;
-    if (typeof updateStaffDto.isActive === 'boolean') staffUpdate.isActive = updateStaffDto.isActive;
+    if (typeof updateStaffDto.isActive === 'boolean') {
+      staffUpdate.isActive = updateStaffDto.isActive;
+      // Clear terminationDate when reactivating
+      if (updateStaffDto.isActive === true) staffUpdate.terminationDate = null;
+    }
     if (updateStaffDto.terminationDate) staffUpdate.terminationDate = new Date(updateStaffDto.terminationDate);
     if (updateStaffDto.annualLeaveBalance !== undefined) staffUpdate.annualLeaveBalance = updateStaffDto.annualLeaveBalance;
     if (updateStaffDto.sickLeaveBalance !== undefined) staffUpdate.sickLeaveBalance = updateStaffDto.sickLeaveBalance;

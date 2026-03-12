@@ -186,6 +186,7 @@ function AdminStaffPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState(searchParams.get('department') || 'all');
   const [positionFilter, setPositionFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [meta, setMeta] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -236,6 +237,7 @@ function AdminStaffPage() {
       if (searchQuery) params.append('search', searchQuery);
       if (departmentFilter !== 'all') params.append('departmentId', departmentFilter);
       if (positionFilter !== 'all') params.append('position', positionFilter.toUpperCase());
+      if (statusFilter !== 'all') params.append('isActive', statusFilter === 'active' ? 'true' : 'false');
 
       const response = await api.get<any>(`/staff?${params.toString()}`);
       // Backend wraps response as { success, data: [...], meta: {...}, timestamp }
@@ -262,7 +264,7 @@ function AdminStaffPage() {
     } finally {
       setLoading(false);
     }
-  }, [meta.page, searchQuery, departmentFilter, positionFilter]);
+  }, [meta.page, searchQuery, departmentFilter, positionFilter, statusFilter]);
 
   const fetchDepartments = useCallback(async () => {
     try {
@@ -677,6 +679,16 @@ function AdminStaffPage() {
             <SelectItem value="senior">Senior</SelectItem>
             <SelectItem value="junior">Junior</SelectItem>
             <SelectItem value="intern">Intern</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
           </SelectContent>
         </Select>
       </div>
