@@ -151,8 +151,9 @@ export default function RolesPage() {
   const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.get<Role[]>('/roles');
-      setRoles(data);
+      const raw = await api.get<any>('/roles');
+      const data = raw?.data ?? raw;
+      setRoles(Array.isArray(data) ? data : []);
     } catch {
       toast.error('Failed to load roles');
     } finally {

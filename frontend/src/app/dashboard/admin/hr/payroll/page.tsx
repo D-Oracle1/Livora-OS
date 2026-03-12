@@ -284,6 +284,19 @@ export default function AdminPayrollPage() {
     }
   };
 
+  const handleRecalculate = async (record: PayrollRecord) => {
+    setActionLoading(record.id);
+    try {
+      await api.post(`/hr/payroll/${record.id}/recalculate`, {});
+      toast.success('Payroll recalculated with current settings');
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to recalculate payroll');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const downloadPeriodReport = (period: { period: string; records: PayrollRecord[]; totalGross: number; totalDeductions: number; totalNet: number; staffCount: number }) => {
     const fmt = (n: number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(n);
     const rows = period.records.map((r) =>
@@ -663,20 +676,33 @@ export default function AdminPayrollPage() {
                         <TableCell>{getStatusBadge(record.status)}</TableCell>
                         <TableCell className="text-right">
                           {(record.status === 'DRAFT' || record.status === 'PENDING_APPROVAL') && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1"
-                              onClick={() => handleApprove(record)}
-                              disabled={actionLoading === record.id}
-                            >
-                              {actionLoading === record.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <CheckCircle2 className="w-4 h-4" />
-                              )}
-                              Approve
-                            </Button>
+                            <div className="flex gap-1 justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={() => handleRecalculate(record)}
+                                disabled={actionLoading === record.id}
+                                title="Recalculate using current settings, allowances & penalties"
+                              >
+                                <RefreshCw className="w-4 h-4" />
+                                Recalc
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={() => handleApprove(record)}
+                                disabled={actionLoading === record.id}
+                              >
+                                {actionLoading === record.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="w-4 h-4" />
+                                )}
+                                Approve
+                              </Button>
+                            </div>
                           )}
                           {record.status === 'APPROVED' && (
                             <Button

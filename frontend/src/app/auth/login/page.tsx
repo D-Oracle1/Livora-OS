@@ -145,8 +145,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-dvh flex items-center justify-center bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900 p-4 relative overflow-hidden">
+      {/* Floating bubbles */}
+      {[
+        { size: 48, left: '8%',  delay: '0s',   duration: '12s', color: 'hsl(var(--primary)/0.12)' },
+        { size: 28, left: '20%', delay: '3s',   duration: '15s', color: 'hsl(var(--accent)/0.15)' },
+        { size: 64, left: '35%', delay: '1.5s', duration: '18s', color: 'hsl(var(--primary)/0.08)' },
+        { size: 20, left: '55%', delay: '5s',   duration: '11s', color: 'hsl(var(--primary)/0.14)' },
+        { size: 40, left: '70%', delay: '2s',   duration: '14s', color: 'hsl(var(--accent)/0.10)' },
+        { size: 32, left: '85%', delay: '7s',   duration: '16s', color: 'hsl(var(--primary)/0.10)' },
+        { size: 18, left: '92%', delay: '4s',   duration: '13s', color: 'hsl(var(--accent)/0.12)' },
+      ].map((b, i) => (
+        <div
+          key={i}
+          className="bubble"
+          style={{
+            width: b.size,
+            height: b.size,
+            left: b.left,
+            animationDelay: b.delay,
+            animationDuration: b.duration,
+            background: b.color,
+          }}
+        />
+      ))}
+      <Card className="w-full max-w-md relative z-10">
         <CardHeader className="text-center">
           {branding.logo ? (
             <img

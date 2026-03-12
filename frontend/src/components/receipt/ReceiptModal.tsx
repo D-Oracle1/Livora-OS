@@ -40,10 +40,28 @@ export function ReceiptModal({ open, onClose, data, branding }: ReceiptModalProp
       const html2canvas = (await import('html2canvas')).default;
       const jsPDF = (await import('jspdf')).default;
 
+      // Capture full scroll height — the dialog clips overflow so offsetHeight
+      // may be shorter than the actual receipt content.
+      const fullHeight = receiptRef.current.scrollHeight;
+
       const canvas = await html2canvas(receiptRef.current, {
         scale: 2,
         useCORS: true,
         logging: false,
+        backgroundColor: '#ffffff',
+        height: fullHeight,
+        onclone: (_doc, element) => {
+          // Force light-mode colors and remove overflow constraints so the
+          // full receipt (including footer) is rendered in the cloned doc.
+          element.style.color = '#111111';
+          element.style.background = '#ffffff';
+          element.style.overflow = 'visible';
+          element.style.height = fullHeight + 'px';
+          // Also unlock the immediate wrapper (.border.rounded-lg.overflow-hidden)
+          if (element.parentElement) {
+            element.parentElement.style.overflow = 'visible';
+          }
+        },
       });
 
       const imgData = canvas.toDataURL('image/png');

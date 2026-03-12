@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   TrendingUp, TrendingDown, DollarSign, AlertCircle,
   ArrowRight, Receipt, Tag, BarChart3, BookOpen, Clock,
-  Percent, Scale, Waves, Lightbulb, ShieldAlert, RefreshCw,
+  Percent, Scale, Waves, Lightbulb, ShieldAlert, RefreshCw, Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,9 +45,10 @@ export default function AccountingOverviewPage() {
   const [recentExpenses, setRecentExpenses] = useState<any[]>([]);
   const [anomalies, setAnomalies]       = useState<any[]>([]);
   const [insights, setInsights]         = useState<any[]>([]);
-  const [trendWindow, setTrendWindow]   = useState<TrendWindow>(6);
-  const [loading, setLoading]           = useState(true);
-  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendWindow, setTrendWindow]         = useState<TrendWindow>(6);
+  const [loading, setLoading]                 = useState(true);
+  const [trendLoading, setTrendLoading]       = useState(false);
+  const [recalculating, setRecalculating]     = useState(false);
 
   const fetchCore = useCallback(async () => {
     try {
@@ -68,6 +69,25 @@ export default function AccountingOverviewPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleRecalculate = async () => {
+    if (!confirm('Recalculate all commission & tax figures from current rate settings? This updates every approved sale and payment record.')) return;
+    setRecalculating(true);
+    try {
+      const res = await api.post<any>('/accounting/recalculate-financials', {});
+      const d = res?.data ?? res;
+      const msg = d?.message ?? `Updated ${d?.updatedSales ?? 0} sales, ${d?.updatedPayments ?? 0} payments`;
+      const { toast: t } = await import('sonner');
+      t.success(msg);
+      await fetchCore();
+      await fetchTrend(trendWindow);
+    } catch (e: any) {
+      const { toast: t } = await import('sonner');
+      t.error(e?.message ?? 'Recalculation failed');
+    } finally {
+      setRecalculating(false);
+    }
+  };
 
   const fetchTrend = useCallback(async (months: TrendWindow) => {
     setTrendLoading(true);
@@ -145,6 +165,10 @@ export default function AccountingOverviewPage() {
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={() => { fetchCore(); fetchTrend(trendWindow); }}>
             <RefreshCw className="w-4 h-4" /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={handleRecalculate} disabled={recalculating}>
+            {recalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Recalculate
           </Button>
           <Link href="/dashboard/admin/accounting/expenses">
             <Button size="sm" className="gap-2">

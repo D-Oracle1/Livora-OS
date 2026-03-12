@@ -279,15 +279,15 @@ export default function ProfitLossPage() {
                 <p className="text-xs text-gray-400 mt-1">Generated: {new Date().toLocaleString()}</p>
               </div>
 
-              {/* Income — cash basis */}
+              {/* Income */}
               <section className="mb-6">
                 <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Income</h3>
-                <p className="text-xs text-gray-400 mb-3">Cash basis — revenue recognised when cash is received</p>
+                <p className="text-xs text-gray-400 mb-3">All approved sales (completed &amp; in-progress) by sale date</p>
                 {(data.revenue?.fullPaymentSales ?? 0) > 0 && (
                   <PLRow label={`Full Payment Sales (${data.revenue?.fullSalesCount ?? 0})`} value={data.revenue?.fullPaymentSales ?? 0} indent />
                 )}
-                {(data.revenue?.installmentPayments ?? 0) > 0 && (
-                  <PLRow label={`Instalment Payments Received (${data.revenue?.installmentPaymentsCount ?? 0})`} value={data.revenue?.installmentPayments ?? 0} indent />
+                {(data.revenue?.installmentSales ?? 0) > 0 && (
+                  <PLRow label={`Instalment Sales (${data.revenue?.installmentSalesCount ?? 0})`} value={data.revenue?.installmentSales ?? 0} indent />
                 )}
                 <PLDivider />
                 <PLRow label="Total Revenue" value={data.revenue?.total ?? 0} bold />
@@ -334,13 +334,13 @@ export default function ProfitLossPage() {
                 </span>
               </div>
 
-              {/* Revenue Detail — cash basis: full sales + installment payments */}
+              {/* Revenue Detail */}
               {(data.salesDetail ?? []).length > 0 && (
                 <section className="mt-8">
                   <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">
-                    Revenue Detail ({data.salesDetail.length} transactions)
+                    Revenue Detail ({data.salesDetail.length} sales)
                   </h3>
-                  <p className="text-xs text-gray-400 mb-3">Cash basis — full sales and installment payments received in period</p>
+                  <p className="text-xs text-gray-400 mb-3">All approved sales in period — full plan and instalment</p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs border border-gray-200 rounded">
                       <thead className="bg-gray-50">
@@ -349,7 +349,7 @@ export default function ProfitLossPage() {
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Type</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Property</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Realtor</th>
-                          <th className="text-right px-3 py-2 font-medium text-gray-600">Amount</th>
+                          <th className="text-right px-3 py-2 font-medium text-gray-600">Revenue</th>
                           <th className="text-right px-3 py-2 font-medium text-gray-600">Commission</th>
                           <th className="text-right px-3 py-2 font-medium text-gray-600">Tax</th>
                         </tr>
@@ -360,16 +360,21 @@ export default function ProfitLossPage() {
                             <td className="px-3 py-2 text-gray-500">{new Date(s.date).toLocaleDateString()}</td>
                             <td className="px-3 py-2">
                               <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                                s.type === 'INSTALLMENT_PAYMENT'
+                                s.type === 'INSTALLMENT_SALE'
                                   ? 'bg-blue-100 text-blue-700'
                                   : 'bg-green-100 text-green-700'
                               }`}>
-                                {s.type === 'INSTALLMENT_PAYMENT' ? 'Instalment' : 'Full Sale'}
+                                {s.type === 'INSTALLMENT_SALE' ? 'Instalment' : 'Full Sale'}
                               </span>
                             </td>
                             <td className="px-3 py-2 text-gray-700 max-w-[130px] truncate">{s.property}</td>
                             <td className="px-3 py-2 text-gray-600">{s.realtor}</td>
-                            <td className="px-3 py-2 text-right font-medium">{formatCurrency(s.salePrice)}</td>
+                            <td className="px-3 py-2 text-right font-medium">
+                              {formatCurrency(s.type === 'INSTALLMENT_SALE' ? s.totalPaid : s.salePrice)}
+                              {s.type === 'INSTALLMENT_SALE' && s.salePrice !== s.totalPaid && (
+                                <span className="block text-xs text-gray-400">of {formatCurrency(s.salePrice)}</span>
+                              )}
+                            </td>
                             <td className="px-3 py-2 text-right text-red-600">{formatCurrency(s.commission)}</td>
                             <td className="px-3 py-2 text-right text-red-600">{formatCurrency(s.tax)}</td>
                           </tr>

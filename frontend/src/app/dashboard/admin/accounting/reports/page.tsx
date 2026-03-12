@@ -407,7 +407,7 @@ export default function ReportsPage() {
                         <th className="text-left px-4 py-3 text-gray-600 font-medium">Property</th>
                         <th className="text-left px-4 py-3 text-gray-600 font-medium">Realtor</th>
                         <th className="text-left px-4 py-3 text-gray-600 font-medium">Client</th>
-                        <th className="text-right px-4 py-3 text-gray-600 font-medium">Sale Price</th>
+                        <th className="text-right px-4 py-3 text-gray-600 font-medium">Amount Received</th>
                         <th className="text-right px-4 py-3 text-gray-600 font-medium">Commission</th>
                         <th className="text-right px-4 py-3 text-gray-600 font-medium">Tax</th>
                         <th className="text-left px-4 py-3 text-gray-600 font-medium">Plan</th>

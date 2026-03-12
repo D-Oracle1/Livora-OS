@@ -69,6 +69,7 @@ interface TaskComment {
   content: string;
   attachments: string[];
   createdAt: string;
+  author?: { firstName: string; lastName: string; avatar: string | null } | null;
 }
 
 interface TaskDetail {
@@ -680,6 +681,11 @@ export default function TasksPage() {
                     <div className="space-y-3 mb-4 max-h-[200px] overflow-y-auto">
                       {detailTask.comments.map((comment) => (
                         <div key={comment.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                          {comment.author && (
+                            <p className="text-xs font-medium mb-1">
+                              {comment.author.firstName} {comment.author.lastName}
+                            </p>
+                          )}
                           <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
                           <p className="text-xs text-muted-foreground mt-1.5">
                             {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at{' '}

@@ -153,7 +153,7 @@ export default function RealtorSettingsPage() {
 
       const data = await response.json();
       const userData = data.data || data;
-      const avatarPath = userData.avatar;
+      const avatarPath = userData.url || userData.avatar;
       if (avatarPath) {
         const fullUrl = getImageUrl(avatarPath);
         setAvatarUrl(fullUrl);

@@ -277,7 +277,7 @@ export default function HomePage() {
 
             {/* Right: Hero Image Carousel */}
             {sideImages.length > 0 && (
-              <div className="hidden lg:flex justify-center items-center">
+              <div className="flex justify-center items-center mt-8 lg:mt-0">
                 <div className="relative w-full max-w-lg aspect-square">
                   {/* Slides */}
                   {sideImages.map((src, idx) => (
@@ -568,8 +568,13 @@ export default function HomePage() {
                   const raw = about.content || '';
                   const plain = raw.replace(/<[^>]+>/g, '').trim();
                   const fallback = 'Your trusted partner in real estate. We are dedicated to helping you find the perfect property and providing exceptional service every step of the way.';
-                  const text = plain || fallback;
-                  return <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed text-base text-justify">{text}</p>;
+                  const full = plain || fallback;
+                  // Excerpt: up to 320 chars, break at last space before limit
+                  const limit = 320;
+                  const excerpt = full.length > limit
+                    ? full.slice(0, full.lastIndexOf(' ', limit)) + '…'
+                    : full;
+                  return <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed text-base text-justify">{excerpt}</p>;
                 })()}
                 {about.items && about.items.length > 0 && (
                   <div className="space-y-3 mb-8">

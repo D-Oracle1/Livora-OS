@@ -122,11 +122,12 @@ export default function PropertiesPage() {
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<PropertyForm>({ ...emptyForm });
-  const [areaUnit, setAreaUnit] = useState<AreaUnit>('sqm');
+  const [areaUnit, setAreaUnit] = useState<AreaUnit>('plot');
 
   // Edit form state
   const [editFormData, setEditFormData] = useState<PropertyForm>({ ...emptyForm });
-  const [editAreaUnit, setEditAreaUnit] = useState<AreaUnit>('sqm');
+  const [editAreaUnit, setEditAreaUnit] = useState<AreaUnit>('plot');
+  const [editStatus, setEditStatus] = useState<string>('AVAILABLE');
   const [editUploadedImages, setEditUploadedImages] = useState<string[]>([]);
   const [editImageFiles, setEditImageFiles] = useState<File[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -274,7 +275,7 @@ export default function PropertiesPage() {
       toast.success('Property created successfully');
       setIsAddDialogOpen(false);
       setFormData({ ...emptyForm });
-      setAreaUnit('sqm');
+      setAreaUnit('plot');
       setUploadedImages([]);
       setImageFiles([]);
       fetchProperties();
@@ -287,6 +288,11 @@ export default function PropertiesPage() {
 
   const openEditDialog = (property: any) => {
     setEditingProperty(property);
+    // For LAND with plots, show numberOfPlots in the area field (unit = plot).
+    // For everything else, show the stored sqm value (unit = sqm).
+    // This prevents the edit form from treating sqm area as a plot count,
+    // which would produce totalPrice = pricePerPlot × (area_in_sqm) → overflow.
+    const isLandWithPlots = property.type === 'LAND' && property.numberOfPlots > 0;
     setEditFormData({
       title: property.title || '',
       address: property.address || '',
@@ -298,11 +304,12 @@ export default function PropertiesPage() {
       type: property.type || 'LAND',
       beds: String(property.bedrooms || ''),
       baths: String(property.bathrooms || ''),
-      sqft: String(property.area || ''),
+      sqft: isLandWithPlots ? String(property.numberOfPlots) : String(property.area || ''),
       description: property.description || '',
     });
     setExistingImages(property.images || []);
-    setEditAreaUnit('sqm');
+    setEditAreaUnit(isLandWithPlots ? 'plot' : 'sqm');
+    setEditStatus(property.status || 'AVAILABLE');
     setEditUploadedImages([]);
     setEditImageFiles([]);
     setError(null);
@@ -358,6 +365,8 @@ export default function PropertiesPage() {
         area: areaInSqm,
         description: editFormData.description || undefined,
         images: allImages,
+        status: editStatus,
+        isListed: editStatus === 'AVAILABLE' || editStatus === 'LISTED',
       };
 
       if (isLand) {
@@ -606,6 +615,25 @@ export default function PropertiesPage() {
             )}
           </div>
         </div>
+
+        {/* Status (edit mode only) */}
+        {existingImgs !== undefined && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Status</label>
+            <select
+              className="w-full px-3 py-2 border rounded-md text-sm"
+              value={editStatus}
+              onChange={(e) => setEditStatus(e.target.value)}
+            >
+              <option value="AVAILABLE">For Sale (Available)</option>
+              <option value="LISTED">Listed</option>
+              <option value="PENDING">Pending</option>
+              <option value="UNDER_CONTRACT">Under Contract</option>
+              <option value="SOLD">Sold</option>
+              <option value="OFF_MARKET">Off Market</option>
+            </select>
+          </div>
+        )}
 
         {/* Description */}
         <div className="space-y-2">

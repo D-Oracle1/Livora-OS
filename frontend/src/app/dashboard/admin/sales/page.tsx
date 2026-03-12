@@ -24,20 +24,28 @@ import {
   Clock,
   AlertCircle,
   Banknote,
+  Plus,
+  Home,
+  LandPlot,
+  Users,
+  ChevronLeft,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { formatCurrency, formatDate, getTierBgClass, formatArea } from '@/lib/utils';
+import { formatCurrency, formatDate, getTierBgClass, formatArea, type AreaUnit, AREA_UNITS, toSqm, fromSqm } from '@/lib/utils';
+import { AreaUnitSelect } from '@/components/area-unit-select';
 import { api } from '@/lib/api';
 import { ReceiptModal, ReceiptData } from '@/components/receipt';
 import { toast } from 'sonner';
@@ -49,6 +57,7 @@ interface Sale {
   id: number | string;
   property: string;
   propertyType: string;
+  propertyAddress: string;
   buyer: string;
   buyerEmail: string;
   buyerPhone: string;
@@ -91,6 +100,26 @@ export default function SalesPage() {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
 
+  // Report sale state
+  const [showReportSale, setShowReportSale] = useState(false);
+  const [reportStep, setReportStep] = useState<'property' | 'form'>('property');
+  const [reportProperties, setReportProperties] = useState<any[]>([]);
+  const [reportPropertiesLoading, setReportPropertiesLoading] = useState(false);
+  const [reportPropertySearch, setReportPropertySearch] = useState('');
+  const [reportSelectedProperty, setReportSelectedProperty] = useState<any>(null);
+  const [reportRealtors, setReportRealtors] = useState<{ id: string; user: { firstName: string; lastName: string } }[]>([]);
+  const [reportAttribution, setReportAttribution] = useState<'REALTOR' | 'COMPANY'>('REALTOR');
+  const [reportSelectedRealtorId, setReportSelectedRealtorId] = useState('');
+  const [reportAreaUnit, setReportAreaUnit] = useState<AreaUnit>('plot');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportForm, setReportForm] = useState({
+    buyerFirstName: '', buyerLastName: '', buyerEmail: '', buyerPhone: '',
+    sqmSold: '', pricePerSqm: '', totalAmount: '', notes: '',
+    paymentMethod: 'BANK_TRANSFER', paymentPlan: 'FULL' as 'FULL' | 'INSTALLMENT',
+    numberOfInstallments: '2', firstPaymentAmount: '',
+    saleDate: new Date().toISOString().split('T')[0],
+  });
+
   const fetchSales = useCallback(async () => {
     try {
       const response: any = await api.get('/sales?page=1&limit=500');
@@ -99,16 +128,20 @@ export default function SalesPage() {
       const items = Array.isArray(wrapped) ? wrapped : (wrapped?.data || []);
       const mapped: Sale[] = items.map((s: any) => ({
         id: s.id,
-        property: s.property?.title || 'Unknown Property',
-        propertyType: s.property?.type || 'Unknown',
-        buyer: `${s.client?.user?.firstName || ''} ${s.client?.user?.lastName || ''}`.trim() || 'Unknown',
+        property: s.property?.title || '',
+        propertyType: s.property?.type || 'Land',
+        propertyAddress: s.property?.address || s.property?.city || '',
+        buyer: `${s.client?.user?.firstName || ''} ${s.client?.user?.lastName || ''}`.trim() || '',
         buyerEmail: s.client?.user?.email || '',
         buyerPhone: s.client?.user?.phone || '',
-        buyerAddress: s.property?.address || s.property?.city || '',
+        buyerAddress: s.client?.address || s.client?.city || '',
         realtor: s.realtorId ? (`${s.realtor?.user?.firstName || ''} ${s.realtor?.user?.lastName || ''}`.trim() || 'Unknown') : 'Company',
         realtorEmail: s.realtor?.user?.email || '',
         realtorTier: s.realtorId ? (s.realtor?.loyaltyTier || 'BRONZE') : '',
-        amount: Number(s.salePrice) || 0,
+        // For installment sales report on how much has been paid, not the full contract value
+        amount: s.paymentPlan === 'INSTALLMENT'
+          ? (Number(s.totalPaid) || 0)
+          : (Number(s.salePrice) || 0),
         commission: Number(s.commissionAmount) || 0,
         plotsSold: 1,
         sqmSold: Number(s.areaSold) || 0,
@@ -232,6 +265,21 @@ export default function SalesPage() {
     }
   };
 
+  const handleDeleteSale = async (saleId: number | string) => {
+    if (!confirm('Permanently delete this cancelled sale? This cannot be undone.')) return;
+    setProcessingId(saleId);
+    try {
+      await api.delete(`/sales/${saleId}`);
+      toast.success('Sale permanently deleted.');
+      await fetchSales();
+      setShowSaleDetail(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete sale.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const openRecordPayment = (sale: Sale) => {
     setPaymentSale(sale);
     setPaymentAmount('');
@@ -280,7 +328,7 @@ export default function SalesPage() {
   const generateReceipt = (sale: Sale) => {
     const receipt: ReceiptData = {
       type: 'sale',
-      receiptNumber: `SALE-${sale.id.toString().padStart(6, '0')}`,
+      receiptNumber: `ELNG-${new Date(sale.date || Date.now()).getFullYear().toString().slice(-2)}-${sale.id.toString().replace(/-/g, '').slice(0, 8).toUpperCase()}`,
       date: sale.date,
       seller: {
         name: companyName,
@@ -294,24 +342,24 @@ export default function SalesPage() {
       },
       property: {
         name: sale.property,
-        address: 'Lagos, Nigeria',
+        address: sale.propertyAddress || '',
         type: sale.propertyType,
       },
+      description: (() => { const qty = sale.plotsSold > 0 ? sale.plotsSold : 1; const isLand = (sale.propertyType || 'Land') === 'Land'; const unit = isLand ? (qty === 1 ? 'plot' : 'plots') : (qty === 1 ? 'unit' : 'units'); return `Purchase of ${qty} ${unit} of ${sale.propertyType || 'Land'} lying and situate at ${sale.property}${sale.propertyAddress ? `, ${sale.propertyAddress}` : ''}.`; })(),
+      realtorName: sale.realtor !== 'Company' ? sale.realtor : undefined,
       items: [
         {
-          description: `Property Sale: ${sale.property}${sale.propertyType === 'Land' ? ` (${sale.plotsSold} plots, ${formatArea(sale.sqmSold)})` : ''}`,
-          quantity: sale.propertyType === 'Land' ? sale.plotsSold : 1,
-          unitPrice: sale.propertyType === 'Land' && sale.plotsSold > 0 ? sale.amount / sale.plotsSold : sale.amount,
+          description: `Property Sale: ${sale.property}`,
+          quantity: sale.plotsSold > 0 ? sale.plotsSold : 1,
+          unitPrice: sale.plotsSold > 0 ? sale.amount / sale.plotsSold : sale.amount,
           amount: sale.amount,
         },
       ],
       subtotal: sale.amount,
-      fees: [
-        { label: `Realtor Commission (${((sale.commission / sale.amount) * 100).toFixed(1)}%)`, amount: sale.commission },
-      ],
+      fees: [],
       total: sale.amount,
       status: sale.status === 'COMPLETED' ? 'completed' : sale.status === 'CANCELLED' ? 'cancelled' : 'pending',
-      notes: `Realtor: ${sale.realtor} (${sale.realtorTier}) | Payment: ${sale.paymentMethod.replace('_', ' ')}${sale.notes ? ` | ${sale.notes}` : ''}`,
+      notes: sale.notes || undefined,
       ...(sale.paymentPlan === 'INSTALLMENT' ? {
         paymentHistory: sale.payments.map(p => ({
           number: p.number,
@@ -329,6 +377,109 @@ export default function SalesPage() {
 
     setReceiptData(receipt);
     setShowReceipt(true);
+  };
+
+  const openReportSaleDialog = async () => {
+    setReportStep('property');
+    setReportSelectedProperty(null);
+    setReportPropertySearch('');
+    setShowReportSale(true);
+    setReportPropertiesLoading(true);
+    try {
+      const res: any = await api.get('/properties?limit=200');
+      const wrapped = res?.data || res;
+      setReportProperties(Array.isArray(wrapped) ? wrapped : (wrapped?.data || []));
+    } catch { setReportProperties([]); }
+    finally { setReportPropertiesLoading(false); }
+    try {
+      const res: any = await api.get('/realtors/directory');
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+      setReportRealtors(list);
+    } catch { setReportRealtors([]); }
+  };
+
+  const selectReportProperty = (property: any) => {
+    setReportSelectedProperty(property);
+    const isLand = property.type === 'LAND';
+    const ppsqm = Number(property.pricePerSqm) || 0;
+    setReportAreaUnit('plot');
+    setReportAttribution('REALTOR');
+    setReportSelectedRealtorId('');
+    setReportForm({
+      buyerFirstName: '', buyerLastName: '', buyerEmail: '', buyerPhone: '',
+      sqmSold: String(property.area || 0),
+      pricePerSqm: String(ppsqm),
+      totalAmount: isLand && ppsqm > 0 ? String(ppsqm * (property.area || 0)) : String(Number(property.price) || 0),
+      notes: '', paymentMethod: 'BANK_TRANSFER', paymentPlan: 'FULL',
+      numberOfInstallments: '2', firstPaymentAmount: '',
+      saleDate: new Date().toISOString().split('T')[0],
+    });
+    setReportStep('form');
+  };
+
+  const updateReportForm = (field: string, value: string) => {
+    setReportForm(prev => {
+      const updated = { ...prev, [field]: value };
+      if (reportSelectedProperty?.type === 'LAND' && (field === 'sqmSold' || field === 'pricePerSqm')) {
+        const sqm = parseFloat(field === 'sqmSold' ? value : updated.sqmSold) || 0;
+        const price = parseFloat(field === 'pricePerSqm' ? value : updated.pricePerSqm) || 0;
+        updated.totalAmount = (sqm * price).toString();
+      }
+      return updated;
+    });
+  };
+
+  const handleReportAreaUnitChange = (newUnit: AreaUnit) => {
+    const currentValue = parseFloat(reportForm.sqmSold) || 0;
+    if (currentValue > 0) {
+      const inSqm = toSqm(currentValue, reportAreaUnit);
+      const converted = fromSqm(inSqm, newUnit);
+      setReportForm(prev => ({ ...prev, sqmSold: converted % 1 === 0 ? String(converted) : converted.toFixed(2) }));
+    }
+    setReportAreaUnit(newUnit);
+  };
+
+  const handleSubmitReportSale = async () => {
+    if (reportAttribution === 'REALTOR' && !reportSelectedRealtorId) {
+      toast.error('Please select a realtor to attribute this sale to'); return;
+    }
+    if (!reportForm.buyerFirstName || !reportForm.buyerLastName || !reportForm.buyerEmail) {
+      toast.error('Please fill in buyer name and email'); return;
+    }
+    if (!reportForm.totalAmount || parseFloat(reportForm.totalAmount) <= 0) {
+      toast.error('Please enter a sale amount'); return;
+    }
+    if (reportForm.paymentPlan === 'INSTALLMENT' && (parseFloat(reportForm.firstPaymentAmount) || 0) <= 0) {
+      toast.error('Please enter a first payment amount'); return;
+    }
+    setReportSubmitting(true);
+    try {
+      const payload: any = {
+        clientName: `${reportForm.buyerFirstName} ${reportForm.buyerLastName}`,
+        clientEmail: reportForm.buyerEmail,
+        clientContact: reportForm.buyerPhone || undefined,
+        propertyId: reportSelectedProperty.id,
+        saleValue: parseFloat(reportForm.totalAmount),
+        saleDate: reportForm.saleDate,
+        notes: reportForm.notes || undefined,
+        paymentPlan: reportForm.paymentPlan,
+        paymentMethod: reportForm.paymentMethod || undefined,
+        areaSold: toSqm(parseFloat(reportForm.sqmSold) || 0, reportAreaUnit) || undefined,
+        ...(reportAttribution === 'REALTOR' && reportSelectedRealtorId ? { realtorId: reportSelectedRealtorId } : {}),
+      };
+      if (reportForm.paymentPlan === 'INSTALLMENT') {
+        payload.numberOfInstallments = parseInt(reportForm.numberOfInstallments) || 2;
+        payload.firstPaymentAmount = parseFloat(reportForm.firstPaymentAmount) || 0;
+      }
+      await api.post('/sales', payload);
+      toast.success('Sale reported successfully!');
+      setShowReportSale(false);
+      fetchSales();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to report sale');
+    } finally {
+      setReportSubmitting(false);
+    }
   };
 
   const handleExportAll = () => {
@@ -379,9 +530,13 @@ export default function SalesPage() {
       <div className="flex flex-wrap gap-4 justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Sales Management</h1>
-          <p className="text-sm text-muted-foreground">Sales reported by realtors</p>
+          <p className="text-sm text-muted-foreground">View, approve and report sales</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <Button className="bg-primary hover:bg-primary/90 gap-2" onClick={openReportSaleDialog}>
+            <Plus className="w-4 h-4" />
+            Report Sale
+          </Button>
           {['month', 'quarter', 'year', 'all'].map((p) => (
             <Button
               key={p}
@@ -551,49 +706,49 @@ export default function SalesPage() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1200px]">
+              <table className="w-full min-w-[1100px]">
                 <thead>
                   <tr className="text-left text-sm text-muted-foreground border-b">
-                    <th className="pb-4 font-medium w-[200px]">Property</th>
-                    <th className="pb-4 font-medium w-[130px]">Buyer</th>
-                    <th className="pb-4 font-medium w-[130px]">Reported By</th>
-                    <th className="pb-4 font-medium text-center w-[90px]">Qty</th>
-                    <th className="pb-4 font-medium text-right w-[120px]">Amount</th>
-                    <th className="pb-4 font-medium text-right w-[100px]">Commission</th>
-                    <th className="pb-4 font-medium text-center w-[90px]">Plan</th>
-                    <th className="pb-4 font-medium text-center w-[90px]">Date</th>
-                    <th className="pb-4 font-medium text-center w-[90px]">Status</th>
-                    <th className="pb-4 font-medium text-center w-[130px]">Actions</th>
+                    <th className="pb-4 pr-4 font-medium w-[220px]">Property</th>
+                    <th className="pb-4 pr-4 font-medium w-[150px]">Buyer</th>
+                    <th className="pb-4 pr-4 font-medium w-[140px]">Reported By</th>
+                    <th className="pb-4 pr-4 font-medium text-center w-[90px]">Qty</th>
+                    <th className="pb-4 pr-4 font-medium text-right w-[120px]">Amount</th>
+                    <th className="pb-4 pr-4 font-medium text-right w-[110px]">Commission</th>
+                    <th className="pb-4 pr-4 font-medium text-center w-[90px]">Plan</th>
+                    <th className="pb-4 pr-4 font-medium text-center w-[90px]">Date</th>
+                    <th className="pb-4 pr-4 font-medium text-center w-[90px]">Status</th>
+                    <th className="pb-4 font-medium text-center w-[120px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredSales.map((sale) => (
                     <tr key={sale.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer" onClick={() => openSaleDetail(sale)}>
-                      <td className="py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <td className="py-4 pr-4 align-top">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                             <Building2 className="w-5 h-5 text-primary" />
                           </div>
-                          <div className="min-w-0">
-                            <p className="font-medium text-sm truncate" title={sale.property}>{sale.property}</p>
-                            <p className="text-xs text-muted-foreground">{sale.propertyType}</p>
+                          <div>
+                            <p className="font-medium text-sm leading-snug">{sale.property}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{sale.propertyType}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4">
-                        <p className="text-sm font-medium truncate" title={sale.buyer}>{sale.buyer}</p>
-                        <p className="text-xs text-muted-foreground">{sale.buyerPhone}</p>
+                      <td className="py-4 pr-4 align-top">
+                        <p className="text-sm font-medium leading-snug">{sale.buyer}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{sale.buyerPhone}</p>
                       </td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="w-7 h-7 shrink-0">
+                      <td className="py-4 pr-4 align-top">
+                        <div className="flex items-start gap-2">
+                          <Avatar className="w-7 h-7 shrink-0 mt-0.5">
                             <AvatarFallback className="bg-primary text-white text-xs">
-                              {sale.realtor.split(' ').map((n: string) => n[0]).join('')}
+                              {sale.realtor.split(' ').filter(Boolean).map((n: string) => n[0]).join('')}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="min-w-0">
-                            <p className="text-sm truncate">{sale.realtor}</p>
-                            {sale.realtorTier && <Badge className={`${getTierBgClass(sale.realtorTier)} text-[10px]`}>{sale.realtorTier}</Badge>}
+                          <div>
+                            <p className="text-sm leading-snug">{sale.realtor}</p>
+                            {sale.realtorTier && <Badge className={`${getTierBgClass(sale.realtorTier)} text-[10px] mt-0.5`}>{sale.realtorTier}</Badge>}
                           </div>
                         </div>
                       </td>
@@ -607,9 +762,9 @@ export default function SalesPage() {
                           <span className="text-muted-foreground">1 unit</span>
                         )}
                       </td>
-                      <td className="py-4 font-semibold text-right">{formatCurrency(sale.amount)}</td>
-                      <td className="py-4 text-primary font-medium text-right">{formatCurrency(sale.commission)}</td>
-                      <td className="py-4 text-center">
+                      <td className="py-4 pr-4 font-semibold text-right align-top">{formatCurrency(sale.amount)}</td>
+                      <td className="py-4 pr-4 text-primary font-medium text-right align-top">{formatCurrency(sale.commission)}</td>
+                      <td className="py-4 pr-4 text-center align-top">
                         {sale.paymentPlan === 'INSTALLMENT' ? (
                           <div className="inline-flex flex-col items-center">
                             <Badge className={`${getBadgeColor(sale)} text-[10px] mb-1`}>
@@ -629,8 +784,8 @@ export default function SalesPage() {
                           <Badge variant="outline" className="text-[10px]">Full</Badge>
                         )}
                       </td>
-                      <td className="py-4 text-muted-foreground text-center text-sm">{formatDate(sale.date)}</td>
-                      <td className="py-4 text-center">
+                      <td className="py-4 pr-4 text-muted-foreground text-center text-sm align-top">{formatDate(sale.date)}</td>
+                      <td className="py-4 pr-4 text-center align-top">
                         <Badge className={
                           sale.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                           sale.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
@@ -680,6 +835,18 @@ export default function SalesPage() {
                               title="Record Payment"
                             >
                               <Banknote className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {sale.status === 'CANCELLED' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:bg-red-50 h-8 px-2"
+                              onClick={() => handleDeleteSale(sale.id)}
+                              disabled={processingId === sale.id}
+                              title="Delete permanently"
+                            >
+                              {processingId === sale.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                             </Button>
                           )}
                           <Button
@@ -939,6 +1106,20 @@ export default function SalesPage() {
                 )}
                 {selectedSale.status !== 'PENDING' && (
                   <div className="flex gap-2">
+                    {selectedSale.status === 'CANCELLED' && (
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleDeleteSale(selectedSale.id)}
+                        disabled={processingId === selectedSale.id}
+                      >
+                        {processingId === selectedSale.id ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <XCircle className="w-4 h-4 mr-2" />
+                        )}
+                        Delete Permanently
+                      </Button>
+                    )}
                     {selectedSale.paymentPlan === 'INSTALLMENT' && selectedSale.remainingBalance > 0 && (
                       <Button
                         className="bg-[#fca639] hover:bg-[#e8953a] text-white"
@@ -1047,6 +1228,278 @@ export default function SalesPage() {
                 >
                   {recordingPayment ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Banknote className="w-4 h-4 mr-2" />}
                   Record Payment
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Sale Dialog */}
+      <Dialog open={showReportSale} onOpenChange={setShowReportSale}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              {reportStep === 'property' ? 'Select Property' : 'Report Sale'}
+            </DialogTitle>
+            <DialogDescription>
+              {reportStep === 'property'
+                ? 'Choose a property to report a sale for'
+                : `Reporting sale for: ${reportSelectedProperty?.title}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {reportStep === 'property' ? (
+            <div className="space-y-4 py-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search properties..."
+                  className="pl-9"
+                  value={reportPropertySearch}
+                  onChange={(e) => setReportPropertySearch(e.target.value)}
+                />
+              </div>
+              {reportPropertiesLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+              ) : (
+                <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                  {reportProperties
+                    .filter(p => (p.title || '').toLowerCase().includes(reportPropertySearch.toLowerCase()) || (p.address || '').toLowerCase().includes(reportPropertySearch.toLowerCase()))
+                    .map((property) => {
+                      const isAvailable = property.status === 'AVAILABLE' || property.status === 'LISTED' || property.isListed;
+                      const Icon = property.type === 'LAND' ? LandPlot : property.type === 'COMMERCIAL' ? Building2 : Home;
+                      return (
+                        <button
+                          key={property.id}
+                          className="w-full flex items-center gap-3 p-3 rounded-lg border text-left hover:border-primary hover:bg-primary/5 transition-colors"
+                          onClick={() => selectReportProperty(property)}
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">
+                            <Icon className="w-5 h-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{property.title}</p>
+                            <p className="text-xs text-muted-foreground truncate">{property.address}{property.city ? `, ${property.city}` : ''}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-semibold text-primary">{formatCurrency(Number(property.price))}</p>
+                            <Badge variant={isAvailable ? 'success' : 'secondary'} className="text-[10px]">
+                              {isAvailable ? 'Available' : property.status}
+                            </Badge>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  {reportProperties.filter(p => (p.title || '').toLowerCase().includes(reportPropertySearch.toLowerCase())).length === 0 && !reportPropertiesLoading && (
+                    <p className="text-center text-muted-foreground py-6 text-sm">No properties found</p>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-5 py-2">
+              {/* Back button */}
+              <button
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground w-fit"
+                onClick={() => setReportStep('property')}
+              >
+                <ChevronLeft className="w-4 h-4" /> Back to property selection
+              </button>
+
+              {/* Property summary */}
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Building2 className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="font-semibold text-sm">{reportSelectedProperty?.title}</p>
+                    <p className="text-xs text-muted-foreground">{reportSelectedProperty?.type} · {formatCurrency(Number(reportSelectedProperty?.price))}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sale Attribution */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm flex items-center gap-2"><Users className="w-4 h-4" /> Sale Attribution *</h4>
+                <div className="flex gap-2">
+                  {(['REALTOR', 'COMPANY'] as const).map((attr) => (
+                    <button
+                      key={attr}
+                      type="button"
+                      onClick={() => setReportAttribution(attr)}
+                      className={`flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-all ${
+                        reportAttribution === attr
+                          ? attr === 'REALTOR' ? 'border-primary bg-primary/10 text-primary' : 'border-blue-600 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      {attr === 'REALTOR' ? 'Assign to Realtor' : 'Company Sale'}
+                    </button>
+                  ))}
+                </div>
+                {reportAttribution === 'REALTOR' ? (
+                  <select
+                    className="w-full px-3 py-2 border rounded-md text-sm"
+                    value={reportSelectedRealtorId}
+                    onChange={(e) => setReportSelectedRealtorId(e.target.value)}
+                  >
+                    <option value="">— Select a realtor —</option>
+                    {reportRealtors.map((r) => (
+                      <option key={r.id} value={r.id}>{r.user.firstName} {r.user.lastName}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+                    No commission or loyalty points will be awarded on company sales.
+                  </div>
+                )}
+              </div>
+
+              {/* Buyer Info */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm flex items-center gap-2"><User className="w-4 h-4" /> Buyer Information</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>First Name *</Label>
+                    <Input placeholder="First name" value={reportForm.buyerFirstName} onChange={(e) => updateReportForm('buyerFirstName', e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Last Name *</Label>
+                    <Input placeholder="Last name" value={reportForm.buyerLastName} onChange={(e) => updateReportForm('buyerLastName', e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email *</Label>
+                    <Input type="email" placeholder="buyer@email.com" value={reportForm.buyerEmail} onChange={(e) => updateReportForm('buyerEmail', e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Phone</Label>
+                    <Input placeholder="+234 xxx xxx xxxx" value={reportForm.buyerPhone} onChange={(e) => updateReportForm('buyerPhone', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sale Details */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm flex items-center gap-2"><DollarSign className="w-4 h-4" /> Sale Details</h4>
+
+                <div className="space-y-1">
+                  <Label>Date of Sale *</Label>
+                  <Input type="date" max={new Date().toISOString().split('T')[0]} value={reportForm.saleDate} onChange={(e) => updateReportForm('saleDate', e.target.value)} />
+                </div>
+
+                {/* Payment Plan */}
+                <div className="space-y-1">
+                  <Label>Payment Plan</Label>
+                  <div className="flex gap-2">
+                    {(['FULL', 'INSTALLMENT'] as const).map((plan) => (
+                      <button key={plan} type="button" onClick={() => updateReportForm('paymentPlan', plan)}
+                        className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                          reportForm.paymentPlan === plan
+                            ? plan === 'FULL' ? 'border-primary bg-primary/10 text-primary' : 'border-[#fca639] bg-[#fca639]/10 text-[#fca639]'
+                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        {plan === 'FULL' ? 'Full Payment' : 'Installment'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {reportForm.paymentPlan === 'INSTALLMENT' && (
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-[#fca639]/5 border border-[#fca639]/20 rounded-lg">
+                    <div className="space-y-1">
+                      <Label>Number of Installments</Label>
+                      <Input type="number" min="2" max="24" value={reportForm.numberOfInstallments} onChange={(e) => updateReportForm('numberOfInstallments', e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>First Payment (₦)</Label>
+                      <Input type="number" placeholder="First installment amount" value={reportForm.firstPaymentAmount} onChange={(e) => updateReportForm('firstPaymentAmount', e.target.value)} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Size Sold ({AREA_UNITS[reportAreaUnit].shortLabel})</Label>
+                    <div className="flex gap-2">
+                      <Input type="number" value={reportForm.sqmSold} onChange={(e) => updateReportForm('sqmSold', e.target.value)} className="flex-1" />
+                      <AreaUnitSelect value={reportAreaUnit} onChange={handleReportAreaUnitChange} />
+                    </div>
+                  </div>
+                  {reportSelectedProperty?.type === 'LAND' ? (
+                    <div className="space-y-1">
+                      <Label>Price per Plot (₦)</Label>
+                      <Input type="number" value={reportForm.pricePerSqm} onChange={(e) => updateReportForm('pricePerSqm', e.target.value)} />
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Label>Payment Method</Label>
+                      <select className="w-full px-3 py-2 border rounded-md text-sm" value={reportForm.paymentMethod} onChange={(e) => updateReportForm('paymentMethod', e.target.value)}>
+                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                        <option value="CASH">Cash</option>
+                        <option value="MORTGAGE">Mortgage</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Total Sale Amount (₦) *</Label>
+                    {reportSelectedProperty?.type === 'LAND' ? (
+                      <div className="px-3 py-2 bg-primary/10 border border-primary/20 rounded-md text-lg font-bold text-primary">
+                        {formatCurrency(parseFloat(reportForm.totalAmount) || 0)}
+                      </div>
+                    ) : (
+                      <Input type="number" value={reportForm.totalAmount} onChange={(e) => updateReportForm('totalAmount', e.target.value)} />
+                    )}
+                  </div>
+                  {reportSelectedProperty?.type === 'LAND' && (
+                    <div className="space-y-1">
+                      <Label>Payment Method</Label>
+                      <select className="w-full px-3 py-2 border rounded-md text-sm" value={reportForm.paymentMethod} onChange={(e) => updateReportForm('paymentMethod', e.target.value)}>
+                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                        <option value="CASH">Cash</option>
+                        <option value="MORTGAGE">Mortgage</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Notes (Optional)</Label>
+                  <textarea
+                    className="w-full px-3 py-2 border rounded-md min-h-16 resize-none text-sm"
+                    placeholder="Any additional notes..."
+                    value={reportForm.notes}
+                    onChange={(e) => updateReportForm('notes', e.target.value)}
+                  />
+                </div>
+
+                {/* Summary */}
+                <div className="p-3 bg-[#fca639]/10 border border-[#fca639]/20 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm">
+                      <p className="text-muted-foreground">{reportSelectedProperty?.title}</p>
+                      <p className="text-muted-foreground">Buyer: {reportForm.buyerFirstName} {reportForm.buyerLastName}</p>
+                      <p className="text-muted-foreground">
+                        Credited to:{' '}
+                        {reportAttribution === 'COMPANY' ? 'Company' : reportSelectedRealtorId
+                          ? `${reportRealtors.find(r => r.id === reportSelectedRealtorId)?.user.firstName} ${reportRealtors.find(r => r.id === reportSelectedRealtorId)?.user.lastName}`
+                          : '—'}
+                      </p>
+                    </div>
+                    <p className="text-xl font-bold text-primary">{formatCurrency(parseFloat(reportForm.totalAmount) || 0)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowReportSale(false)}>Cancel</Button>
+                <Button className="bg-primary hover:bg-primary/90" onClick={handleSubmitReportSale} disabled={reportSubmitting}>
+                  {reportSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  Submit Sale Report
                 </Button>
               </DialogFooter>
             </div>

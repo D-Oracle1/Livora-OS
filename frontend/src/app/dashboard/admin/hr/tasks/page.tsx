@@ -18,6 +18,10 @@ import {
   Edit,
   Trash2,
   MessageSquare,
+  FileText,
+  ExternalLink,
+  Paperclip,
+  Send,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +76,22 @@ interface Task {
   assignee: StaffMember;
   creator: StaffMember;
   _count?: { comments: number };
+}
+
+interface TaskComment {
+  id: string;
+  authorId: string;
+  content: string;
+  attachments: string[];
+  createdAt: string;
+  author?: { firstName: string; lastName: string; avatar: string | null } | null;
+}
+
+interface TaskDetail extends Task {
+  reportDescription: string | null;
+  reportLinks: string[];
+  attachments: string[];
+  comments: TaskComment[];
 }
 
 const PRIORITIES = [
@@ -133,6 +153,10 @@ export default function AdminTasksPage() {
 
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [sendingComment, setSendingComment] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -195,9 +219,37 @@ export default function AdminTasksPage() {
     setDialogOpen(true);
   };
 
-  const openViewDialog = (task: Task) => {
+  const openViewDialog = async (task: Task) => {
     setSelectedTask(task);
+    setTaskDetail(null);
+    setCommentText('');
     setViewDialogOpen(true);
+    setDetailLoading(true);
+    try {
+      const res = await api.get<any>(`/tasks/${task.id}`);
+      const data = res?.data || res;
+      setTaskDetail(data);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load task details');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const addAdminComment = async () => {
+    if (!taskDetail || !commentText.trim()) return;
+    setSendingComment(true);
+    try {
+      await api.post(`/tasks/${taskDetail.id}/comments`, { content: commentText.trim() });
+      setCommentText('');
+      const res = await api.get<any>(`/tasks/${taskDetail.id}`);
+      setTaskDetail(res?.data || res);
+      toast.success('Comment added');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add comment');
+    } finally {
+      setSendingComment(false);
+    }
   };
 
   const handleSave = async () => {
@@ -578,27 +630,31 @@ export default function AdminTasksPage() {
       </Dialog>
 
       {/* View Dialog */}
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+      <Dialog open={viewDialogOpen} onOpenChange={(open) => { setViewDialogOpen(open); if (!open) { setTaskDetail(null); setCommentText(''); } }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Task Details</DialogTitle>
           </DialogHeader>
-          {selectedTask && (
-            <div className="space-y-4 py-4">
+          {detailLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (taskDetail || selectedTask) && (
+            <div className="space-y-4 py-2">
               <div>
-                <h3 className="text-lg font-semibold">{selectedTask.title}</h3>
-                {selectedTask.description && (
-                  <p className="text-muted-foreground mt-2">{selectedTask.description}</p>
+                <h3 className="text-lg font-semibold">{(taskDetail || selectedTask)!.title}</h3>
+                {(taskDetail || selectedTask)!.description && (
+                  <p className="text-muted-foreground mt-2 whitespace-pre-wrap">{(taskDetail || selectedTask)!.description}</p>
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge className={getPriorityConfig(selectedTask.priority).color}>
-                  {getPriorityConfig(selectedTask.priority).label}
+                <Badge className={getPriorityConfig((taskDetail || selectedTask)!.priority).color}>
+                  {getPriorityConfig((taskDetail || selectedTask)!.priority).label}
                 </Badge>
-                <Badge className={getStatusConfig(selectedTask.status).color}>
-                  {getStatusConfig(selectedTask.status).label}
+                <Badge className={getStatusConfig((taskDetail || selectedTask)!.status).color}>
+                  {getStatusConfig((taskDetail || selectedTask)!.status).label}
                 </Badge>
-                {selectedTask.tags.map((tag) => (
+                {(taskDetail || selectedTask)!.tags.map((tag) => (
                   <Badge key={tag} variant="outline">{tag}</Badge>
                 ))}
               </div>
@@ -608,12 +664,12 @@ export default function AdminTasksPage() {
                   <div className="flex items-center gap-2 mt-1">
                     <Avatar className="w-8 h-8">
                       <AvatarFallback className="bg-primary text-white text-xs">
-                        {selectedTask.assignee?.user?.firstName?.[0]}
-                        {selectedTask.assignee?.user?.lastName?.[0]}
+                        {(taskDetail || selectedTask)!.assignee?.user?.firstName?.[0]}
+                        {(taskDetail || selectedTask)!.assignee?.user?.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
                     <span className="font-medium">
-                      {selectedTask.assignee?.user?.firstName} {selectedTask.assignee?.user?.lastName}
+                      {(taskDetail || selectedTask)!.assignee?.user?.firstName} {(taskDetail || selectedTask)!.assignee?.user?.lastName}
                     </span>
                   </div>
                 </div>
@@ -622,12 +678,12 @@ export default function AdminTasksPage() {
                   <div className="flex items-center gap-2 mt-1">
                     <Avatar className="w-8 h-8">
                       <AvatarFallback className="bg-primary text-white text-xs">
-                        {selectedTask.creator?.user?.firstName?.[0]}
-                        {selectedTask.creator?.user?.lastName?.[0]}
+                        {(taskDetail || selectedTask)!.creator?.user?.firstName?.[0]}
+                        {(taskDetail || selectedTask)!.creator?.user?.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
                     <span className="font-medium">
-                      {selectedTask.creator?.user?.firstName} {selectedTask.creator?.user?.lastName}
+                      {(taskDetail || selectedTask)!.creator?.user?.firstName} {(taskDetail || selectedTask)!.creator?.user?.lastName}
                     </span>
                   </div>
                 </div>
@@ -635,19 +691,113 @@ export default function AdminTasksPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Due Date</p>
-                  <p className={`font-medium ${isOverdue(selectedTask.dueDate, selectedTask.status) ? 'text-red-600' : ''}`}>
-                    {formatDate(selectedTask.dueDate)}
+                  <p className={`font-medium ${isOverdue((taskDetail || selectedTask)!.dueDate, (taskDetail || selectedTask)!.status) ? 'text-red-600' : ''}`}>
+                    {formatDate((taskDetail || selectedTask)!.dueDate)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Created</p>
-                  <p className="font-medium">{formatDate(selectedTask.createdAt)}</p>
+                  <p className="font-medium">{formatDate((taskDetail || selectedTask)!.createdAt)}</p>
                 </div>
               </div>
-              {selectedTask.completedAt && (
+              {(taskDetail || selectedTask)!.completedAt && (
                 <div>
                   <p className="text-sm text-muted-foreground">Completed</p>
-                  <p className="font-medium text-green-600">{formatDate(selectedTask.completedAt)}</p>
+                  <p className="font-medium text-green-600">{formatDate((taskDetail || selectedTask)!.completedAt)}</p>
+                </div>
+              )}
+
+              {/* Report Section */}
+              {taskDetail && (taskDetail.reportDescription || taskDetail.reportLinks.length > 0 || taskDetail.attachments.length > 0) && (
+                <div className="border rounded-lg p-4 bg-purple-50/50 dark:bg-purple-900/10 space-y-3">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-purple-600" />
+                    Staff Report
+                  </h4>
+                  {taskDetail.reportDescription && (
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{taskDetail.reportDescription}</p>
+                  )}
+                  {taskDetail.reportLinks.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Links</p>
+                      {taskDetail.reportLinks.map((link, i) => (
+                        <a
+                          key={i}
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{link}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {taskDetail.attachments.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Attachments</p>
+                      {taskDetail.attachments.map((url, i) => {
+                        const filename = url.split('/').pop() || `File ${i + 1}`;
+                        return (
+                          <a
+                            key={i}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                          >
+                            <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{filename}</span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Comments Section */}
+              {taskDetail && (
+                <div className="border-t pt-4 space-y-3">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    Comments ({taskDetail.comments.length})
+                  </h4>
+                  {taskDetail.comments.length > 0 && (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {taskDetail.comments.map((comment) => (
+                        <div key={comment.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                          {comment.author && (
+                            <p className="text-xs font-medium mb-1">
+                              {comment.author.firstName} {comment.author.lastName}
+                            </p>
+                          )}
+                          <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+                          <p className="text-xs text-muted-foreground mt-1.5">
+                            {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at{' '}
+                            {new Date(comment.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Add a comment..."
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), addAdminComment())}
+                      disabled={sendingComment}
+                    />
+                    <Button
+                      size="icon"
+                      onClick={addAdminComment}
+                      disabled={!commentText.trim() || sendingComment}
+                    >
+                      {sendingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

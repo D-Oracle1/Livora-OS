@@ -29,6 +29,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { api, getImageUrl } from '@/lib/api';
+import { resetBrandingCache } from '@/hooks/use-branding';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { cn } from '@/lib/utils';
 
@@ -78,6 +79,7 @@ export default function CmsPage() {
     try {
       await api.put(`/cms/sections/${activeTab}`, { content: sectionData });
       toast.success('Section saved successfully!');
+      if (activeTab === 'branding') resetBrandingCache();
     } catch {
       toast.error('Failed to save section');
     } finally {
@@ -371,6 +373,119 @@ export default function CmsPage() {
                   <label className="text-sm font-medium mb-1 block">WhatsApp Link (Full URL)</label>
                   <Input value={sectionData.whatsappLink || ''} onChange={(e) => updateField('whatsappLink', e.target.value)} placeholder="https://wa.me/234XXXXXXXXXX" />
                   <p className="text-xs text-muted-foreground mt-1">Paste your full WhatsApp or WhatsApp Business link. This is what opens when users click the WhatsApp icon on the support widget.</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-sm mb-3">Receipt &amp; Document Branding</h3>
+              <p className="text-xs text-muted-foreground mb-4">These fields apply <strong>only to receipts and PDF documents</strong> — they are architecturally separate from your platform logo and company name above.</p>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Receipt Header Logo</label>
+                  <div className="flex items-center gap-3">
+                    {sectionData.receiptHeaderLogo && (
+                      <img src={sectionData.receiptHeaderLogo?.startsWith('http') ? sectionData.receiptHeaderLogo : getImageUrl(sectionData.receiptHeaderLogo)} alt="Receipt header logo" className="h-14 w-auto object-contain rounded border bg-gray-50 px-2" />
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => handleImageUpload('receiptHeaderLogo')}>
+                      <Upload className="w-4 h-4 mr-2" />
+                      {sectionData.receiptHeaderLogo ? 'Change' : 'Upload'}
+                    </Button>
+                    <Input placeholder="Or paste image URL" value={sectionData.receiptHeaderLogo || ''} onChange={(e) => updateField('receiptHeaderLogo', e.target.value)} className="flex-1" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Top-left logo on all receipts. Independent of the platform logo shown in the dashboard/website.</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Receipt Company Name</label>
+                  <Input value={sectionData.receiptCompanyName || ''} onChange={(e) => updateField('receiptCompanyName', e.target.value)} placeholder="e.g. PRINCY & EDDY PROPERTIES" />
+                  <p className="text-xs text-muted-foreground mt-1">Name shown at the top of all receipts. Falls back to your general company name if left empty.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Receipt Watermark Logo</label>
+                    <div className="flex items-center gap-2">
+                      {sectionData.receiptWatermarkLogo && (
+                        <img src={sectionData.receiptWatermarkLogo?.startsWith('http') ? sectionData.receiptWatermarkLogo : getImageUrl(sectionData.receiptWatermarkLogo)} alt="Watermark" className="h-10 w-auto object-contain rounded border bg-gray-50 px-1" />
+                      )}
+                      <Button variant="outline" size="sm" onClick={() => handleImageUpload('receiptWatermarkLogo')}>
+                        <Upload className="w-4 h-4 mr-1" />
+                        {sectionData.receiptWatermarkLogo ? 'Change' : 'Upload'}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Optional. Falls back to receipt header logo, then platform logo.</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Watermark Opacity (%)</label>
+                    <Input
+                      type="number" min="0" max="20"
+                      value={sectionData.watermarkOpacity ?? 4}
+                      onChange={(e) => updateField('watermarkOpacity', Math.min(20, Math.max(0, Number(e.target.value))))}
+                      placeholder="4"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">0 = hidden, 4 = subtle (default), 10 = visible.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">RC Number</label>
+                    <Input value={sectionData.rcNumber || ''} onChange={(e) => updateField('rcNumber', e.target.value)} placeholder="e.g. 7379240" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Payment Method</label>
+                    <Input value={sectionData.paymentMethod || ''} onChange={(e) => updateField('paymentMethod', e.target.value)} placeholder="e.g. Bank Transfer" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Account Name</label>
+                    <Input value={sectionData.accountName || ''} onChange={(e) => updateField('accountName', e.target.value)} placeholder="e.g. Princy And Eddy Resources Nigeria Limited" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Account Number</label>
+                    <Input value={sectionData.accountNumber || ''} onChange={(e) => updateField('accountNumber', e.target.value)} placeholder="e.g. 1311025917" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Bank Name</label>
+                  <Input value={sectionData.bankName || ''} onChange={(e) => updateField('bankName', e.target.value)} placeholder="e.g. Zenith Bank" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Signatory Name</label>
+                    <Input value={sectionData.signatoryName || ''} onChange={(e) => updateField('signatoryName', e.target.value)} placeholder="e.g. Daniel Onyekachi Onwuegbuchu" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Signatory Title</label>
+                    <Input value={sectionData.signatoryTitle || ''} onChange={(e) => updateField('signatoryTitle', e.target.value)} placeholder="e.g. Admin Manager" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Signature Image</label>
+                  <div className="flex items-center gap-3">
+                    {sectionData.signatureImage && (
+                      <img src={sectionData.signatureImage?.startsWith('http') ? sectionData.signatureImage : getImageUrl(sectionData.signatureImage)} alt="Signature" className="h-16 w-auto object-contain rounded border bg-gray-50 px-2" />
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => handleImageUpload('signatureImage')}>
+                      <Upload className="w-4 h-4 mr-2" />
+                      {sectionData.signatureImage ? 'Change' : 'Upload'}
+                    </Button>
+                    <Input placeholder="Or paste image URL" value={sectionData.signatureImage || ''} onChange={(e) => updateField('signatureImage', e.target.value)} className="flex-1" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Optional. Appears above the signature line on receipts. Upload on a white/transparent background.</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Receipt Footer Logo</label>
+                  <div className="flex items-center gap-3">
+                    {sectionData.receiptLogo && (
+                      <img src={sectionData.receiptLogo?.startsWith('http') ? sectionData.receiptLogo : sectionData.receiptLogo} alt="Receipt logo" className="w-20 h-20 object-contain rounded-lg border bg-gray-50" />
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => handleImageUpload('receiptLogo')}>
+                      <Upload className="w-4 h-4 mr-2" />
+                      {sectionData.receiptLogo ? 'Change' : 'Upload'}
+                    </Button>
+                    <Input placeholder="Or paste image URL" value={sectionData.receiptLogo || ''} onChange={(e) => updateField('receiptLogo', e.target.value)} className="flex-1" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Logo shown at the bottom-right of every receipt. Falls back to main company logo if empty.</p>
                 </div>
               </div>
             </div>

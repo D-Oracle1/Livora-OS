@@ -95,7 +95,7 @@ export default function StaffSalesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reportedSales, setReportedSales] = useState<any[]>([]);
   const [salesLoading, setSalesLoading] = useState(true);
-  const [saleAreaUnit, setSaleAreaUnit] = useState<AreaUnit>('sqm');
+  const [saleAreaUnit, setSaleAreaUnit] = useState<AreaUnit>('plot');
   const [realtors, setRealtors] = useState<Realtor[]>([]);
   const [selectedRealtorId, setSelectedRealtorId] = useState('');
   const [saleAttribution, setSaleAttribution] = useState<'REALTOR' | 'COMPANY'>('REALTOR');
@@ -153,8 +153,9 @@ export default function StaffSalesPage() {
 
   const fetchRealtors = async () => {
     try {
-      const data: any = await api.get('/realtors/directory');
-      setRealtors(Array.isArray(data) ? data : []);
+      const res: any = await api.get('/realtors/directory');
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+      setRealtors(list);
     } catch {
       setRealtors([]);
     }
@@ -172,7 +173,7 @@ export default function StaffSalesPage() {
 
   const openReportSale = (property: any) => {
     setSelectedProperty(property);
-    setSaleAreaUnit('sqm');
+    setSaleAreaUnit('plot');
     setSelectedRealtorId('');
     setSaleAttribution('REALTOR');
     const isLand = property.type === 'LAND';

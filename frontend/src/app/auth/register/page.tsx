@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Building2, Eye, EyeOff, Loader2, ChevronRight, ChevronLeft, UserPlus } from 'lucide-react';
+import { Building2, Eye, EyeOff, Loader2, ChevronRight, ChevronLeft, UserPlus, Home, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +27,11 @@ export default function RegisterPage() {
   const refCode = searchParams.get('ref');
   const redirectTo = searchParams.get('redirect');
   const isRealtorSignup = roleParam?.toLowerCase() === 'realtor';
+  // effectiveRole: determined by URL param immediately, or chosen via Step 0 if no param
+  const [effectiveRole, setEffectiveRole] = useState<'CLIENT' | 'REALTOR' | null>(
+    roleParam ? (isRealtorSignup ? 'REALTOR' : 'CLIENT') : null,
+  );
+  const isRealtorFlow = effectiveRole === 'REALTOR';
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState(1);
@@ -124,7 +129,7 @@ export default function RegisterPage() {
           address: formData.address,
           city: formData.city,
           state: formData.state,
-          ...(isRealtorSignup && { role: 'REALTOR' }),
+          ...(isRealtorFlow && { role: 'REALTOR' }),
           ...(refCode && { referralCode: refCode }),
         }),
       });
@@ -157,41 +162,89 @@ export default function RegisterPage() {
           </div>
           <CardTitle className="text-2xl">Create an account</CardTitle>
           <CardDescription>
-            {isRealtorSignup ? `Register as a Realtor on ${companyName}` : `Join ${companyName} today`}
+            {effectiveRole === null
+              ? `Join ${companyName} — select your account type`
+              : isRealtorFlow
+              ? `Register as a Realtor on ${companyName}`
+              : `Join ${companyName} today`}
           </CardDescription>
 
-          {isRealtorSignup && (
+          {isRealtorFlow && effectiveRole !== null && (
             <div className="flex items-center gap-2 mt-2 p-3 rounded-lg bg-primary/10 text-primary text-sm font-medium">
               <UserPlus className="w-4 h-4" />
               Registering as a Realtor
             </div>
           )}
 
-          {/* Progress Steps */}
-          <div className="flex items-center justify-center gap-2 mt-4">
-            {[1, 2].map((s) => (
-              <div key={s} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                    step >= s ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
-                  }`}
-                >
-                  {s}
-                </div>
-                {s < 2 && (
-                  <div className={`w-12 h-1 mx-1 ${step > s ? 'bg-primary' : 'bg-gray-200'}`} />
-                )}
+          {/* Progress Steps — only shown after role selection */}
+          {effectiveRole !== null && (
+            <>
+              <div className="flex items-center justify-center gap-2 mt-4">
+                {[1, 2].map((s) => (
+                  <div key={s} className="flex items-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                        step >= s ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
+                      }`}
+                    >
+                      {s}
+                    </div>
+                    {s < 2 && (
+                      <div className={`w-12 h-1 mx-1 ${step > s ? 'bg-primary' : 'bg-gray-200'}`} />
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex justify-between text-xs text-muted-foreground mt-2 px-8">
-            <span>Account</span>
-            <span>Personal</span>
-          </div>
+              <div className="flex justify-between text-xs text-muted-foreground mt-2 px-8">
+                <span>Account</span>
+                <span>Personal</span>
+              </div>
+            </>
+          )}
         </CardHeader>
         <CardContent>
+          {/* Step 0 — Role Selection (shown only when no ?role= param) */}
+          {effectiveRole === null && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-center text-muted-foreground mb-6">
+                How would you like to use {companyName}?
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => setEffectiveRole('CLIENT')}
+                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                    <Home className="w-6 h-6 text-blue-600 dark:text-blue-400 group-hover:text-primary" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-sm">I&apos;m a Client</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Buy or invest in properties</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setEffectiveRole('REALTOR')}
+                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                    <Briefcase className="w-6 h-6 text-green-600 dark:text-green-400 group-hover:text-primary" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-sm">I&apos;m a Realtor</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Sell and manage properties</p>
+                  </div>
+                </button>
+              </div>
+              <p className="text-xs text-center text-muted-foreground pt-2">
+                Already have an account?{' '}
+                <Link href="/auth/login" className="text-primary hover:underline">Sign in</Link>
+              </p>
+            </div>
+          )}
+
+          {/* Steps 1 & 2 — only rendered after role is selected */}
           {/* Social Login Buttons */}
-          {step === 1 && (
+          {effectiveRole !== null && step === 1 && (
             <>
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <Button
@@ -246,7 +299,7 @@ export default function RegisterPage() {
             </>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {effectiveRole !== null && <form onSubmit={handleSubmit} className="space-y-4">
             {/* Step 1 - Account Details */}
             {step === 1 && (
               <>
@@ -447,14 +500,16 @@ export default function RegisterPage() {
                 </Button>
               )}
             </div>
-          </form>
+          </form>}
 
-          <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-            Already have an account?{' '}
-            <Link href="/auth/login" className="text-primary hover:underline font-medium">
-              Sign in
-            </Link>
-          </div>
+          {effectiveRole !== null && (
+            <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+              Already have an account?{' '}
+              <Link href="/auth/login" className="text-primary hover:underline font-medium">
+                Sign in
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -15,6 +15,9 @@ import {
   Users,
   Loader2,
   X,
+  Paperclip,
+  ImageIcon,
+  FileText,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -96,15 +99,38 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+
   const handleSend = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() && attachmentUrls.length === 0) return;
     const msg = newMessage;
+    const urls = attachmentUrls;
     setNewMessage('');
+    setAttachmentUrls([]);
     sendTyping(false);
     try {
-      await sendMessage(msg);
+      const type = urls.length > 0 && !msg.trim() ? 'IMAGE' : 'TEXT';
+      await sendMessage(msg, type, urls.length > 0 ? urls : undefined);
     } catch {
       setNewMessage(msg);
+      setAttachmentUrls(urls);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    e.target.value = '';
+    setUploading(true);
+    try {
+      const uploaded = await api.uploadFiles('/upload/task-files', files);
+      setAttachmentUrls((prev) => [...prev, ...uploaded]);
+    } catch {
+      // toast handled by api
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -492,7 +518,40 @@ export default function ChatPage() {
                                   {message.sender?.firstName} {message.sender?.lastName}
                                 </p>
                               )}
-                              <p className="whitespace-pre-wrap break-words text-sm">{message.content}</p>
+                              {message.content && (
+                                <p className="whitespace-pre-wrap break-words text-sm">{message.content}</p>
+                              )}
+                              {Array.isArray(message.attachments) && message.attachments.length > 0 && (
+                                <div className="mt-1 space-y-1">
+                                  {(message.attachments as string[]).map((url, i) => {
+                                    const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+                                    return isImage ? (
+                                      <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                        <img
+                                          src={url}
+                                          alt="attachment"
+                                          className="max-w-[220px] rounded-lg mt-1 cursor-pointer hover:opacity-90"
+                                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                        />
+                                      </a>
+                                    ) : (
+                                      <a
+                                        key={i}
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={cn(
+                                          'flex items-center gap-1.5 text-xs underline',
+                                          isMe ? 'text-white/80' : 'text-blue-600',
+                                        )}
+                                      >
+                                        <FileText className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="truncate max-w-[180px]">{url.split('/').pop()}</span>
+                                      </a>
+                                    );
+                                  })}
+                                </div>
+                              )}
                               <div className={cn('flex items-center gap-1 mt-0.5', isMe ? 'justify-end' : 'justify-start')}>
                                 <span className={cn('text-[10px]', isMe ? 'text-white/60' : 'text-muted-foreground')}>
                                   {formatMessageTime(message.createdAt)}
@@ -522,7 +581,48 @@ export default function ChatPage() {
 
                   {/* Message Input */}
                   <div className="p-3 border-t">
+                    {/* Attachment previews */}
+                    {attachmentUrls.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {attachmentUrls.map((url, i) => {
+                          const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+                          return (
+                            <div key={i} className="relative group">
+                              {isImage ? (
+                                <img src={url} alt="preview" className="w-14 h-14 rounded-lg object-cover border" />
+                              ) : (
+                                <div className="w-14 h-14 rounded-lg border flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                                  <FileText className="w-6 h-6 text-muted-foreground" />
+                                </div>
+                              )}
+                              <button
+                                onClick={() => setAttachmentUrls((prev) => prev.filter((_, idx) => idx !== i))}
+                                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*,application/pdf,.doc,.docx,.xlsx,.csv"
+                        multiple
+                        className="hidden"
+                        onChange={handleFileSelect}
+                      />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0 disabled:opacity-40"
+                        title="Attach file"
+                      >
+                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+                      </button>
                       <input
                         type="text"
                         placeholder="Type a message..."
@@ -533,7 +633,7 @@ export default function ChatPage() {
                       />
                       <button
                         onClick={handleSend}
-                        disabled={!newMessage.trim()}
+                        disabled={!newMessage.trim() && attachmentUrls.length === 0}
                         className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 disabled:opacity-40 transition-colors shrink-0"
                       >
                         <Send className="w-4 h-4" />

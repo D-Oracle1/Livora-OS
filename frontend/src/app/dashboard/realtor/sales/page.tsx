@@ -189,7 +189,7 @@ export default function RealtorSalesPage() {
 
   const handleViewReceipt = (sale: SaleItem) => {
     const receiptData: ReceiptData = {
-      receiptNumber: `REC-${sale.id.toString().padStart(6, '0')}`,
+      receiptNumber: `ELNG-${new Date(sale.date || Date.now()).getFullYear().toString().slice(-2)}-${sale.id.toString().replace(/-/g, '').slice(0, 8).toUpperCase()}`,
       type: 'sale',
       date: sale.date,
       seller: {
@@ -204,19 +204,20 @@ export default function RealtorSalesPage() {
       property: {
         name: sale.property,
         type: sale.propertyType,
-        address: 'Lagos, Nigeria',
+        address: '',
       },
+      description: (() => { const qty = sale.plotsSold > 0 ? sale.plotsSold : 1; const isLand = (sale.propertyType || 'Land') === 'Land'; const unit = isLand ? (qty === 1 ? 'plot' : 'plots') : (qty === 1 ? 'unit' : 'units'); return `Purchase of ${qty} ${unit} of ${sale.propertyType || 'Land'} lying and situate at ${sale.property}.`; })(),
+      realtorName: undefined,
       items: [
         {
-          description: `Property Sale: ${sale.property}${sale.propertyType === 'Land' ? ` (${sale.plotsSold} plots, ${sale.sqmSold} sqm)` : ''}`,
-          quantity: sale.propertyType === 'Land' ? sale.plotsSold : 1,
+          description: `Property Sale: ${sale.property}`,
+          quantity: sale.plotsSold > 0 ? sale.plotsSold : 1,
+          unitPrice: sale.plotsSold > 0 ? sale.amount / sale.plotsSold : sale.amount,
           amount: sale.amount,
         },
       ],
       subtotal: sale.amount,
-      fees: [
-        { label: 'Commission', amount: sale.commission },
-      ],
+      fees: [],
       total: sale.amount,
       status: sale.status === 'COMPLETED' ? 'completed' : sale.status === 'CANCELLED' ? 'cancelled' : sale.status === 'IN_PROGRESS' ? 'pending' : 'pending',
       ...(sale.paymentPlan === 'INSTALLMENT' ? {

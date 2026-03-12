@@ -16,6 +16,21 @@ export interface BrandingData {
   supportEmail?: string;
   supportPhone?: string;
   address?: string;
+  // Receipt / document details
+  rcNumber?: string;
+  accountName?: string;
+  accountNumber?: string;
+  bankName?: string;
+  paymentMethod?: string;
+  signatoryName?: string;
+  signatoryTitle?: string;
+  signatureImage?: string;
+  // Receipt document branding — architecturally separate from platform/general logo
+  receiptHeaderLogo?: string;    // top-left logo shown only on receipts
+  receiptCompanyName?: string;   // company name shown only on receipts (overrides companyName)
+  receiptWatermarkLogo?: string; // watermark logo (if different from header logo)
+  watermarkOpacity?: number;     // 0–10, default 4 (stored as integer percentage)
+  receiptLogo?: string;          // bottom-right footer logo on receipts
 }
 
 // Module-level cache — survives across component mounts within a page session

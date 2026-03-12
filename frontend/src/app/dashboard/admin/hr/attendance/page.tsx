@@ -117,11 +117,12 @@ export default function AdminAttendancePage() {
 
   // Calculate stats from attendance data
   const stats = [
-    { label: 'Present', value: attendance.filter((a) => a.status === 'PRESENT').length, color: 'bg-green-500' },
-    { label: 'Late', value: attendance.filter((a) => a.status === 'LATE').length, color: 'bg-orange-500' },
-    { label: 'Absent', value: attendance.filter((a) => a.status === 'ABSENT').length, color: 'bg-red-500' },
-    { label: 'On Leave', value: attendance.filter((a) => a.status === 'ON_LEAVE').length, color: 'bg-blue-500' },
-    { label: 'WFH', value: attendance.filter((a) => a.status === 'WORK_FROM_HOME').length, color: 'bg-purple-500' },
+    { label: 'Present',   value: attendance.filter((a) => a.status === 'PRESENT').length,          color: 'bg-green-500' },
+    { label: 'Late',      value: attendance.filter((a) => a.status === 'LATE').length,              color: 'bg-orange-500' },
+    { label: 'Half Day',  value: attendance.filter((a) => a.status === 'HALF_DAY').length,          color: 'bg-yellow-500' },
+    { label: 'Absent',    value: attendance.filter((a) => a.status === 'ABSENT').length,            color: 'bg-red-500' },
+    { label: 'On Leave',  value: attendance.filter((a) => a.status === 'ON_LEAVE').length,          color: 'bg-blue-500' },
+    { label: 'WFH',       value: attendance.filter((a) => a.status === 'WORK_FROM_HOME').length,    color: 'bg-purple-500' },
   ];
 
   const total = attendance.length || 1;
@@ -227,6 +228,7 @@ export default function AdminAttendancePage() {
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="PRESENT">Present</SelectItem>
             <SelectItem value="LATE">Late</SelectItem>
+            <SelectItem value="HALF_DAY">Half Day</SelectItem>
             <SelectItem value="ABSENT">Absent</SelectItem>
             <SelectItem value="ON_LEAVE">On Leave</SelectItem>
             <SelectItem value="WORK_FROM_HOME">Work from Home</SelectItem>

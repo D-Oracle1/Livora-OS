@@ -53,7 +53,7 @@ interface ChatContextValue {
   typingUsers: TypingUser[];
   fetchRooms: () => Promise<void>;
   selectRoom: (room: ChatRoom) => Promise<void>;
-  sendMessage: (content: string, type?: string) => Promise<void>;
+  sendMessage: (content: string, type?: string, attachments?: string[]) => Promise<void>;
   createRoom: (participantIds: string[], name?: string) => Promise<ChatRoom>;
   sendTyping: (isTyping: boolean) => void;
   setActiveRoom: (room: ChatRoom | null) => void;
@@ -161,13 +161,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, [subscribeToChannel, unsubscribeFromChannel]);
 
-  const sendMessage = useCallback(async (content: string, type = 'TEXT') => {
-    if (!activeRoomRef.current || !content.trim()) return;
+  const sendMessage = useCallback(async (content: string, type = 'TEXT', attachments?: string[]) => {
+    if (!activeRoomRef.current || (!content.trim() && (!attachments || attachments.length === 0))) return;
 
     try {
       const res = await api.post<any>(`/chat/rooms/${activeRoomRef.current}/messages`, {
         content: content.trim(),
         type,
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
       });
       // Handle TransformInterceptor wrapper: { success, data: { message }, timestamp }
       const msg = res?.data ?? res;

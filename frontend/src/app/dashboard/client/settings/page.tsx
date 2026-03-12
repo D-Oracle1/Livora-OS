@@ -147,7 +147,7 @@ export default function ClientSettingsPage() {
 
       const data = await response.json();
       const userData = data.data || data;
-      const avatarPath = userData.avatar;
+      const avatarPath = userData.url || userData.avatar;
       if (avatarPath) {
         setAvatarUrl(getImageUrl(avatarPath));
         updateSessionUser({ avatar: avatarPath });

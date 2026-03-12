@@ -193,7 +193,15 @@ export default function CommissionPage() {
       await api.put('/settings/commission-rates', body);
       setTierRates(editingRates);
       setShowRateSettings(false);
-      toast.success('Commission rates updated successfully!');
+      toast.success('Commission rates updated — recalculating existing records...');
+
+      // Retroactively apply new rates to all existing sales/payments
+      const result = await api.post<any>('/accounting/recalculate-financials', {});
+      const r = result?.data ?? result;
+      toast.success(`Records updated: ${r?.updatedSales ?? 0} sales, ${r?.updatedPayments ?? 0} payments`);
+
+      // Refresh commission list to reflect updated amounts
+      fetchCommissions();
     } catch (error: any) {
       console.error('Commission update error:', error);
       toast.error(error?.message || 'Failed to update commission rates. Please try again.');

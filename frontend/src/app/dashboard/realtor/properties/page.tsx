@@ -95,7 +95,7 @@ export default function RealtorPropertiesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reportedSales, setReportedSales] = useState<any[]>([]);
   const [salesLoading, setSalesLoading] = useState(true);
-  const [saleAreaUnit, setSaleAreaUnit] = useState<AreaUnit>('sqm');
+  const [saleAreaUnit, setSaleAreaUnit] = useState<AreaUnit>('plot');
 
   const [saleForm, setSaleForm] = useState<SaleReportForm>({
     buyerFirstName: '',
@@ -174,7 +174,7 @@ export default function RealtorPropertiesPage() {
 
   const openReportSale = (property: any) => {
     setSelectedProperty(property);
-    setSaleAreaUnit('sqm');
+    setSaleAreaUnit('plot');
     const isLand = property.type === 'LAND';
     const storedPricePerSqm = Number(property.pricePerSqm) || 0;
     setSaleForm({
