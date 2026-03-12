@@ -34,7 +34,8 @@ export class AdminService {
       totalProperties,
       activeListings,
       filteredSalesCount,
-      filteredRevenue,
+      filteredRevenueFullPlan,
+      filteredRevenueInstallment,
       filteredCommission,
       pendingSales,
       salesForChart,
@@ -55,13 +56,19 @@ export class AdminService {
           saleDate: dateFilter,
         },
       }),
-      // Revenue from completed + in-progress sales
+      // Cash-basis revenue: FULL plan — revenue = salePrice (COMPLETED only)
+      this.prisma.sale.aggregate({
+        where: { status: SaleStatus.COMPLETED, paymentPlan: 'FULL', saleDate: dateFilter },
+        _sum: { salePrice: true, commissionAmount: true },
+      }),
+      // Cash-basis revenue: INSTALLMENT plan — revenue = totalPaid (actual cash received)
       this.prisma.sale.aggregate({
         where: {
           status: { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] },
+          paymentPlan: 'INSTALLMENT',
           saleDate: dateFilter,
         },
-        _sum: { salePrice: true, commissionAmount: true },
+        _sum: { totalPaid: true, commissionAmount: true },
       }),
       // Commission from completed + in-progress sales in the period
       this.prisma.commission.aggregate({
@@ -98,6 +105,14 @@ export class AdminService {
 
     const chartData = groupSalesIntoChartBuckets(salesForChart, activePeriod, startDate, endDate);
 
+    // Cash-basis revenue: FULL plan uses salePrice, INSTALLMENT uses totalPaid
+    const filteredRevenue =
+      Number(filteredRevenueFullPlan._sum.salePrice ?? 0) +
+      Number(filteredRevenueInstallment._sum.totalPaid ?? 0);
+    const filteredCommissionFromSales =
+      Number(filteredRevenueFullPlan._sum.commissionAmount ?? 0) +
+      Number(filteredRevenueInstallment._sum.commissionAmount ?? 0);
+
     // Convert tier distribution to object
     const tierDistributionMap = tierDistribution.reduce((acc, item) => {
       acc[item.loyaltyTier] = item._count.id;
@@ -113,11 +128,11 @@ export class AdminService {
         pending: pendingSales,
       },
       revenue: {
-        filtered: filteredRevenue._sum.salePrice || 0,
+        filtered: filteredRevenue,
       },
       commission: {
         filtered: filteredCommission._sum.amount || 0,
-        filteredFromSales: filteredRevenue._sum.commissionAmount || 0,
+        filteredFromSales: filteredCommissionFromSales,
       },
       chartData,
       recentSales,
@@ -392,7 +407,8 @@ export class AdminService {
       salesByRealtor,
       topProperties,
       tierDistribution,
-      totalStats,
+      totalStatsFullPlan,
+      totalStatsInstallment,
       salesWithPropertyInfo,
       newClientsCount,
     ] = await Promise.all([
@@ -429,13 +445,21 @@ export class AdminService {
         by: ['loyaltyTier'],
         _count: { id: true },
       }),
+      // Cash-basis revenue: FULL plan — revenue = salePrice (COMPLETED only)
+      this.prisma.sale.aggregate({
+        where: { status: SaleStatus.COMPLETED, paymentPlan: 'FULL', saleDate: dateFilter },
+        _count: { id: true },
+        _sum: { salePrice: true, commissionAmount: true },
+      }),
+      // Cash-basis revenue: INSTALLMENT plan — revenue = totalPaid (actual cash received)
       this.prisma.sale.aggregate({
         where: {
           status: { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] },
+          paymentPlan: 'INSTALLMENT',
           saleDate: dateFilter,
         },
         _count: { id: true },
-        _sum: { salePrice: true, commissionAmount: true },
+        _sum: { totalPaid: true, commissionAmount: true },
       }),
       // Get all sales with property info for aggregation
       this.prisma.sale.findMany({
@@ -516,8 +540,8 @@ export class AdminService {
         realtorId: s.realtorId,
         realtor: realtor?.user,
         salesCount: s._count.id,
-        totalRevenue: s._sum.salePrice,
-        totalCommission: s._sum.commissionAmount,
+        totalRevenue: Number(s._sum.salePrice ?? 0),
+        totalCommission: Number(s._sum.commissionAmount ?? 0),
       };
     });
 
@@ -533,14 +557,18 @@ export class AdminService {
       revenue: pt.revenue,
     }));
 
+    // Cash-basis revenue: FULL plan salePrice + INSTALLMENT plan totalPaid
+    const totalCashRevenue =
+      Number(totalStatsFullPlan._sum.salePrice ?? 0) +
+      Number(totalStatsInstallment._sum.totalPaid ?? 0);
+    const totalSalesCount = (totalStatsFullPlan._count.id || 0) + (totalStatsInstallment._count.id || 0);
+
     // Summary stats
     const stats = {
-      totalRevenue: Number(totalStats._sum.salePrice || 0),
-      propertiesSold: totalStats._count.id || 0,
+      totalRevenue: totalCashRevenue,
+      propertiesSold: totalSalesCount,
       newClients: newClientsCount,
-      avgSalePrice: totalStats._count.id > 0
-        ? Number(totalStats._sum.salePrice || 0) / totalStats._count.id
-        : 0,
+      avgSalePrice: totalSalesCount > 0 ? totalCashRevenue / totalSalesCount : 0,
     };
 
     const result = {

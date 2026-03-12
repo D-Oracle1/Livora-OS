@@ -422,6 +422,7 @@ function AdminStaffPage() {
 
   const handleToggleStatus = async (staffMember: StaffData) => {
     setActionLoading(staffMember.id);
+    const activating = !staffMember.isActive;
     try {
       if (staffMember.isActive) {
         await api.delete(`/staff/${staffMember.id}`);
@@ -430,6 +431,13 @@ function AdminStaffPage() {
         await api.put(`/staff/${staffMember.id}`, { isActive: true });
         toast.success('Staff member activated successfully!');
       }
+      // Optimistically update local state immediately so the badge reflects the change
+      setStaff(prev => prev.map(s =>
+        s.id === staffMember.id
+          ? { ...s, isActive: activating, user: { ...s.user, status: activating ? 'ACTIVE' : 'INACTIVE' } }
+          : s
+      ));
+      // Background refresh to sync with server
       fetchStaff();
     } catch (error: any) {
       toast.error(error.message || 'Failed to update status');
