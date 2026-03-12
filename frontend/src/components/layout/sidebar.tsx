@@ -160,6 +160,7 @@ const groupedNavigationConfig: Record<string, NavSection[]> = {
     {
       label: 'People',
       items: [
+        { name: 'All Users', href: '/dashboard/admin/users', icon: Users, moduleKey: 'staff' },
         { name: 'Realtors', href: '/dashboard/admin/realtors', icon: Users, moduleKey: 'realtors' },
         { name: 'Clients', href: '/dashboard/admin/clients', icon: Briefcase, moduleKey: 'clients' },
         { name: 'Staff', href: '/dashboard/admin/staff', icon: UserCog, moduleKey: 'staff' },
