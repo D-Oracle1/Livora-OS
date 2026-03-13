@@ -1,0 +1,267 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 160 79% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 160 79% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 160 79% 13%;
+    --primary: 160 79% 20%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 160 15% 95%;
+    --secondary-foreground: 160 79% 20%;
+    --muted: 160 15% 95%;
+    --muted-foreground: 160 10% 45%;
+    --accent: 37 97% 61%;
+    --accent-foreground: 160 79% 13%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 160 15% 90%;
+    --input: 160 15% 90%;
+    --ring: 160 79% 20%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 160 50% 6%;
+    --foreground: 0 0% 98%;
+    --card: 160 40% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 160 40% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 160 79% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 160 30% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 160 30% 15%;
+    --muted-foreground: 160 15% 60%;
+    --accent: 37 97% 61%;
+    --accent-foreground: 160 79% 13%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 160 30% 18%;
+    --input: 160 30% 18%;
+    --ring: 160 79% 30%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    /* Remove the blue tap flash on links/buttons on iOS */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    /* Prevent iOS from auto-resizing text when rotating the device */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    /* Prevent unwanted horizontal scroll on mobile */
+    overflow-x: hidden;
+  }
+
+  /* Remove the 300ms tap delay on interactive elements */
+  a, button, [role="button"], input, select, textarea, label {
+    touch-action: manipulation;
+  }
+
+  /* Safe-area padding only in PWA standalone mode (installed to home screen).
+     In a regular iOS Safari browser there are no insets — applying them
+     universally creates white gaps at the top and bottom of the page. */
+  @media all and (display-mode: standalone) {
+    @supports (padding: env(safe-area-inset-top)) {
+      body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+      }
+    }
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border border-white/20 dark:border-gray-700/20;
+  }
+
+  .glass-card {
+    @apply glass rounded-xl shadow-glass;
+  }
+
+  /* Platform landing — glassmorphism */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .glass-panel-strong {
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+  }
+
+  /* Super admin — clean light cards (CSS-variable driven for dynamic theming) */
+  .neuo-base {
+    background-color: var(--neuo-base-bg, #f0f4f8);
+  }
+
+  .neuo-card {
+    background: var(--neuo-card-bg, #ffffff);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .neuo-card-sm {
+    background: var(--neuo-card-bg, #ffffff);
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .neuo-inset {
+    background: var(--neuo-base-bg, #f0f4f8);
+    border-radius: 12px;
+    box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.07), inset -2px -2px 5px rgba(255, 255, 255, 0.95);
+  }
+
+  .neuo-btn {
+    background: var(--neuo-base-bg, #f0f4f8);
+    border-radius: 10px;
+    box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.08), -2px -2px 6px rgba(255, 255, 255, 0.9);
+    transition: box-shadow 0.2s, transform 0.1s;
+  }
+
+  .neuo-btn:hover {
+    box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.1), -3px -3px 8px rgba(255, 255, 255, 0.95);
+  }
+
+  .neuo-btn:active {
+    box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.08), inset -2px -2px 4px rgba(255, 255, 255, 0.9);
+    transform: scale(0.98);
+  }
+
+  .gradient-primary {
+    @apply bg-gradient-to-r from-primary-600 via-primary-500 to-primary-400;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-400;
+  }
+
+  .tier-bronze {
+    @apply text-[#CD7F32] bg-[#CD7F32]/10;
+  }
+
+  .tier-silver {
+    @apply text-[#C0C0C0] bg-[#C0C0C0]/10;
+  }
+
+  .tier-gold {
+    @apply text-[#FFD700] bg-[#FFD700]/10;
+  }
+
+  .tier-platinum {
+    @apply text-[#E5E4E2] bg-[#E5E4E2]/10;
+  }
+
+  .animate-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Loading skeleton animation */
+.skeleton {
+  @apply relative overflow-hidden bg-muted;
+}
+
+.skeleton::after {
+  @apply absolute inset-0;
+  content: '';
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+/* Chart tooltip styles */
+.recharts-tooltip-wrapper {
+  @apply !outline-none;
+}
+
+.recharts-default-tooltip {
+  @apply !bg-card !border-border !rounded-lg !shadow-lg;
+}
+
+/* Hero section diagonal clip */
+.clip-hero {
+  clip-path: polygon(15% 0, 100% 0, 100% 100%, 0 100%);
+}
+
+/* Floating bubble animation (login/auth pages) */
+@keyframes bubble-rise {
+  0%   { transform: translateY(0) scale(1);   opacity: 0.55; }
+  50%  { transform: translateY(-45vh) scale(1.08); opacity: 0.35; }
+  100% { transform: translateY(-95vh) scale(0.9);  opacity: 0; }
+}
+
+.bubble {
+  position: absolute;
+  bottom: -10%;
+  border-radius: 50%;
+  animation: bubble-rise linear infinite;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    animation: none;
+    opacity: 0;
+  }
+}
