@@ -5,10 +5,12 @@ import { motion } from 'framer-motion';
 import {
   Clock,
   Search,
-  Download,
   Calendar,
   Loader2,
   RefreshCw,
+  QrCode,
+  RotateCw,
+  X,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,8 +32,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { api, getImageUrl } from '@/lib/api';
+
+interface QrData {
+  token: string;
+  qrCodeDataUrl: string;
+  expiresAt: string;
+}
 
 interface AttendanceRecord {
   id: string;
@@ -79,6 +93,25 @@ export default function AdminAttendancePage() {
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // QR code state
+  const [showQrDialog, setShowQrDialog] = useState(false);
+  const [qrData, setQrData] = useState<QrData | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+
+  const generateQrCode = async () => {
+    setQrLoading(true);
+    try {
+      const res = await api.get<any>('/hr/attendance/qr/today');
+      const data = res?.data || res;
+      setQrData(data);
+      setShowQrDialog(true);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to generate QR code');
+    } finally {
+      setQrLoading(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -149,13 +182,17 @@ export default function AdminAttendancePage() {
           <h1 className="text-2xl font-bold">Attendance Management</h1>
           <p className="text-muted-foreground">Monitor and manage staff attendance records</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             className="w-full sm:w-[180px]"
           />
+          <Button className="gap-2" onClick={generateQrCode} disabled={qrLoading}>
+            {qrLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+            Show QR Code
+          </Button>
           <Button variant="outline" className="gap-2" onClick={fetchData} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -235,6 +272,51 @@ export default function AdminAttendancePage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* QR Code Dialog */}
+      <Dialog open={showQrDialog} onOpenChange={setShowQrDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="w-5 h-5" />
+              Today's Attendance QR Code
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 p-2">
+            <p className="text-sm text-center text-muted-foreground">
+              Display this to staff — they scan it with their phone to clock in.
+            </p>
+            {qrData?.qrCodeDataUrl && (
+              <div className="border-4 border-black rounded-xl p-2 bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrData.qrCodeDataUrl}
+                  alt="Attendance QR Code"
+                  className="w-64 h-64"
+                />
+              </div>
+            )}
+            {qrData?.expiresAt && (
+              <p className="text-xs text-muted-foreground">
+                Valid until {new Date(qrData.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={generateQrCode}
+              disabled={qrLoading}
+            >
+              {qrLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RotateCw className="w-4 h-4" />
+              )}
+              Regenerate QR Code
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Attendance Table */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>

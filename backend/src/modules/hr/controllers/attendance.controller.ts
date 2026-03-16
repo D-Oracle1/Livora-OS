@@ -59,6 +59,13 @@ export class AttendanceController {
     return this.attendanceService.getMyAttendance(userId, { startDate, endDate });
   }
 
+  @Get('qr/today')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
+  @ApiOperation({ summary: 'Generate QR code for today\'s attendance check-in' })
+  generateQr() {
+    return this.attendanceService.generateTodayQr();
+  }
+
   @Get('today')
   @Roles('STAFF')
   @ApiOperation({ summary: 'Get today\'s attendance status' })

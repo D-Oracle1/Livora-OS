@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as QRCode from 'qrcode';
 import { PrismaService } from '../../../database/prisma.service';
 import { ClockInDto, ClockOutDto, UpdateAttendanceDto, AttendanceQueryDto } from '../dto/attendance.dto';
 import { AttendanceStatus } from '@prisma/client';
@@ -9,7 +11,50 @@ export class AttendanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly policyService: PolicyService,
+    private readonly jwtService: JwtService,
   ) {}
+
+  // ── QR CODE ──────────────────────────────────────────────────────────────
+
+  async generateTodayQr(): Promise<{ token: string; qrCodeDataUrl: string; expiresAt: string }> {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // Token expires at end of day
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+    const ttl = Math.floor((endOfDay.getTime() - Date.now()) / 1000);
+
+    const token = this.jwtService.sign(
+      { type: 'attendance-qr', date: today },
+      { expiresIn: ttl },
+    );
+
+    const qrCodeDataUrl = await QRCode.toDataURL(token, {
+      width: 300,
+      margin: 2,
+      color: { dark: '#000000', light: '#FFFFFF' },
+    });
+
+    return { token, qrCodeDataUrl, expiresAt: endOfDay.toISOString() };
+  }
+
+  private validateQrToken(qrToken: string): void {
+    try {
+      const payload = this.jwtService.verify(qrToken) as { type: string; date: string };
+
+      if (payload.type !== 'attendance-qr') {
+        throw new BadRequestException('Invalid QR code');
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      if (payload.date !== today) {
+        throw new BadRequestException("QR code has expired — ask your admin to generate today's code");
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException('Invalid or expired QR code');
+    }
+  }
 
   private async getAttendanceThresholds() {
     const [workStartSetting, workHoursSetting, latenessPolicy] = await Promise.all([
@@ -26,6 +71,12 @@ export class AttendanceService {
   }
 
   async clockIn(userId: string, dto: ClockInDto, ipAddress?: string) {
+    // QR token is required — validates physical presence
+    if (!dto.qrToken) {
+      throw new BadRequestException('QR code is required to clock in');
+    }
+    this.validateQrToken(dto.qrToken);
+
     const staffProfile = await this.prisma.staffProfile.findUnique({
       where: { userId },
     });

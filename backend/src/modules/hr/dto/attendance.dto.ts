@@ -7,6 +7,11 @@ export class ClockInDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  @ApiPropertyOptional({ description: 'QR code token scanned from admin-generated attendance QR' })
+  @IsOptional()
+  @IsString()
+  qrToken?: string;
 }
 
 export class ClockOutDto {

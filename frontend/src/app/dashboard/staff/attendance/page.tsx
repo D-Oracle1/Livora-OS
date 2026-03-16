@@ -13,10 +13,19 @@ import {
   MapPin,
   Loader2,
   RefreshCw,
+  QrCode,
+  CameraOff,
+  X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -81,6 +90,124 @@ const formatDuration = (totalMinutes: number) => {
   return `${hours}h ${minutes}m`;
 };
 
+// ── QR Scanner Modal ──────────────────────────────────────────────────────────
+
+interface QrScannerProps {
+  open: boolean;
+  onClose: () => void;
+  onScanned: (token: string) => void;
+}
+
+function QrScannerModal({ open, onClose, onScanned }: QrScannerProps) {
+  const scannerRef = useRef<any>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(true);
+  const divId = 'qr-attendance-scanner';
+
+  useEffect(() => {
+    if (!open) return;
+
+    setCameraError(null);
+    setStarting(true);
+
+    let scanner: any;
+    let stopped = false;
+
+    const start = async () => {
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        if (stopped) return;
+
+        scanner = new Html5Qrcode(divId);
+        scannerRef.current = scanner;
+
+        await scanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 240, height: 240 } },
+          (text: string) => {
+            // Success — stop scanner then notify parent
+            scanner.stop().catch(() => {});
+            onScanned(text);
+          },
+          // Frame errors are expected — ignore them
+          undefined,
+        );
+        setStarting(false);
+      } catch (err: any) {
+        if (!stopped) {
+          setCameraError(
+            err?.message?.includes('permission')
+              ? 'Camera permission denied. Please allow camera access and try again.'
+              : 'Could not start camera. Make sure no other app is using it.',
+          );
+          setStarting(false);
+        }
+      }
+    };
+
+    start();
+
+    return () => {
+      stopped = true;
+      scannerRef.current?.stop()?.catch(() => {});
+      scannerRef.current = null;
+    };
+  }, [open, onScanned]);
+
+  const handleClose = () => {
+    scannerRef.current?.stop()?.catch(() => {});
+    scannerRef.current = null;
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <QrCode className="w-5 h-5" />
+            Scan Attendance QR Code
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col items-center gap-4 p-2">
+          <p className="text-sm text-center text-muted-foreground">
+            Point your camera at the QR code displayed by your admin to clock in.
+          </p>
+
+          {cameraError ? (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <CameraOff className="w-12 h-12 text-muted-foreground" />
+              <p className="text-sm text-destructive">{cameraError}</p>
+            </div>
+          ) : (
+            <div className="relative w-full">
+              {starting && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 rounded-lg">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              )}
+              {/* html5-qrcode mounts its video + canvas into this div */}
+              <div
+                id={divId}
+                className="w-full overflow-hidden rounded-lg"
+                style={{ minHeight: '280px' }}
+              />
+            </div>
+          )}
+
+          <Button variant="outline" className="w-full gap-2" onClick={handleClose}>
+            <X className="w-4 h-4" />
+            Cancel
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
 export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -88,6 +215,7 @@ export default function AttendancePage() {
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   const isClockedIn = todayRecord?.clockIn && !todayRecord?.clockOut;
 
@@ -95,7 +223,7 @@ export default function AttendancePage() {
   const weeklyStats = useCallback(() => {
     const now = new Date();
     const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+    weekStart.setDate(now.getDate() - now.getDay());
     weekStart.setHours(0, 0, 0, 0);
 
     const weekRecords = attendanceHistory.filter((r) => {
@@ -108,7 +236,6 @@ export default function AttendancePage() {
     const onTimeDays = weekRecords.filter((r) => r.status === 'PRESENT').length;
     const totalDays = weekRecords.filter((r) => r.clockIn).length;
 
-    // Calculate average clock-in time
     const clockInTimes = weekRecords
       .filter((r) => r.clockIn)
       .map((r) => {
@@ -135,7 +262,6 @@ export default function AttendancePage() {
   const fetchAttendance = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch both attendance history and today's status in parallel
       const [historyRes, todayRes] = await Promise.all([
         api.get('/hr/attendance/my'),
         api.get('/hr/attendance/today'),
@@ -144,17 +270,12 @@ export default function AttendancePage() {
       const historyData = Array.isArray(historyRes) ? historyRes : (historyRes?.data || []);
       setAttendanceHistory(historyData);
 
-      // Use the dedicated today endpoint for accurate status
       const todayData = todayRes?.data || todayRes;
-      const todayRec = todayData?.record || null;
+      setTodayRecord(todayData?.record || null);
 
-      setTodayRecord(todayRec);
-
-      // Start timer if clocked in (has clockIn but no clockOut)
-      if (todayRec?.clockIn && !todayRec?.clockOut) {
-        const clockInTime = new Date(todayRec.clockIn).getTime();
-        const elapsed = Date.now();
-        setElapsedTime(Math.floor((elapsed - clockInTime) / 1000));
+      if (todayData?.record?.clockIn && !todayData?.record?.clockOut) {
+        const clockInTime = new Date(todayData.record.clockIn).getTime();
+        setElapsedTime(Math.floor((Date.now() - clockInTime) / 1000));
       } else {
         setElapsedTime(0);
       }
@@ -170,13 +291,12 @@ export default function AttendancePage() {
     fetchAttendance();
   }, [fetchAttendance]);
 
-  // Live timer effect
+  // Live timer
   useEffect(() => {
     if (isClockedIn && todayRecord?.clockIn) {
       timerRef.current = setInterval(() => {
         const clockInTime = new Date(todayRecord.clockIn!).getTime();
-        const now = Date.now();
-        setElapsedTime(Math.floor((now - clockInTime) / 1000));
+        setElapsedTime(Math.floor((Date.now() - clockInTime) / 1000));
       }, 1000);
     } else {
       if (timerRef.current) {
@@ -184,33 +304,31 @@ export default function AttendancePage() {
         timerRef.current = null;
       }
     }
-
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [isClockedIn, todayRecord?.clockIn]);
 
-  const handleClockIn = async () => {
+  // Called after a successful QR scan
+  const handleQrScanned = useCallback(async (qrToken: string) => {
+    setShowScanner(false);
     setActionLoading(true);
     try {
-      await api.post('/hr/attendance/clock-in', {});
+      await api.post('/hr/attendance/clock-in', { qrToken });
       toast.success('Clocked in successfully!');
       fetchAttendance();
     } catch (err: any) {
-      const errorMsg = err.message || 'Failed to clock in';
-      // If already clocked in, refresh to get correct state
-      if (errorMsg.toLowerCase().includes('already clocked in') || errorMsg.toLowerCase().includes('clock out first')) {
-        toast.info('You are already clocked in. Refreshing status...');
+      const msg = err.message || 'Failed to clock in';
+      if (msg.toLowerCase().includes('already clocked in') || msg.toLowerCase().includes('clock out first')) {
+        toast.info('You are already clocked in. Refreshing status…');
         fetchAttendance();
       } else {
-        toast.error(errorMsg);
+        toast.error(msg);
       }
     } finally {
       setActionLoading(false);
     }
-  };
+  }, [fetchAttendance]);
 
   const handleClockOut = async () => {
     setActionLoading(true);
@@ -238,25 +356,27 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6">
+      {/* QR Scanner Modal */}
+      <QrScannerModal
+        open={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScanned={handleQrScanned}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Attendance</h1>
           <p className="text-muted-foreground">Track your work hours and attendance</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={fetchAttendance} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
+        <Button variant="outline" className="gap-2" onClick={fetchAttendance} disabled={loading}>
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Clock In/Out Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="border-2 border-primary/20">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -303,28 +423,43 @@ export default function AttendancePage() {
                   </div>
                 </div>
               </div>
+
               <div className="flex flex-col gap-2">
-                <Button
-                  size="lg"
-                  variant={isClockedIn ? 'destructive' : 'default'}
-                  className="gap-2 min-w-[150px]"
-                  onClick={isClockedIn ? handleClockOut : handleClockIn}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : isClockedIn ? (
-                    <>
-                      <LogOut className="w-5 h-5" />
-                      Clock Out
-                    </>
-                  ) : (
-                    <>
-                      <LogIn className="w-5 h-5" />
-                      Clock In
-                    </>
-                  )}
-                </Button>
+                {isClockedIn ? (
+                  <Button
+                    size="lg"
+                    variant="destructive"
+                    className="gap-2 min-w-[150px]"
+                    onClick={handleClockOut}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <LogOut className="w-5 h-5" />
+                        Clock Out
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    className="gap-2 min-w-[150px]"
+                    onClick={() => setShowScanner(true)}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <QrCode className="w-5 h-5" />
+                        Clock In
+                      </>
+                    )}
+                  </Button>
+                )}
+
                 {todayRecord?.clockOut && !isClockedIn && (
                   <p className="text-xs text-muted-foreground text-center">
                     Last session: {todayRecord.hoursWorked?.toFixed(1) || 0}h worked
@@ -386,42 +521,40 @@ export default function AttendancePage() {
               <div className="text-center py-8 text-muted-foreground">
                 <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No attendance records yet</p>
-                <p className="text-sm">Clock in to start tracking your attendance</p>
+                <p className="text-sm">Scan the attendance QR code to start tracking</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Day</TableHead>
-                    <TableHead>Clock In</TableHead>
-                    <TableHead>Clock Out</TableHead>
-                    <TableHead>Hours</TableHead>
-                    <TableHead>Overtime</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attendanceHistory.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell className="font-medium">{formatDate(record.date)}</TableCell>
-                      <TableCell>{getDayName(record.date)}</TableCell>
-                      <TableCell>{formatTime(record.clockIn)}</TableCell>
-                      <TableCell>{formatTime(record.clockOut)}</TableCell>
-                      <TableCell>{record.hoursWorked ? `${record.hoursWorked.toFixed(1)}h` : '-'}</TableCell>
-                      <TableCell>
-                        {record.overtime && record.overtime > 0 ? (
-                          <span className="text-green-600">+{record.overtime.toFixed(1)}h</span>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(record.status)}</TableCell>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Day</TableHead>
+                      <TableHead>Clock In</TableHead>
+                      <TableHead>Clock Out</TableHead>
+                      <TableHead>Hours</TableHead>
+                      <TableHead>Overtime</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {attendanceHistory.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell className="font-medium">{formatDate(record.date)}</TableCell>
+                        <TableCell>{getDayName(record.date)}</TableCell>
+                        <TableCell>{formatTime(record.clockIn)}</TableCell>
+                        <TableCell>{formatTime(record.clockOut)}</TableCell>
+                        <TableCell>{record.hoursWorked ? `${record.hoursWorked.toFixed(1)}h` : '-'}</TableCell>
+                        <TableCell>
+                          {record.overtime && record.overtime > 0 ? (
+                            <span className="text-green-600">+{record.overtime.toFixed(1)}h</span>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(record.status)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>

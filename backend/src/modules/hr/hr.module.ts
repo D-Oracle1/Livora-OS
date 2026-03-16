@@ -13,11 +13,13 @@ import { PolicyController } from './controllers/policy.controller';
 import { SalaryConfigController } from './controllers/salary-config.controller';
 import { NotificationModule } from '../notification/notification.module';
 import { SettingsModule } from '../settings/settings.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     NotificationModule,
     SettingsModule,
+    AuthModule,
   ],
   controllers: [
     AttendanceController,
