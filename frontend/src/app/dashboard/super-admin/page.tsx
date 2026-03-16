@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, Users, Home, DollarSign, Loader2, RefreshCw, Activity, TrendingUp, ArrowUpRight } from 'lucide-react';
+import { Building2, Users, Home, Loader2, RefreshCw, Activity, TrendingUp, ArrowUpRight } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { usePlatformBranding } from '@/hooks/use-platform-branding';
 
 function formatNumber(n: number) {
@@ -107,7 +108,7 @@ export default function SuperAdminDashboard() {
       label: 'Total Revenue',
       value: stats?.totalRevenue ?? 0,
       display: '₦' + formatNumber(stats?.totalRevenue ?? 0),
-      icon: DollarSign,
+      icon: NairaSign,
       change: '+19%',
     },
   ];

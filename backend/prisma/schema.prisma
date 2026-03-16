@@ -219,6 +219,16 @@ enum PaymentStatus {
   CANCELLED
 }
 
+// General Ledger — every financial event is recorded here.
+// This is the single source of financial truth.
+enum LedgerEntryType {
+  SALE_PAYMENT      // Cash received for a property sale
+  EXPENSE           // Business expense paid out
+  COMMISSION        // Commission earned/owed to realtor
+  COMMISSION_PAYOUT // Commission actually disbursed to realtor
+  TAX               // Tax liability created from commission
+}
+
 // ===========================================
 // STAFF & HR ENUMS
 // ===========================================
@@ -2163,4 +2173,45 @@ model ExpenseAuditLog {
 
   @@index([expenseId])
   @@map("expense_audit_logs")
+}
+
+// ===========================================
+// GENERAL LEDGER — Single Financial Truth
+// Every financial transaction is recorded here.
+// No page should calculate financial data
+// independently — all numbers come from this table.
+// ===========================================
+
+model GeneralLedger {
+  id            String          @id @default(uuid())
+
+  // What kind of financial event this is
+  entryType     LedgerEntryType
+
+  // Link back to the source record (payment.id, sale.id, expense.id, commission.id, tax.id)
+  referenceId   String
+  referenceType String          // PAYMENT | SALE | EXPENSE | COMMISSION | TAX
+
+  // Double-entry accounts
+  // SALE_PAYMENT  → debit CASH          / credit REVENUE
+  // COMMISSION    → debit COMM_EXPENSE  / credit COMM_PAYABLE
+  // TAX           → debit TAX_EXPENSE   / credit TAX_PAYABLE
+  // EXPENSE       → debit EXPENSE       / credit CASH
+  debitAccount  String
+  creditAccount String
+
+  amount        Decimal         @db.Decimal(15, 2)
+  entryDate     DateTime        // Economic date: paymentDate, expenseDate, saleDate
+
+  description   String?
+  metadata      Json?           // saleId, realtorId, categoryId, etc.
+
+  createdAt     DateTime        @default(now())
+
+  // Prevent duplicate ledger entries for the same financial event
+  @@unique([referenceId, referenceType, entryType])
+  @@index([entryType])
+  @@index([referenceId])
+  @@index([entryDate])
+  @@map("general_ledger")
 }

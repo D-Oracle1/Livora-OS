@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Request } from 'express';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
+import { CdnService } from './cdn.service';
 import { DatabaseModule } from '../../database/database.module';
 
 interface MulterFile {
@@ -52,7 +53,7 @@ interface MulterFile {
     }),
   ],
   controllers: [UploadController],
-  providers: [UploadService],
-  exports: [UploadService],
+  providers: [UploadService, CdnService],
+  exports: [UploadService, CdnService],
 })
 export class UploadModule {}

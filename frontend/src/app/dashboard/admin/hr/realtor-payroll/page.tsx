@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Clock,
   Users,
-  DollarSign,
   FileText,
   Search,
   Loader2,

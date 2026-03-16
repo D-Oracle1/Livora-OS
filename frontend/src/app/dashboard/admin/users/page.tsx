@@ -58,6 +58,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [allTimeActive, setAllTimeActive] = useState<number | null>(null);
 
   // Status change dialog
   const [changeStatusUser, setChangeStatusUser] = useState<any>(null);
@@ -75,10 +76,25 @@ export default function AdminUsersPage() {
       if (statusFilter) params.append('status', statusFilter);
 
       const res: any = await api.get(`/users?${params.toString()}`);
-      const data = res?.data || res;
-      setUsers(Array.isArray(data) ? data : data?.data || []);
-      setTotalPages(data?.meta?.totalPages || 1);
-      setTotal(data?.meta?.total || 0);
+      // Handle both response shapes:
+      //   unwrapped: { data: [...], meta: {...} }
+      //   wrapped:   { success, data: { data: [...], meta: {...} }, timestamp }
+      const inner = res?.data;
+      let userList: any[];
+      let pageMeta: any;
+      if (Array.isArray(inner)) {
+        userList = inner;
+        pageMeta = res?.meta;
+      } else if (inner?.data) {
+        userList = inner.data;
+        pageMeta = inner.meta;
+      } else {
+        userList = [];
+        pageMeta = {};
+      }
+      setUsers(userList);
+      setTotalPages(pageMeta?.totalPages || 1);
+      setTotal(pageMeta?.total || 0);
     } catch {
       setUsers([]);
     } finally {
@@ -89,6 +105,13 @@ export default function AdminUsersPage() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    api.get('/users/stats').then((res: any) => {
+      const d = res?.data || res;
+      setAllTimeActive(d?.activeUsers ?? null);
+    }).catch(() => {});
+  }, []);
 
   const handleStatusChange = async () => {
     if (!changeStatusUser || !pendingStatus) return;
@@ -166,8 +189,8 @@ export default function AdminUsersPage() {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Total Users', value: total },
-          { label: 'Active', value: users.filter(u => u.status === 'ACTIVE').length },
-          { label: 'Inactive / Suspended', value: users.filter(u => u.status !== 'ACTIVE').length },
+          { label: 'Active', value: allTimeActive ?? users.filter(u => u.status === 'ACTIVE').length },
+          { label: 'Inactive / Suspended', value: allTimeActive !== null ? total - allTimeActive : users.filter(u => u.status !== 'ACTIVE').length },
         ].map((s) => (
           <Card key={s.label}>
             <CardHeader className="pb-1 pt-4">
@@ -271,18 +294,55 @@ export default function AdminUsersPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </p>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+        <div className="flex items-center justify-center gap-1 pb-4">
+          {/* Prev */}
+          <button
+            onClick={() => setPage(page - 1)}
+            disabled={page <= 1}
+            className="w-8 h-8 flex items-center justify-center rounded text-sm text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          {/* Page numbers */}
+          {(() => {
+            const items: (number | 'ellipsis')[] = [];
+            if (totalPages <= 7) {
+              for (let i = 1; i <= totalPages; i++) items.push(i);
+            } else {
+              items.push(1);
+              if (page > 3) items.push('ellipsis');
+              for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) items.push(i);
+              if (page < totalPages - 2) items.push('ellipsis');
+              items.push(totalPages);
+            }
+            return items.map((item, idx) =>
+              item === 'ellipsis' ? (
+                <span key={`e-${idx}`} className="w-8 h-8 flex items-center justify-center text-sm text-muted-foreground">…</span>
+              ) : (
+                <button
+                  key={item}
+                  onClick={() => setPage(item)}
+                  className={`w-8 h-8 flex items-center justify-center rounded text-sm font-medium transition-colors ${
+                    item === page
+                      ? 'bg-primary/15 text-primary font-semibold'
+                      : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {item}
+                </button>
+              )
+            );
+          })()}
+
+          {/* Next */}
+          <button
+            onClick={() => setPage(page + 1)}
+            disabled={page >= totalPages}
+            className="w-8 h-8 flex items-center justify-center rounded text-sm text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       )}
 

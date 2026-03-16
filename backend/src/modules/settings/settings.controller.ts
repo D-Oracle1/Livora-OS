@@ -6,6 +6,7 @@ import {
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -69,5 +70,24 @@ export class SettingsController {
     settings: any,
   ) {
     return this.settingsService.updatePayrollSettings(settings);
+  }
+
+  // ============ Notification Preferences (per-user) ============
+
+  @Get('notifications')
+  @ApiOperation({ summary: 'Get current user notification preferences' })
+  @ApiResponse({ status: 200, description: 'Notification preferences object' })
+  async getNotificationPrefs(@CurrentUser('id') userId: string) {
+    return this.settingsService.getNotificationPreferences(userId);
+  }
+
+  @Put('notifications')
+  @ApiOperation({ summary: 'Update current user notification preferences' })
+  @ApiResponse({ status: 200, description: 'Updated notification preferences' })
+  async updateNotificationPrefs(
+    @CurrentUser('id') userId: string,
+    @Body(new ValidationPipe({ whitelist: false, transform: true })) prefs: Record<string, boolean>,
+  ) {
+    return this.settingsService.updateNotificationPreferences(userId, prefs);
   }
 }

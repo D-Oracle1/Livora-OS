@@ -124,4 +124,11 @@ export class PayrollController {
   markAsPaid(@Param('id', ParseUUIDPipe) id: string) {
     return this.payrollService.markAsPaid(id);
   }
+
+  @Post(':id/recalculate')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
+  @ApiOperation({ summary: 'Recalculate payroll deductions using current settings, allowances, and penalties (DRAFT/PENDING only)' })
+  recalculate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.payrollService.recalculate(id);
+  }
 }

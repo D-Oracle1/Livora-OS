@@ -10,7 +10,6 @@ import {
   Mail,
   Phone,
   Home,
-  DollarSign,
   Eye,
   Edit,
   UserX,
@@ -23,6 +22,8 @@ import {
   Upload,
   FileSpreadsheet,
   Copy,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +46,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatCurrency } from '@/lib/utils';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth-storage';
@@ -130,6 +132,7 @@ export default function ClientsPage() {
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState<any | null>(null);
   const [meta, setMeta] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
+  const [allTimeActive, setAllTimeActive] = useState<number | null>(null);
   const [formData, setFormData] = useState<ClientFormData>({
     firstName: '',
     lastName: '',
@@ -147,11 +150,21 @@ export default function ClientsPage() {
       params.append('limit', '50');
       if (searchTerm) params.append('search', searchTerm);
 
-      const response = await api.get<ClientResponse>(`/clients?${params.toString()}`);
-      const data = response.data || response;
-      setClients(Array.isArray(data) ? data : (data as any).data || []);
-      if ((data as any).meta) {
-        setMeta((data as any).meta);
+      const response = await api.get<any>(`/clients?${params.toString()}`);
+      let clientList: ClientData[] = [];
+      let responseMeta = null;
+      if (Array.isArray(response)) {
+        clientList = response;
+      } else if (response?.data && Array.isArray(response.data)) {
+        clientList = response.data;
+        responseMeta = response.meta;
+      } else if (response?.data?.data && Array.isArray(response.data.data)) {
+        clientList = response.data.data;
+        responseMeta = response.data.meta || response.meta;
+      }
+      setClients(clientList);
+      if (responseMeta) {
+        setMeta(responseMeta);
       }
     } catch (error: any) {
       console.error('Failed to fetch clients:', error);
@@ -176,6 +189,14 @@ export default function ClientsPage() {
     fetchRealtors();
   }, [fetchClients, fetchRealtors]);
 
+  useEffect(() => {
+    // Get all-time active client count (not limited to current page)
+    api.get('/users?role=CLIENT&status=ACTIVE&limit=1').then((res: any) => {
+      const d = res?.data || res;
+      setAllTimeActive(d?.meta?.total ?? null);
+    }).catch(() => {});
+  }, []);
+
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
       const matchesStatus = filterStatus === 'ALL' || client.user.status === filterStatus;
@@ -184,7 +205,7 @@ export default function ClientsPage() {
   }, [clients, filterStatus]);
 
   const stats = useMemo(() => {
-    const activeCount = clients.filter(c => c.user.status === 'ACTIVE').length;
+    const activeCount = allTimeActive ?? clients.filter(c => c.user.status === 'ACTIVE').length;
     const totalProperties = clients.reduce((sum, c) => sum + (c._count?.ownedProperties || 0), 0);
     const totalPortfolio = clients.reduce((sum, c) => sum + Number(c.totalPurchaseValue || 0), 0);
 
@@ -192,9 +213,9 @@ export default function ClientsPage() {
       { title: 'Total Clients', value: meta.total.toString(), icon: Briefcase, color: 'text-blue-600', bgColor: 'bg-blue-100' },
       { title: 'Active Clients', value: activeCount.toString(), icon: Briefcase, color: 'text-green-600', bgColor: 'bg-green-100' },
       { title: 'Total Properties', value: totalProperties.toString(), icon: Home, color: 'text-purple-600', bgColor: 'bg-purple-100' },
-      { title: 'Portfolio Value', value: formatCurrency(totalPortfolio), icon: DollarSign, color: 'text-primary', bgColor: 'bg-primary/10' },
+      { title: 'Portfolio Value', value: formatCurrency(totalPortfolio), icon: NairaSign, color: 'text-primary', bgColor: 'bg-primary/10' },
     ];
-  }, [clients, meta.total]);
+  }, [clients, meta.total, allTimeActive]);
 
   const handleAddClient = async () => {
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
@@ -602,6 +623,55 @@ export default function ClientsPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Pagination */}
+      {meta.totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1 pb-4">
+          <button
+            onClick={() => setMeta(p => ({ ...p, page: p.page - 1 }))}
+            disabled={meta.page <= 1}
+            className="w-8 h-8 flex items-center justify-center rounded text-sm text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          {(() => {
+            const items: (number | 'ellipsis')[] = [];
+            if (meta.totalPages <= 7) {
+              for (let i = 1; i <= meta.totalPages; i++) items.push(i);
+            } else {
+              items.push(1);
+              if (meta.page > 3) items.push('ellipsis');
+              for (let i = Math.max(2, meta.page - 1); i <= Math.min(meta.totalPages - 1, meta.page + 1); i++) items.push(i);
+              if (meta.page < meta.totalPages - 2) items.push('ellipsis');
+              items.push(meta.totalPages);
+            }
+            return items.map((item, idx) =>
+              item === 'ellipsis' ? (
+                <span key={`e-${idx}`} className="w-8 h-8 flex items-center justify-center text-sm text-muted-foreground">…</span>
+              ) : (
+                <button
+                  key={item}
+                  onClick={() => setMeta(p => ({ ...p, page: item as number }))}
+                  className={`w-8 h-8 flex items-center justify-center rounded text-sm font-medium transition-colors ${
+                    item === meta.page
+                      ? 'bg-primary/15 text-primary font-semibold'
+                      : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {item}
+                </button>
+              )
+            );
+          })()}
+          <button
+            onClick={() => setMeta(p => ({ ...p, page: p.page + 1 }))}
+            disabled={meta.page >= meta.totalPages}
+            className="w-8 h-8 flex items-center justify-center rounded text-sm text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Reset Password Dialog */}
       <Dialog open={resetPwdOpen} onOpenChange={(open) => { setResetPwdOpen(open); if (!open) setResetPwdResult(null); }}>

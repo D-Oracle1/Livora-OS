@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
-  DollarSign,
   Search,
   TrendingUp,
   Calendar,
@@ -33,6 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { formatCurrency, formatDate, formatArea } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { ReceiptModal, ReceiptData } from '@/components/receipt';
 import { toast } from 'sonner';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
@@ -183,7 +183,7 @@ export default function RealtorSalesPage() {
       { title: 'Total Reports', value: filteredSales.length.toString(), icon: TrendingUp, color: 'text-blue-600', bgColor: 'bg-blue-100' },
       { title: 'Completed', value: activeSales.length.toString(), icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' },
       { title: 'In Progress', value: `${inProgressCount}`, icon: Clock, color: 'text-orange-600', bgColor: 'bg-orange-100' },
-      { title: 'My Commission', value: formatCurrency(totalCommission), icon: DollarSign, color: 'text-primary', bgColor: 'bg-primary/10' },
+      { title: 'My Commission', value: formatCurrency(totalCommission), icon: NairaSign, color: 'text-primary', bgColor: 'bg-primary/10' },
     ];
   }, [filteredSales]);
 
@@ -369,7 +369,7 @@ export default function RealtorSalesPage() {
         <Card>
           <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-primary" />
+              <NairaSign className="w-5 h-5 text-primary" />
               My Reported Sales
               <Badge variant="outline" className="ml-2">{getTimePeriodLabel()}</Badge>
             </CardTitle>

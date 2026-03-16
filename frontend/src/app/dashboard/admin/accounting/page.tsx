@@ -3,15 +3,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  TrendingUp, TrendingDown, DollarSign, AlertCircle,
+  TrendingUp, TrendingDown, AlertCircle,
   ArrowRight, Receipt, Tag, BarChart3, BookOpen, Clock,
   Percent, Scale, Waves, Lightbulb, ShieldAlert, RefreshCw, Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { NairaSign } from '@/components/icons/naira-sign';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -24,6 +24,60 @@ const TREND_WINDOWS: { label: string; value: TrendWindow }[] = [
   { label: '6M', value: 6 },
   { label: '12M', value: 12 },
 ];
+
+type PeriodKey = 'this_month' | 'last_month' | 'this_quarter' | 'last_quarter' | 'this_year' | 'all_time';
+
+const PERIODS: { label: string; key: PeriodKey }[] = [
+  { label: 'This Month',    key: 'this_month' },
+  { label: 'Last Month',    key: 'last_month' },
+  { label: 'This Quarter',  key: 'this_quarter' },
+  { label: 'Last Quarter',  key: 'last_quarter' },
+  { label: 'This Year',     key: 'this_year' },
+  { label: 'All Time',      key: 'all_time' },
+];
+
+function getPeriodDates(key: PeriodKey): { startDate: string; endDate: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const q = Math.floor(m / 3);
+
+  switch (key) {
+    case 'this_month':
+      return {
+        startDate: new Date(y, m, 1).toISOString(),
+        endDate:   now.toISOString(),
+      };
+    case 'last_month': {
+      const start = new Date(y, m - 1, 1);
+      const end   = new Date(y, m, 0, 23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+    case 'this_quarter':
+      return {
+        startDate: new Date(y, q * 3, 1).toISOString(),
+        endDate:   now.toISOString(),
+      };
+    case 'last_quarter': {
+      const lq = q === 0 ? 3 : q - 1;
+      const ly = q === 0 ? y - 1 : y;
+      return {
+        startDate: new Date(ly, lq * 3, 1).toISOString(),
+        endDate:   new Date(ly, lq * 3 + 3, 0, 23, 59, 59, 999).toISOString(),
+      };
+    }
+    case 'this_year':
+      return {
+        startDate: new Date(y, 0, 1).toISOString(),
+        endDate:   now.toISOString(),
+      };
+    case 'all_time':
+      return {
+        startDate: new Date('2020-01-01').toISOString(),
+        endDate:   now.toISOString(),
+      };
+  }
+}
 
 const SEVERITY_CONFIG = {
   CRITICAL: { bg: 'bg-red-50 border-red-200', icon: 'text-red-500', badge: 'bg-red-100 text-red-700' },
@@ -45,30 +99,51 @@ export default function AccountingOverviewPage() {
   const [recentExpenses, setRecentExpenses] = useState<any[]>([]);
   const [anomalies, setAnomalies]       = useState<any[]>([]);
   const [insights, setInsights]         = useState<any[]>([]);
-  const [trendWindow, setTrendWindow]         = useState<TrendWindow>(6);
-  const [loading, setLoading]                 = useState(true);
-  const [trendLoading, setTrendLoading]       = useState(false);
-  const [recalculating, setRecalculating]     = useState(false);
+  const [trendWindow, setTrendWindow]   = useState<TrendWindow>(6);
+  const [activePeriod, setActivePeriod]   = useState<PeriodKey>('this_month');
+  const [loading, setLoading]             = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [trendLoading, setTrendLoading]   = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
-  const fetchCore = useCallback(async () => {
+  const fetchSummary = useCallback(async (period: PeriodKey) => {
+    const { startDate, endDate } = getPeriodDates(period);
+    setSummaryLoading(true);
     try {
+      const raw = await api.get<any>(`/accounting/summary?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`);
+      setSummary(raw?.data ?? raw);
+    } catch {
+      // silently fail
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, []);
+
+  const fetchCore = useCallback(async (period: PeriodKey = activePeriod) => {
+    setLoading(true);
+    try {
+      const { startDate, endDate } = getPeriodDates(period);
       const [sumRaw, expRaw, anomRaw, insRaw] = await Promise.all([
-        api.get<any>('/accounting/summary'),
+        api.get<any>(`/accounting/summary?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
         api.get<any>('/expenses?limit=5'),
         api.get<any>('/accounting/anomalies').catch(() => null),
         api.get<any>('/accounting/insights').catch(() => null),
       ]);
       setSummary(sumRaw?.data ?? sumRaw);
-      // TransformInterceptor: { success, data: [...], meta: {} }
       setRecentExpenses(Array.isArray(expRaw?.data) ? expRaw.data : []);
       setAnomalies(anomRaw?.data?.anomalies ?? anomRaw?.anomalies ?? []);
       setInsights(insRaw?.data?.insights ?? insRaw?.insights ?? []);
     } catch {
-      // silently fail — UI shows zeros
+      // silently fail
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activePeriod]);
+
+  const handlePeriodChange = (key: PeriodKey) => {
+    setActivePeriod(key);
+    fetchSummary(key);
+  };
 
   const handleRecalculate = async () => {
     if (!confirm('Recalculate all commission & tax figures from current rate settings? This updates every approved sale and payment record.')) return;
@@ -79,7 +154,7 @@ export default function AccountingOverviewPage() {
       const msg = d?.message ?? `Updated ${d?.updatedSales ?? 0} sales, ${d?.updatedPayments ?? 0} payments`;
       const { toast: t } = await import('sonner');
       t.success(msg);
-      await fetchCore();
+      await fetchCore(activePeriod);
       await fetchTrend(trendWindow);
     } catch (e: any) {
       const { toast: t } = await import('sonner');
@@ -101,47 +176,48 @@ export default function AccountingOverviewPage() {
     }
   }, []);
 
-  useEffect(() => { fetchCore(); }, [fetchCore]);
+  useEffect(() => { fetchCore(activePeriod); }, []);
   useEffect(() => { fetchTrend(trendWindow); }, [fetchTrend, trendWindow]);
 
-  const mtd = summary?.mtd;
+  const periodData = summary?.period;
   const ytd = summary?.ytd;
+  const periodLabel = PERIODS.find(p => p.key === activePeriod)?.label ?? 'Period';
 
   const statCards = [
     {
-      label: 'Revenue (MTD)',
-      value: formatCurrency(mtd?.totalRevenue ?? 0),
-      icon: DollarSign,
+      label: `Revenue`,
+      value: formatCurrency(periodData?.totalRevenue ?? 0),
+      icon: NairaSign,
       color: 'text-green-600',
       bg: 'bg-green-50',
     },
     {
-      label: 'Expenses (MTD)',
-      value: formatCurrency(mtd?.totalExpenses ?? 0),
+      label: `Expenses`,
+      value: formatCurrency(periodData?.totalExpenses ?? 0),
       icon: Receipt,
       color: 'text-red-600',
       bg: 'bg-red-50',
     },
     {
-      label: 'Commission (MTD)',
-      value: formatCurrency(mtd?.totalCommission ?? 0),
+      label: `Commission`,
+      value: formatCurrency(periodData?.totalCommission ?? 0),
       icon: Percent,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
     },
     {
-      label: 'Taxes (MTD)',
-      value: formatCurrency(mtd?.totalTax ?? 0),
+      label: `Taxes`,
+      value: formatCurrency(periodData?.totalTax ?? 0),
       icon: Scale,
       color: 'text-purple-600',
       bg: 'bg-purple-50',
     },
     {
-      label: 'Net Profit (MTD)',
-      value: formatCurrency(mtd?.netProfit ?? 0),
-      icon: (mtd?.netProfit ?? 0) >= 0 ? TrendingUp : TrendingDown,
-      color: (mtd?.netProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600',
-      bg: (mtd?.netProfit ?? 0) >= 0 ? 'bg-emerald-50' : 'bg-red-50',
+      label: `Net Profit`,
+      value: formatCurrency(periodData?.netProfit ?? 0),
+      icon: (periodData?.netProfit ?? 0) >= 0 ? TrendingUp : TrendingDown,
+      color: (periodData?.netProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600',
+      bg: (periodData?.netProfit ?? 0) >= 0 ? 'bg-emerald-50' : 'bg-red-50',
     },
   ];
 
@@ -163,7 +239,7 @@ export default function AccountingOverviewPage() {
           <p className="text-sm text-gray-500 mt-1">Platform-wide financial summary</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => { fetchCore(); fetchTrend(trendWindow); }}>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => { fetchCore(activePeriod); fetchTrend(trendWindow); }}>
             <RefreshCw className="w-4 h-4" /> Refresh
           </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={handleRecalculate} disabled={recalculating}>
@@ -199,35 +275,55 @@ export default function AccountingOverviewPage() {
         </div>
       )}
 
-      {/* Stat Cards — 5 metrics */}
-      {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <Card key={i}><CardContent className="p-5"><div className="h-14 bg-gray-100 rounded animate-pulse" /></CardContent></Card>
+      {/* Period Selector + Stat Cards */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-gray-500 font-medium">Show:</span>
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => handlePeriodChange(p.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                activePeriod === p.key
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {p.label}
+            </button>
           ))}
         </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {statCards.map((card) => (
-            <Card key={card.label} className="overflow-hidden">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0">
-                    <p className="text-xs text-gray-500 truncate">{card.label}</p>
-                    <p className="text-lg font-bold text-gray-900 mt-1 truncate">{card.value}</p>
+
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {[...Array(5)].map((_, i) => (
+              <Card key={i}><CardContent className="p-5"><div className="h-14 bg-gray-100 rounded animate-pulse" /></CardContent></Card>
+            ))}
+          </div>
+        ) : (
+          <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 transition-opacity duration-150 ${summaryLoading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+            {statCards.map((card) => (
+              <Card key={card.label} className="overflow-hidden">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500 truncate">{card.label}</p>
+                      <p className="text-xs text-blue-500 font-medium truncate">{periodLabel}</p>
+                      <p className="text-lg font-bold text-gray-900 mt-1 truncate">{card.value}</p>
+                    </div>
+                    <div className={`p-2 rounded-lg ${card.bg} ml-2 flex-shrink-0`}>
+                      <card.icon className={`w-4 h-4 ${card.color}`} />
+                    </div>
                   </div>
-                  <div className={`p-2 rounded-lg ${card.bg} ml-2 flex-shrink-0`}>
-                    <card.icon className={`w-4 h-4 ${card.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Revenue vs Expenses Chart with period selector */}
+        {/* Revenue vs Expenses Chart */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -369,7 +465,7 @@ export default function AccountingOverviewPage() {
         </Card>
       </div>
 
-      {/* Quick Links — 6 tiles */}
+      {/* Quick Links */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold flex items-center gap-2">

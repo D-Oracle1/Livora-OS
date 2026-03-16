@@ -9,7 +9,6 @@ import {
   Mail,
   Phone,
   Home,
-  DollarSign,
   MoreHorizontal,
   MessageSquare,
 } from 'lucide-react';
@@ -20,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatCurrency } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 export default function RealtorClientsPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,7 +60,7 @@ export default function RealtorClientsPage() {
     { title: 'Total Clients', value: String(totalClients), icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-100' },
     { title: 'Active Clients', value: String(activeClients), icon: Users, color: 'text-green-600', bgColor: 'bg-green-100' },
     { title: 'Prospective', value: String(prospectiveClients), icon: Users, color: 'text-orange-600', bgColor: 'bg-orange-100' },
-    { title: 'Portfolio Value', value: formatCurrency(portfolioValue), icon: DollarSign, color: 'text-primary', bgColor: 'bg-primary/10' },
+    { title: 'Portfolio Value', value: formatCurrency(portfolioValue), icon: NairaSign, color: 'text-primary', bgColor: 'bg-primary/10' },
   ];
 
   const filteredClients = clients.filter((client: any) => {

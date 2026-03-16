@@ -78,6 +78,7 @@ export class MailService {
       this.logger.log(`Email "${subject}" sent to ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send "${subject}" to ${to}: ${error.message}`);
+      throw error;
     }
   }
 
@@ -482,6 +483,41 @@ export class MailService {
       <p>Please log in to the admin dashboard to review and confirm this purchase.</p>
     `);
     await this.send(to, 'Payment Submitted — Action Required', html, undefined, companyName);
+  }
+
+  // ============ Contact Form Emails ============
+
+  async sendContactFormEmail(
+    to: string,
+    data: { name: string; email: string; phone?: string; message: string },
+  ): Promise<void> {
+    const phoneRow = data.phone
+      ? `<tr><td style="padding:8px 0;color:#666;">Phone</td><td style="padding:8px 0;font-weight:bold;text-align:right;">${escapeHtml(data.phone)}</td></tr>`
+      : '';
+    const html = this.baseTemplate(`
+      <h2 style="color:#333;">New Contact Form Submission</h2>
+      <p>A new enquiry has been received from your platform contact form.</p>
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+        <tr><td style="padding:8px 0;color:#666;">Name</td><td style="padding:8px 0;font-weight:bold;text-align:right;">${escapeHtml(data.name)}</td></tr>
+        <tr><td style="padding:8px 0;color:#666;">Email</td><td style="padding:8px 0;font-weight:bold;text-align:right;">${escapeHtml(data.email)}</td></tr>
+        ${phoneRow}
+      </table>
+      <h3 style="color:#333;margin-bottom:8px;">Message</h3>
+      <div style="background:#f9fafb;border-left:4px solid #3b82f6;padding:16px;border-radius:4px;">
+        <p style="margin:0;color:#374151;line-height:1.6;">${escapeHtml(data.message)}</p>
+      </div>
+      <p style="color:#666;font-size:13px;margin-top:20px;">Reply directly to this email or contact the sender at ${escapeHtml(data.email)}.</p>
+    `);
+    await this.send(to, 'New Contact Form Submission', html);
+  }
+
+  async sendContactAutoReply(to: string, name: string): Promise<void> {
+    const html = this.baseTemplate(`
+      <h2 style="color:#333;">Thank you for reaching out, ${escapeHtml(name)}!</h2>
+      <p>We have received your message and will get back to you as soon as possible, usually within 1-2 business days.</p>
+      <p style="color:#666;font-size:14px;">If you have an urgent enquiry, please call us directly.</p>
+    `);
+    await this.send(to, 'We received your message', html);
   }
 
   // ============ Newsletter Emails ============

@@ -9,6 +9,7 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { NotificationService } from '../notification/notification.service';
 import { ClientService } from '../client/client.service';
 import { SettingsService } from '../settings/settings.service';
+import { LedgerService } from '../accounting/ledger.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
@@ -26,6 +27,7 @@ export class SaleService {
     @Inject(forwardRef(() => ClientService))
     private readonly clientService: ClientService,
     private readonly settingsService: SettingsService,
+    private readonly ledgerService: LedgerService,
   ) {}
 
   async create(createSaleDto: CreateSaleDto, realtorUserId: string, reporterRole: string = 'REALTOR') {
@@ -78,10 +80,16 @@ export class SaleService {
       throw new BadRequestException('Failed to get or create client profile');
     }
 
-    // Commission is only applicable when a realtor is credited
-    const commissionRate = realtorProfile ? this.getCommissionRate(realtorProfile.loyaltyTier) : 0;
-    // Tax rate is read from configurable settings; falls back to 15% if not configured
-    const taxRate = realtorProfile ? await this.settingsService.getMainTaxRate() : 0;
+    // Commission and tax rates are always read from configurable settings
+    const [commissionRates, taxRate] = realtorProfile
+      ? await Promise.all([
+          this.settingsService.getCommissionRates(),
+          this.settingsService.getMainTaxRate(),
+        ])
+      : [{ [LoyaltyTier.BRONZE]: 0.03 }, 0];
+    const commissionRate = realtorProfile
+      ? (commissionRates[realtorProfile.loyaltyTier as string] ?? 0.03)
+      : 0;
 
     const isInstallment = createSaleDto.paymentPlan === 'INSTALLMENT';
     const totalSalePrice = Number(createSaleDto.saleValue);
@@ -96,10 +104,13 @@ export class SaleService {
       throw new BadRequestException('First payment cannot exceed total sale price');
     }
 
-    // Calculate commission & tax on first payment (not total price)
+    // Commission & tax are based on firstPaymentAmount × rate.
+    // For FULL plan firstPaymentAmount = totalSalePrice, so this is the full commission.
+    // For INSTALLMENT, sale.commissionAmount starts here and grows with totalPaid as
+    // further payments come in (see recordPayment).
     const firstCommission = firstPaymentAmount * commissionRate;
-    const firstTax = firstCommission * taxRate;
-    const firstNet = firstCommission - firstTax;
+    const firstTax        = firstCommission * taxRate;
+    const firstNet        = firstCommission - firstTax;
 
     // Create the sale as PENDING — admin must approve before financial processing
     const sale = await this.prisma.sale.create({
@@ -216,24 +227,73 @@ export class SaleService {
     let points = 0;
 
     if (sale.realtorId) {
-      // Create commission record
-      await this.commissionService.create({
+      // Always re-read the current tax rate at approval time so Tax records
+      // reflect the configured rate, not whatever was stored at sale creation.
+      const currentTaxRate = await this.settingsService.getMainTaxRate();
+      const commissionAmount = Number(sale.commissionAmount);
+      const taxAmount       = commissionAmount * currentTaxRate;
+      const netAmount       = commissionAmount - taxAmount;
+
+      // Correct the sale's tax figures with the live rate
+      await this.prisma.sale.update({
+        where: { id: sale.id },
+        data: { taxRate: currentTaxRate, taxAmount, netAmount },
+      });
+
+      // Create commission record and capture the ID for the ledger entry
+      const commissionRecord = await this.commissionService.create({
         saleId: sale.id,
         realtorId: sale.realtorId,
-        amount: Number(sale.commissionAmount),
+        amount: commissionAmount,
         rate: sale.commissionRate,
       });
 
-      // Create tax record
+      // Create tax record using the live rate
       const now = new Date();
-      await this.taxService.create({
+      const taxRecord = await this.taxService.create({
         saleId: sale.id,
         realtorId: sale.realtorId,
-        amount: Number(sale.taxAmount),
-        rate: sale.taxRate,
+        amount: taxAmount,
+        rate: currentTaxRate,
         year: now.getFullYear(),
         quarter: Math.floor(now.getMonth() / 3) + 1,
       });
+
+      // ── Post to General Ledger (FULL plan only — installments posted per payment) ──
+      if (!isInstallment) {
+        await Promise.all([
+          // Cash received for the full sale
+          this.ledgerService.postSalePayment({
+            referenceId:   sale.id,
+            referenceType: 'SALE',
+            amount:        Number(sale.salePrice),
+            entryDate:     sale.saleDate,
+            saleId:        sale.id,
+            description:   `Full payment – ${sale.property?.title ?? sale.id}`,
+          }),
+          // Commission liability created
+          commissionRecord && commissionAmount > 0
+            ? this.ledgerService.postCommission({
+                referenceId:   (commissionRecord as any).id,
+                referenceType: 'COMMISSION',
+                amount:        commissionAmount,
+                entryDate:     sale.saleDate,
+                saleId:        sale.id,
+                realtorId:     sale.realtorId,
+              })
+            : Promise.resolve(),
+          // Tax liability created
+          taxRecord && taxAmount > 0
+            ? this.ledgerService.postTax({
+                referenceId:   (taxRecord as any).id,
+                referenceType: 'TAX',
+                amount:        taxAmount,
+                entryDate:     sale.saleDate,
+                saleId:        sale.id,
+              })
+            : Promise.resolve(),
+        ]);
+      }
 
       // Award loyalty points
       points = await this.loyaltyService.awardPoints({
@@ -385,6 +445,11 @@ export class SaleService {
       const newRemainingBalance = Number(sale.salePrice) - newTotalPaid;
       const isFullyPaid = newRemainingBalance <= 0;
 
+      // Updated sale-level commission/tax based on newTotalPaid × rate
+      const newSaleCommission = newTotalPaid * commissionRate;
+      const newSaleTax        = newSaleCommission * taxRate;
+      const newSaleNet        = newSaleCommission - newSaleTax;
+
       // Create the payment record
       const newPayment = await tx.payment.create({
         data: {
@@ -404,15 +469,17 @@ export class SaleService {
         },
       });
 
-      // Update sale running totals atomically
+      // Update sale running totals atomically.
+      // commissionAmount / taxAmount / netAmount grow with totalPaid × rate so they
+      // always reflect commission earned on cash received so far.
       await tx.sale.update({
         where: { id: saleId },
         data: {
           totalPaid: newTotalPaid,
           remainingBalance: newRemainingBalance,
-          commissionAmount: { increment: commissionAmount },
-          taxAmount: { increment: taxAmount },
-          netAmount: { increment: netCommission },
+          commissionAmount: newSaleCommission,
+          taxAmount: newSaleTax,
+          netAmount: newSaleNet,
           status: isFullyPaid ? SaleStatus.COMPLETED : SaleStatus.IN_PROGRESS,
           closingDate: isFullyPaid ? new Date() : undefined,
           nextPaymentDue: isFullyPaid
@@ -429,16 +496,62 @@ export class SaleService {
         });
       }
 
-      if (sale.realtorId) {
-        await tx.commission.updateMany({
-          where: { saleId },
-          data: { amount: { increment: commissionAmount } },
-        });
-        await tx.tax.updateMany({
-          where: { saleId },
-          data: { amount: { increment: taxAmount } },
-        });
-      }
+      // Keep Commission and Tax ledger records in sync with the updated sale totals
+      await tx.commission.updateMany({
+        where: { saleId },
+        data: { amount: newSaleCommission },
+      });
+      await tx.tax.updateMany({
+        where: { saleId },
+        data: { amount: newSaleTax },
+      });
+
+      // ── Post to General Ledger — one entry per payment, per type ──────────────
+      // Each installment payment creates its own immutable ledger entries so that
+      // revenue is recognised on the actual payment date (true cash-basis accounting).
+      const paymentDate = dto.paymentDate ? new Date(dto.paymentDate) : new Date();
+
+      await Promise.all([
+        // Cash received for this installment
+        this.ledgerService.postSalePayment(
+          {
+            referenceId:   newPayment.id,
+            referenceType: 'PAYMENT',
+            amount:        paymentAmount,
+            entryDate:     paymentDate,
+            saleId,
+            description:   `Installment #${lastPaymentNumber + 1}`,
+          },
+          tx,
+        ),
+        // Commission earned on this payment
+        commissionAmount > 0
+          ? this.ledgerService.postCommission(
+              {
+                referenceId:   newPayment.id,
+                referenceType: 'PAYMENT',
+                amount:        commissionAmount,
+                entryDate:     paymentDate,
+                saleId,
+                realtorId:     sale.realtorId,
+              },
+              tx,
+            )
+          : Promise.resolve(),
+        // Tax on the commission for this payment
+        taxAmount > 0
+          ? this.ledgerService.postTax(
+              {
+                referenceId:   newPayment.id,
+                referenceType: 'PAYMENT',
+                amount:        taxAmount,
+                entryDate:     paymentDate,
+                saleId,
+              },
+              tx,
+            )
+          : Promise.resolve(),
+      ]);
 
       return { newPayment, sale, isFullyPaid, lastPaymentNumber, paymentAmount, newRemainingBalance };
     });
@@ -495,16 +608,6 @@ export class SaleService {
       },
       payments,
     };
-  }
-
-  private getCommissionRate(tier: LoyaltyTier): number {
-    const rates = {
-      [LoyaltyTier.BRONZE]: 0.03,
-      [LoyaltyTier.SILVER]: 0.035,
-      [LoyaltyTier.GOLD]: 0.04,
-      [LoyaltyTier.PLATINUM]: 0.05,
-    };
-    return rates[tier] || 0.03;
   }
 
   private async updateRealtorStats(realtorId: string) {
@@ -740,6 +843,18 @@ export class SaleService {
       });
 
       if (sale.realtorId && sale.realtor) {
+        // Always re-read the current tax rate at approval time
+        const currentTaxRate   = await this.settingsService.getMainTaxRate();
+        const commissionAmount = Number(sale.commissionAmount);
+        const taxAmount        = commissionAmount * currentTaxRate;
+        const netAmount        = commissionAmount - taxAmount;
+
+        // Correct the sale's tax figures with the live rate
+        await this.prisma.sale.update({
+          where: { id: sale.id },
+          data: { taxRate: currentTaxRate, taxAmount, netAmount },
+        });
+
         // Create commission record if not exists
         const existingCommission = await this.prisma.commission.findUnique({
           where: { saleId: sale.id },
@@ -749,25 +864,30 @@ export class SaleService {
           await this.commissionService.create({
             saleId: sale.id,
             realtorId: sale.realtorId,
-            amount: Number(sale.commissionAmount),
+            amount: commissionAmount,
             rate: sale.commissionRate,
           });
         }
 
-        // Create tax record if not exists
+        // Upsert tax record using the live rate
         const existingTax = await this.prisma.tax.findUnique({
           where: { saleId: sale.id },
         });
+        const now = new Date();
 
         if (!existingTax) {
-          const now = new Date();
           await this.taxService.create({
             saleId: sale.id,
             realtorId: sale.realtorId,
-            amount: Number(sale.taxAmount),
-            rate: sale.taxRate,
+            amount: taxAmount,
+            rate: currentTaxRate,
             year: now.getFullYear(),
             quarter: Math.floor(now.getMonth() / 3) + 1,
+          });
+        } else {
+          await this.prisma.tax.update({
+            where: { saleId: sale.id },
+            data: { amount: taxAmount, rate: currentTaxRate },
           });
         }
 
@@ -860,9 +980,25 @@ export class SaleService {
     return updatedSale;
   }
 
+  async deleteCancelledSale(id: string) {
+    const sale = await this.prisma.sale.findUnique({ where: { id } });
+    if (!sale) throw new NotFoundException('Sale not found');
+    if (sale.status !== SaleStatus.CANCELLED) {
+      throw new BadRequestException('Only cancelled sales can be deleted');
+    }
+
+    // Remove all child records before deleting the sale
+    await this.prisma.payment.deleteMany({ where: { saleId: id } });
+    await this.prisma.commission.deleteMany({ where: { saleId: id } });
+    await this.prisma.tax.deleteMany({ where: { saleId: id } });
+    await this.prisma.sale.delete({ where: { id } });
+
+    return { success: true, message: 'Cancelled sale deleted' };
+  }
+
   async getStats(period?: 'week' | 'month' | 'quarter' | 'year') {
     const now = new Date();
-    let startDate: Date | undefined;
+    let startDate: Date = new Date('2020-01-01T00:00:00Z'); // epoch fallback (all-time)
 
     if (period) {
       switch (period) {
@@ -872,44 +1008,43 @@ export class SaleService {
         case 'month':
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
           break;
-        case 'quarter':
+        case 'quarter': {
           const quarter = Math.floor(now.getMonth() / 3);
           startDate = new Date(now.getFullYear(), quarter * 3, 1);
           break;
+        }
         case 'year':
           startDate = new Date(now.getFullYear(), 0, 1);
           break;
       }
     }
 
-    const where = startDate
-      ? {
-          status: SaleStatus.COMPLETED,
-          saleDate: { gte: startDate },
-        }
-      : { status: SaleStatus.COMPLETED };
+    // Sale counts still use saleDate (measures deals closed in the period)
+    const dateFilter = period ? { gte: startDate } : undefined;
+    const ACTIVE_STATUS = { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] };
 
-    const [count, sum, pending] = await Promise.all([
-      this.prisma.sale.count({ where }),
-      this.prisma.sale.aggregate({
-        where,
-        _sum: {
-          salePrice: true,
-          commissionAmount: true,
-          taxAmount: true,
-          netAmount: true,
-        },
-      }),
-      this.prisma.sale.count({ where: { status: SaleStatus.PENDING } }),
-    ]);
+    const [countFull, countInstall, pending, totalRevenue, totalCommission, totalTax] =
+      await Promise.all([
+        this.prisma.sale.count({
+          where: { status: SaleStatus.COMPLETED, paymentPlan: 'FULL', ...(dateFilter ? { saleDate: dateFilter } : {}) },
+        }),
+        this.prisma.sale.count({
+          where: { status: ACTIVE_STATUS, paymentPlan: 'INSTALLMENT', ...(dateFilter ? { saleDate: dateFilter } : {}) },
+        }),
+        this.prisma.sale.count({ where: { status: SaleStatus.PENDING } }),
+        // Revenue, commission, tax from ledger (cash-basis, payment-date attributed)
+        this.ledgerService.getRevenue(startDate, now),
+        this.ledgerService.getCommissionTotal(startDate, now),
+        this.ledgerService.getTaxTotal(startDate, now),
+      ]);
 
     return {
-      totalSales: count,
-      pendingSales: pending,
-      totalRevenue: sum._sum.salePrice || 0,
-      totalCommission: sum._sum.commissionAmount || 0,
-      totalTax: sum._sum.taxAmount || 0,
-      totalNetEarnings: sum._sum.netAmount || 0,
+      totalSales:       countFull + countInstall,
+      pendingSales:     pending,
+      totalRevenue,
+      totalCommission,
+      totalTax,
+      totalNetEarnings: totalRevenue - totalCommission - totalTax,
     };
   }
 }

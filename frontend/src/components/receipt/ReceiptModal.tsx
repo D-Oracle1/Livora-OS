@@ -36,48 +36,71 @@ export function ReceiptModal({ open, onClose, data, branding }: ReceiptModalProp
     if (!receiptRef.current || !data) return;
 
     try {
-      // Dynamic import of html2canvas
       const html2canvas = (await import('html2canvas')).default;
       const jsPDF = (await import('jspdf')).default;
 
-      // Capture full scroll height — the dialog clips overflow so offsetHeight
-      // may be shorter than the actual receipt content.
-      const fullHeight = receiptRef.current.scrollHeight;
+      // Clone the receipt into a full-size off-screen container so html2canvas
+      // sees the complete content regardless of the dialog's scroll constraints.
+      const clone = receiptRef.current.cloneNode(true) as HTMLElement;
+      const container = document.createElement('div');
+      Object.assign(container.style, {
+        position: 'fixed',
+        top: '0',
+        left: '-9999px',
+        width: '794px',          // A4-ish pixel width at 96dpi
+        background: '#ffffff',
+        zIndex: '-1',
+        overflow: 'visible',
+      });
+      container.appendChild(clone);
+      document.body.appendChild(container);
 
-      const canvas = await html2canvas(receiptRef.current, {
+      const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        height: fullHeight,
-        onclone: (_doc, element) => {
-          // Force light-mode colors and remove overflow constraints so the
-          // full receipt (including footer) is rendered in the cloned doc.
-          element.style.color = '#111111';
-          element.style.background = '#ffffff';
-          element.style.overflow = 'visible';
-          element.style.height = fullHeight + 'px';
-          // Also unlock the immediate wrapper (.border.rounded-lg.overflow-hidden)
-          if (element.parentElement) {
-            element.parentElement.style.overflow = 'visible';
-          }
+        width: 794,
+        onclone: (_doc, el) => {
+          el.style.overflow = 'visible';
+          el.style.color = '#111111';
         },
       });
 
+      document.body.removeChild(container);
+
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      const imgWidth = 210; // A4 width in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pageW = 210;  // A4 mm
+      const pageH = 297;
+      const margin = 10;  // mm on each side
+      const usableW = pageW - margin * 2;
+      const imgH = (canvas.height * usableW) / canvas.width;
 
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      let yPos = margin;
+      let remaining = imgH;
+
+      // Multi-page support: if receipt is taller than one page
+      while (remaining > 0) {
+        const sliceH = Math.min(remaining, pageH - margin * 2);
+        const srcY = (imgH - remaining) * (canvas.height / imgH);
+        const srcH = sliceH * (canvas.height / imgH);
+
+        // Draw the relevant slice
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = srcH;
+        const ctx = sliceCanvas.getContext('2d')!;
+        ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+
+        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, yPos, usableW, sliceH);
+        remaining -= sliceH;
+        if (remaining > 0) { pdf.addPage(); yPos = margin; }
+      }
+
       pdf.save(`receipt-${data.receiptNumber}.pdf`);
-
-      toast.success('Receipt downloaded successfully!');
+      toast.success('Receipt downloaded!');
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast.error('Failed to download receipt. Please try again.');
@@ -93,36 +116,41 @@ export function ReceiptModal({ open, onClose, data, branding }: ReceiptModalProp
       return;
     }
 
-    const styles = document.querySelectorAll('style, link[rel="stylesheet"]');
-    let styleHTML = '';
-    styles.forEach((style) => {
-      styleHTML += style.outerHTML;
-    });
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Receipt - ${data?.receiptNumber}</title>
-          ${styleHTML}
-          <style>
-            body { margin: 0; padding: 20px; }
-            @media print {
-              body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-            }
-          </style>
-        </head>
-        <body>
-          ${receiptRef.current.outerHTML}
-        </body>
-      </html>
-    `);
+    // Receipt uses 100% inline styles — no external CSS needed.
+    // We only add a minimal page reset so browser defaults don't interfere.
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+  <head>
+    <title>Receipt - ${data?.receiptNumber ?? ''}</title>
+    <meta charset="utf-8" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: #fff;
+        font-family: Arial, Helvetica, sans-serif;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      img { max-width: 100%; display: block; }
+      table { border-collapse: collapse; }
+      @page { margin: 10mm; }
+    </style>
+  </head>
+  <body>
+    ${receiptRef.current.outerHTML}
+  </body>
+</html>`);
 
     printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
-    };
+
+    // Wait for images to load before triggering print dialog
+    printWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      }, 300);
+    });
   };
 
   const handleSendEmail = async () => {

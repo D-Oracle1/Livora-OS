@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Clock,
   Users,
-  DollarSign,
   FileText,
   Search,
   Loader2,
@@ -49,6 +48,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { api, getImageUrl } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 interface PayrollRecord {
   id: string;
@@ -346,13 +346,13 @@ export default function AdminPayrollPage() {
     ? [
         { label: 'Total Payroll', value: formatCurrency(summary.totalNetPay), icon: Wallet, color: 'text-blue-600', bg: 'bg-blue-100' },
         { label: 'Staff Count', value: summary.totalRecords.toString(), icon: Users, color: 'text-green-600', bg: 'bg-green-100' },
-        { label: 'Avg. Salary', value: formatCurrency(summary.totalRecords > 0 ? summary.totalNetPay / summary.totalRecords : 0), icon: DollarSign, color: 'text-purple-600', bg: 'bg-purple-100' },
+        { label: 'Avg. Salary', value: formatCurrency(summary.totalRecords > 0 ? summary.totalNetPay / summary.totalRecords : 0), icon: NairaSign, color: 'text-purple-600', bg: 'bg-purple-100' },
         { label: 'Pending Approval', value: (summary.byStatus?.DRAFT || 0) + (summary.byStatus?.PENDING_APPROVAL || 0), icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100' },
       ]
     : [
         { label: 'Total Payroll', value: formatCurrency(0), icon: Wallet, color: 'text-blue-600', bg: 'bg-blue-100' },
         { label: 'Staff Count', value: '0', icon: Users, color: 'text-green-600', bg: 'bg-green-100' },
-        { label: 'Avg. Salary', value: formatCurrency(0), icon: DollarSign, color: 'text-purple-600', bg: 'bg-purple-100' },
+        { label: 'Avg. Salary', value: formatCurrency(0), icon: NairaSign, color: 'text-purple-600', bg: 'bg-purple-100' },
         { label: 'Pending Approval', value: '0', icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100' },
       ];
 

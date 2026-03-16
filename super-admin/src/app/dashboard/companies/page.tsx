@@ -1049,7 +1049,7 @@ export default function CompaniesPage() {
                         const name = e.target.value;
                         setExistingDbData({ ...existingDbData, name, slug: autoSlug(name) });
                       }}
-                      placeholder="RMS Platform"
+                      placeholder="Vicson Digital Hub"
                       required
                     />
                   </div>

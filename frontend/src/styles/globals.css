@@ -243,25 +243,102 @@
   clip-path: polygon(15% 0, 100% 0, 100% 100%, 0 100%);
 }
 
-/* Floating bubble animation (login/auth pages) */
-@keyframes bubble-rise {
-  0%   { transform: translateY(0) scale(1);   opacity: 0.55; }
-  50%  { transform: translateY(-45vh) scale(1.08); opacity: 0.35; }
-  100% { transform: translateY(-95vh) scale(0.9);  opacity: 0; }
+/* Floating bubble animations — 6 randomised paths (login/auth pages) */
+
+/* Drifts right in a gentle curve */
+@keyframes bubble-a {
+  0%   { transform: translate(0,      0)      scale(1)    rotate(0deg);   opacity: 0; }
+  8%   { opacity: 1; }
+  40%  { transform: translate(30px,  -36vh)   scale(1.07) rotate(6deg);   opacity: 0.92; }
+  70%  { transform: translate(55px,  -64vh)   scale(1.03) rotate(10deg);  opacity: 0.80; }
+  100% { transform: translate(70px,  -96vh)   scale(0.88) rotate(14deg);  opacity: 0; }
+}
+
+/* Drifts left in a gentle curve */
+@keyframes bubble-b {
+  0%   { transform: translate(0,      0)      scale(1)    rotate(0deg);   opacity: 0; }
+  8%   { opacity: 1; }
+  40%  { transform: translate(-35px, -38vh)   scale(1.06) rotate(-5deg);  opacity: 0.90; }
+  70%  { transform: translate(-60px, -65vh)   scale(1.02) rotate(-9deg);  opacity: 0.78; }
+  100% { transform: translate(-80px, -96vh)   scale(0.87) rotate(-13deg); opacity: 0; }
+}
+
+/* S-curve: right then left */
+@keyframes bubble-c {
+  0%   { transform: translate(0,      0)      scale(1)    rotate(0deg);   opacity: 0; }
+  8%   { opacity: 1; }
+  30%  { transform: translate(45px,  -28vh)   scale(1.08) rotate(8deg);   opacity: 0.93; }
+  60%  { transform: translate(-20px, -58vh)   scale(1.04) rotate(-4deg);  opacity: 0.82; }
+  100% { transform: translate(-50px, -97vh)   scale(0.89) rotate(-10deg); opacity: 0; }
+}
+
+/* S-curve: left then right */
+@keyframes bubble-d {
+  0%   { transform: translate(0,      0)      scale(1)    rotate(0deg);   opacity: 0; }
+  8%   { opacity: 1; }
+  30%  { transform: translate(-50px, -30vh)   scale(1.07) rotate(-7deg);  opacity: 0.91; }
+  62%  { transform: translate(15px,  -60vh)   scale(1.03) rotate(3deg);   opacity: 0.80; }
+  100% { transform: translate(40px,  -96vh)   scale(0.88) rotate(9deg);   opacity: 0; }
+}
+
+/* Wide sweep right */
+@keyframes bubble-e {
+  0%   { transform: translate(0,       0)     scale(1)    rotate(0deg);   opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { transform: translate(80px,  -42vh)   scale(1.05) rotate(12deg);  opacity: 0.88; }
+  100% { transform: translate(110px, -96vh)   scale(0.86) rotate(18deg);  opacity: 0; }
+}
+
+/* Wide sweep left */
+@keyframes bubble-f {
+  0%   { transform: translate(0,        0)    scale(1)    rotate(0deg);   opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { transform: translate(-90px, -44vh)   scale(1.05) rotate(-11deg); opacity: 0.87; }
+  100% { transform: translate(-120px, -96vh)  scale(0.85) rotate(-17deg); opacity: 0; }
 }
 
 .bubble {
   position: absolute;
-  bottom: -10%;
+  bottom: -12%;
   border-radius: 50%;
-  animation: bubble-rise linear infinite;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
   pointer-events: none;
   will-change: transform, opacity;
+  background:
+    radial-gradient(
+      circle at 33% 28%,
+      rgba(255,255,255,0.75) 0%,
+      rgba(255,255,255,0.22) 32%,
+      transparent 65%
+    ),
+    radial-gradient(
+      circle at 68% 72%,
+      rgba(255,255,255,0.14) 0%,
+      transparent 52%
+    ),
+    var(--bubble-color, hsl(var(--primary) / 0.6));
+  box-shadow:
+    inset  5px  7px 16px rgba(255,255,255,0.60),
+    inset -3px -4px 10px rgba(0,0,0,0.14),
+    0 10px 40px rgba(0,0,0,0.22),
+    0  3px 10px rgba(0,0,0,0.12);
+  backdrop-filter: blur(2px);
+}
+
+.bubble::after {
+  content: '';
+  position: absolute;
+  top: 12%;
+  left: 18%;
+  width: 32%;
+  height: 18%;
+  background: rgba(255,255,255,0.78);
+  border-radius: 50%;
+  filter: blur(5px);
+  transform: rotate(-22deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bubble {
-    animation: none;
-    opacity: 0;
-  }
+  .bubble { animation: none; opacity: 0; }
 }

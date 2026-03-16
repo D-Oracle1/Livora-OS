@@ -21,6 +21,8 @@ import {
   Upload,
   FileSpreadsheet,
   Copy,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -139,11 +141,18 @@ export default function RealtorsPage() {
       if (filterTier !== 'ALL') params.append('tier', filterTier);
 
       const response = await api.get<RealtorResponse>(`/admin/realtors?${params.toString()}`);
-      const data = response.data || response;
-      setRealtors(Array.isArray(data) ? data : (data as any).data || []);
-      if ((data as any).meta) {
-        setMeta((data as any).meta);
+      const inner = (response as any)?.data;
+      let list: any[];
+      let pageMeta: any;
+      if (Array.isArray(inner)) {
+        list = inner; pageMeta = (response as any)?.meta;
+      } else if (inner?.data) {
+        list = inner.data; pageMeta = inner.meta;
+      } else {
+        list = []; pageMeta = {};
       }
+      setRealtors(list);
+      if (pageMeta?.total !== undefined) setMeta(pageMeta);
     } catch (error: any) {
       console.error('Failed to fetch realtors:', error);
       toast.error(error.message || 'Failed to load realtors');
@@ -586,6 +595,38 @@ export default function RealtorsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pagination */}
+        {meta.totalPages > 1 && (
+          <div className="flex items-center justify-center gap-1 pb-4">
+            <button onClick={() => setMeta(p => ({ ...p, page: p.page - 1 }))} disabled={meta.page <= 1}
+              className="w-8 h-8 flex items-center justify-center rounded text-sm text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            {(() => {
+              const items: (number | 'ellipsis')[] = [];
+              if (meta.totalPages <= 7) { for (let i = 1; i <= meta.totalPages; i++) items.push(i); }
+              else {
+                items.push(1);
+                if (meta.page > 3) items.push('ellipsis');
+                for (let i = Math.max(2, meta.page - 1); i <= Math.min(meta.totalPages - 1, meta.page + 1); i++) items.push(i);
+                if (meta.page < meta.totalPages - 2) items.push('ellipsis');
+                items.push(meta.totalPages);
+              }
+              return items.map((item, idx) => item === 'ellipsis'
+                ? <span key={`e-${idx}`} className="w-8 h-8 flex items-center justify-center text-sm text-muted-foreground">…</span>
+                : <button key={item} onClick={() => setMeta(p => ({ ...p, page: item as number }))}
+                    className={`w-8 h-8 flex items-center justify-center rounded text-sm font-medium transition-colors ${item === meta.page ? 'bg-primary/15 text-primary font-semibold' : 'text-muted-foreground hover:bg-muted'}`}>
+                    {item}
+                  </button>
+              );
+            })()}
+            <button onClick={() => setMeta(p => ({ ...p, page: p.page + 1 }))} disabled={meta.page >= meta.totalPages}
+              className="w-8 h-8 flex items-center justify-center rounded text-sm text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </motion.div>
 
       {/* Reset Password Dialog */}

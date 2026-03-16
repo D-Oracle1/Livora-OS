@@ -7,26 +7,31 @@
     {
       "path": "/api/v1/cron/keep-alive",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/v1/cron/rankings/daily",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/v1/cron/rankings/monthly",
+      "schedule": "0 2 1 * *"
+    },
+    {
+      "path": "/api/v1/cron/rankings/yearly",
+      "schedule": "0 3 1 1 *"
+    },
+    {
+      "path": "/api/v1/cron/overdue-payments",
+      "schedule": "0 6 * * *"
     }
   ],
   "functions": {
     "api/index.ts": {
       "maxDuration": 60,
       "memory": 1769,
-      "includeFiles": "{dist/**,node_modules/.prisma/**,node_modules/@prisma/engines/**,node_modules/pg*/**,node_modules/exceljs/**,node_modules/archiver/**,node_modules/@vercel/blob/**,node_modules/undici/**,prisma/**}"
+      "includeFiles": "{dist/**,prisma/**,node_modules/.prisma/**,node_modules/@prisma/engines/**,node_modules/pg*/**,node_modules/{exceljs,archiver,@vercel/blob,undici,openai,@sentry,passport-google-oauth20,passport-facebook}/**}"
     }
   },
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,PATCH,DELETE,OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type,Authorization,x-cron-secret,x-company-id" },
-        { "key": "Access-Control-Allow-Credentials", "value": "true" }
-      ]
-    }
-  ],
   "rewrites": [
     {
       "source": "/(.*)",

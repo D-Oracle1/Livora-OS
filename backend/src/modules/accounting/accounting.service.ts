@@ -1,14 +1,33 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { SettingsService } from '../settings/settings.service';
+import { LedgerService } from './ledger.service';
 import { Prisma } from '@prisma/client';
 
+/**
+ * AccountingService — the authoritative financial reporting layer.
+ *
+ * RULE: Every financial total (revenue, commission, tax, expenses, net profit)
+ * is derived exclusively from the GeneralLedger via LedgerService.
+ * No module may recalculate these figures independently.
+ *
+ * The Sale / Payment / Commission / Tax / Expense tables remain the operational
+ * source-of-record for individual transactions, but their *aggregates* are
+ * always read from the ledger.
+ */
 @Injectable()
 export class AccountingService {
   private readonly logger = new Logger(AccountingService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settingsService: SettingsService,
+    private readonly ledger: LedgerService,
+  ) {}
 
-  /** Run a Prisma expense query safely; returns fallback on table-not-found errors */
+  private toNum = (v: Prisma.Decimal | null | undefined) => Number(v ?? 0);
+
+  /** Safe expense query — returns fallback on table-not-found errors */
   private async safeExpenseQuery<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
     try {
       return await fn();
@@ -18,121 +37,22 @@ export class AccountingService {
     }
   }
 
-  /**
-   * CASH-BASIS REVENUE HELPERS
-   *
-   * Revenue is recognised when cash is received:
-   *   - FULL payment plan  → Sale.salePrice on the saleDate the sale completed
-   *   - INSTALLMENT plan   → Payment.amount on each paymentDate (never the parent Sale)
-   *
-   * Commission and Tax follow the same split so there is no double-counting.
-   */
-  private async cashRevenue(dateField: 'saleDate' | 'paymentDate', filter: any) {
-    const [fullSales, payments] = await Promise.all([
-      this.prisma.sale.aggregate({
-        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: filter },
-        _sum: { salePrice: true },
-        _count: true,
-      }),
-      this.prisma.payment.aggregate({
-        where: { status: 'COMPLETED', paymentDate: filter },
-        _sum: { amount: true, commissionAmount: true, taxAmount: true },
-        _count: true,
-      }),
-    ]);
-    return { fullSales, payments };
-  }
-
-  private async cashCommission(saleDateFilter: any, paymentDateFilter: any) {
-    const [fromFullSales, fromPayments] = await Promise.all([
-      // Commission on FULL plan completed sales
-      this.prisma.commission.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: saleDateFilter } },
-        _sum: { amount: true },
-        _count: true,
-      }),
-      // Commission embedded in each installment payment
-      this.prisma.payment.aggregate({
-        where: { status: 'COMPLETED', paymentDate: paymentDateFilter },
-        _sum: { commissionAmount: true },
-      }),
-    ]);
-    return { fromFullSales, fromPayments };
-  }
-
-  private async cashTax(saleDateFilter: any, paymentDateFilter: any) {
-    const [fromFullSales, fromPayments] = await Promise.all([
-      this.prisma.tax.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: saleDateFilter } },
-        _sum: { amount: true },
-      }),
-      this.prisma.payment.aggregate({
-        where: { status: 'COMPLETED', paymentDate: paymentDateFilter },
-        _sum: { taxAmount: true },
-      }),
-    ]);
-    return { fromFullSales, fromPayments };
-  }
-
   // ─── Dashboard Summary ───────────────────────────────────────────────────────
 
-  async getDashboardSummary() {
+  /**
+   * Financial summary for a selectable period + YTD.
+   * Pass startDate / endDate to control the "period" section (defaults to current month).
+   * Revenue, commission, tax, and expenses all come from the general ledger.
+   */
+  async getDashboardSummary(startDate?: string, endDate?: string) {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfYear  = new Date(now.getFullYear(), 0, 1);
+    const periodStart = startDate ? new Date(startDate) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const periodEnd   = endDate   ? new Date(endDate)   : now;
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-    const toNum = (v: Prisma.Decimal | null | undefined) => Number(v ?? 0);
-
-    // Run MTD and YTD sets sequentially to respect pgBouncer pool limits
-    const mtdFilter = { gte: startOfMonth };
-    const ytdFilter = { gte: startOfYear };
-
-    const [
-      // MTD
-      mtdFullSales, mtdPayments, mtdExpenses,
-      // YTD
-      ytdFullSales, ytdPayments, ytdExpenses,
-      // Pending expenses (no date filter)
-      pendingExpenses,
-    ] = await Promise.all([
-      // MTD: FULL plan sales completed this month
-      this.prisma.sale.aggregate({
-        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: mtdFilter },
-        _sum: { salePrice: true },
-      }),
-      // MTD: installment payments received this month
-      this.prisma.payment.aggregate({
-        where: { status: 'COMPLETED', paymentDate: mtdFilter },
-        _sum: { amount: true, commissionAmount: true, taxAmount: true },
-      }),
-      // MTD: approved expenses this month
-      this.safeExpenseQuery(
-        () => this.prisma.expense.aggregate({
-          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: mtdFilter },
-          _sum: { amount: true },
-          _count: true,
-        }),
-        { _sum: { amount: null }, _count: 0 },
-      ),
-      // YTD: FULL plan sales completed this year
-      this.prisma.sale.aggregate({
-        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: ytdFilter },
-        _sum: { salePrice: true },
-      }),
-      // YTD: installment payments received this year
-      this.prisma.payment.aggregate({
-        where: { status: 'COMPLETED', paymentDate: ytdFilter },
-        _sum: { amount: true, commissionAmount: true, taxAmount: true },
-      }),
-      // YTD: approved expenses this year
-      this.safeExpenseQuery(
-        () => this.prisma.expense.aggregate({
-          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: ytdFilter },
-          _sum: { amount: true },
-        }),
-        { _sum: { amount: null } },
-      ),
-      // Pending expenses (unapproved)
+    const [period, ytd, pendingExpenses] = await Promise.all([
+      this.ledger.getPeriodSummary(periodStart, periodEnd),
+      this.ledger.getPeriodSummary(startOfYear, now),
       this.safeExpenseQuery(
         () => this.prisma.expense.aggregate({
           where: { approvalStatus: 'PENDING', deletedAt: null },
@@ -143,62 +63,26 @@ export class AccountingService {
       ),
     ]);
 
-    // MTD commission: FULL-sale commissions + installment payment commissions
-    const [mtdFullComm, ytdFullComm] = await Promise.all([
-      this.prisma.commission.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: mtdFilter } },
-        _sum: { amount: true },
-      }),
-      this.prisma.commission.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: ytdFilter } },
-        _sum: { amount: true },
-      }),
-    ]);
-
-    // MTD tax: FULL-sale taxes + installment payment taxes
-    const [mtdFullTax, ytdFullTax] = await Promise.all([
-      this.prisma.tax.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: mtdFilter } },
-        _sum: { amount: true },
-      }),
-      this.prisma.tax.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: ytdFilter } },
-        _sum: { amount: true },
-      }),
-    ]);
-
-    // ── MTD calculations ──────────────────────────────────────────────────────
-    const totalRevenueMTD   = toNum(mtdFullSales._sum.salePrice) + toNum(mtdPayments._sum.amount);
-    const totalCommissionMTD = toNum(mtdFullComm._sum.amount)    + toNum(mtdPayments._sum.commissionAmount);
-    const totalTaxMTD        = toNum(mtdFullTax._sum.amount)     + toNum(mtdPayments._sum.taxAmount);
-    const totalExpensesMTD   = toNum(mtdExpenses._sum.amount);
-    const netProfitMTD       = totalRevenueMTD - totalCommissionMTD - totalTaxMTD - totalExpensesMTD;
-
-    // ── YTD calculations ──────────────────────────────────────────────────────
-    const totalRevenueYTD   = toNum(ytdFullSales._sum.salePrice) + toNum(ytdPayments._sum.amount);
-    const totalCommissionYTD = toNum(ytdFullComm._sum.amount)    + toNum(ytdPayments._sum.commissionAmount);
-    const totalTaxYTD        = toNum(ytdFullTax._sum.amount)     + toNum(ytdPayments._sum.taxAmount);
-    const totalExpensesYTD   = toNum(ytdExpenses._sum.amount);
-    const netProfitYTD       = totalRevenueYTD - totalCommissionYTD - totalTaxYTD - totalExpensesYTD;
-
     return {
-      mtd: {
-        totalRevenue: totalRevenueMTD,
-        totalCommission: totalCommissionMTD,
-        totalTax: totalTaxMTD,
-        totalExpenses: totalExpensesMTD,
-        netProfit: netProfitMTD,
+      period: {
+        totalRevenue:    period.revenue,
+        totalCommission: period.commission,
+        totalTax:        period.tax,
+        totalExpenses:   period.expenses,
+        netProfit:       period.netProfit,
+        startDate:       periodStart.toISOString(),
+        endDate:         periodEnd.toISOString(),
       },
       ytd: {
-        totalRevenue: totalRevenueYTD,
-        totalCommission: totalCommissionYTD,
-        totalTax: totalTaxYTD,
-        totalExpenses: totalExpensesYTD,
-        netProfit: netProfitYTD,
+        totalRevenue:    ytd.revenue,
+        totalCommission: ytd.commission,
+        totalTax:        ytd.tax,
+        totalExpenses:   ytd.expenses,
+        netProfit:       ytd.netProfit,
       },
       pendingExpenses: {
-        count: pendingExpenses._count,
-        amount: toNum(pendingExpenses._sum.amount),
+        count:  pendingExpenses._count as number,
+        amount: this.toNum(pendingExpenses._sum.amount),
       },
     };
   }
@@ -209,93 +93,50 @@ export class AccountingService {
     const start = new Date(startDate);
     const end   = new Date(endDate);
 
-    const saleDateFilter    = { gte: start, lte: end };
-    const paymentDateFilter = { gte: start, lte: end };
-
-    const toNum = (v: Prisma.Decimal | null | undefined) => Number(v ?? 0);
-
-    const [
-      fullSalesAgg,
-      installmentPaymentsAgg,
-      fullSalesCommission,
-      fullSalesTax,
-      expenses,
-      expensesByCategory,
-      // Detail: FULL plan completed sales in period
-      fullSalesDetail,
-      // Detail: installment payments in period with sale/property info
-      installmentPaymentsDetail,
-    ] = await Promise.all([
-      // Revenue: FULL plan sales
-      this.prisma.sale.aggregate({
-        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: saleDateFilter },
-        _sum: { salePrice: true },
-        _count: true,
-      }),
-      // Revenue: installment payments received
-      this.prisma.payment.aggregate({
-        where: { status: 'COMPLETED', paymentDate: paymentDateFilter },
-        _sum: { amount: true, commissionAmount: true, taxAmount: true },
-        _count: true,
-      }),
-      // Commission: FULL plan sales
-      this.prisma.commission.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: saleDateFilter } },
-        _sum: { amount: true },
-        _count: true,
-      }),
-      // Tax: FULL plan sales
-      this.prisma.tax.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: saleDateFilter } },
-        _sum: { amount: true },
-      }),
-      // Expenses
+    // Ledger gives us authoritative totals for the period
+    const [periodSummary, expenses, expensesByCategory] = await Promise.all([
+      this.ledger.getPeriodSummary(start, end),
       this.safeExpenseQuery(
         () => this.prisma.expense.aggregate({
-          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: saleDateFilter },
+          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: start, lte: end } },
           _sum: { amount: true },
           _count: true,
         }),
         { _sum: { amount: null }, _count: 0 },
       ),
-      // Expenses by category
       this.safeExpenseQuery(
         () => this.prisma.expense.groupBy({
           by: ['categoryId'],
-          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: saleDateFilter },
+          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: start, lte: end } },
           _sum: { amount: true },
           _count: true,
           orderBy: { _sum: { amount: 'desc' } },
         }),
         [],
       ),
-      // FULL sales detail
+    ]);
+
+    // Detail rows — still from Sale/Payment for individual breakdown display
+    const [fullSalesDetail, installmentPaymentsDetail] = await Promise.all([
       this.prisma.sale.findMany({
-        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: saleDateFilter },
+        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: start, lte: end } },
         select: {
-          id: true,
-          salePrice: true,
-          saleDate: true,
-          commissionAmount: true,
-          taxAmount: true,
-          netAmount: true,
+          id: true, salePrice: true, saleDate: true,
+          commissionAmount: true, taxAmount: true, netAmount: true,
           property: { select: { title: true, type: true } },
           realtor: { select: { user: { select: { firstName: true, lastName: true } } } },
         },
         orderBy: { saleDate: 'desc' },
       }),
-      // Installment payments detail
+      // Installment detail: show individual payments received in the period
       this.prisma.payment.findMany({
-        where: { status: 'COMPLETED', paymentDate: paymentDateFilter },
+        where: { status: 'COMPLETED', paymentDate: { gte: start, lte: end } },
         select: {
-          id: true,
-          amount: true,
-          commissionAmount: true,
-          taxAmount: true,
-          paymentDate: true,
+          id: true, amount: true, paymentDate: true, paymentNumber: true,
+          commissionAmount: true, taxAmount: true, netCommission: true,
           sale: {
             select: {
-              id: true,
+              id: true, salePrice: true, paymentPlan: true,
               property: { select: { title: true, type: true } },
               realtor: { select: { user: { select: { firstName: true, lastName: true } } } },
             },
@@ -305,9 +146,9 @@ export class AccountingService {
       }),
     ]);
 
-    // Enrich expense categories
+    // Category names for expense breakdown
     const categoryIds = expensesByCategory.map((e) => e.categoryId);
-    const categories  = categoryIds.length
+    const categories = categoryIds.length
       ? await this.prisma.expenseCategory.findMany({
           where: { id: { in: categoryIds } },
           select: { id: true, name: true, type: true },
@@ -315,152 +156,71 @@ export class AccountingService {
       : [];
     const catMap = new Map(categories.map((c) => [c.id, c]));
 
-    // ── Totals ────────────────────────────────────────────────────────────────
-    const fullRevenue     = toNum(fullSalesAgg._sum.salePrice);
-    const installRevenue  = toNum(installmentPaymentsAgg._sum.amount);
-    const totalRevenue    = fullRevenue + installRevenue;
-
-    const fullComm        = toNum(fullSalesCommission._sum.amount);
-    const installComm     = toNum(installmentPaymentsAgg._sum.commissionAmount);
-    const totalCommission = fullComm + installComm;
-
-    const fullTax         = toNum(fullSalesTax._sum.amount);
-    const installTax      = toNum(installmentPaymentsAgg._sum.taxAmount);
-    const totalTax        = fullTax + installTax;
-
-    const totalExpenses   = toNum(expenses._sum.amount);
-    const grossProfit     = totalRevenue - totalCommission - totalTax;
-    const netProfit       = grossProfit - totalExpenses;
-
     return {
       period: { startDate: start.toISOString(), endDate: end.toISOString() },
       basis: 'CASH',
+      // All financial totals are from the single ledger source
       revenue: {
-        fullPaymentSales: fullRevenue,
-        fullSalesCount: fullSalesAgg._count,
-        installmentPayments: installRevenue,
-        installmentPaymentsCount: installmentPaymentsAgg._count,
-        total: totalRevenue,
-        // legacy field retained for P&L display
-        propertySales: totalRevenue,
-        salesCount: fullSalesAgg._count + installmentPaymentsAgg._count,
+        fromFullSales:       fullSalesDetail.reduce((s, r) => s + this.toNum(r.salePrice), 0),
+        fromInstallments:    installmentPaymentsDetail.reduce((s, p) => s + this.toNum(p.amount), 0),
+        total:               periodSummary.revenue,
+        salesCount:          fullSalesDetail.length + installmentPaymentsDetail.length,
       },
       deductions: {
-        commissions: totalCommission,
-        commissionsCount: fullSalesCommission._count + installmentPaymentsAgg._count,
-        taxes: totalTax,
-        total: totalCommission + totalTax,
+        commissions:         periodSummary.commission,
+        taxes:               periodSummary.tax,
+        total:               periodSummary.commission + periodSummary.tax,
       },
-      grossProfit,
+      grossProfit: periodSummary.revenue - periodSummary.commission - periodSummary.tax,
       expenses: {
-        total: totalExpenses,
-        count: expenses._count,
+        total: periodSummary.expenses,
+        count: expenses._count as number,
         byCategory: expensesByCategory.map((e) => ({
-          categoryId: e.categoryId,
+          categoryId:   e.categoryId,
           categoryName: catMap.get(e.categoryId)?.name ?? 'Unknown',
           categoryType: catMap.get(e.categoryId)?.type ?? 'OTHER',
-          total: toNum(e._sum.amount),
+          total: this.toNum(e._sum.amount),
           count: e._count,
         })),
       },
-      netProfit,
+      netProfit: periodSummary.netProfit,
+      // Detail rows for display
       salesDetail: [
-        // FULL sales
         ...fullSalesDetail.map((s) => ({
-          id: s.id,
-          type: 'FULL_SALE',
-          date: s.saleDate,
-          property: s.property?.title ?? 'N/A',
-          propertyType: s.property?.type ?? 'N/A',
-          realtor: s.realtor?.user
-            ? `${s.realtor.user.firstName} ${s.realtor.user.lastName}`
-            : 'N/A',
-          salePrice: toNum(s.salePrice),
-          commission: toNum(s.commissionAmount),
-          tax: toNum(s.taxAmount),
-          net: toNum(s.netAmount),
+          id: s.id, type: 'FULL_SALE', date: s.saleDate,
+          property:     s.property?.title ?? 'N/A',
+          propertyType: s.property?.type  ?? 'N/A',
+          realtor: s.realtor?.user ? `${s.realtor.user.firstName} ${s.realtor.user.lastName}` : 'N/A',
+          salePrice:  this.toNum(s.salePrice),
+          commission: this.toNum(s.commissionAmount),
+          tax:        this.toNum(s.taxAmount),
+          net:        this.toNum(s.netAmount),
         })),
-        // Installment payments
-        ...installmentPaymentsDetail.map((p) => ({
-          id: p.id,
-          type: 'INSTALLMENT_PAYMENT',
-          date: p.paymentDate,
-          property: p.sale?.property?.title ?? 'N/A',
-          propertyType: p.sale?.property?.type ?? 'N/A',
-          realtor: p.sale?.realtor?.user
-            ? `${p.sale.realtor.user.firstName} ${p.sale.realtor.user.lastName}`
-            : 'N/A',
-          salePrice: toNum(p.amount),
-          commission: toNum(p.commissionAmount),
-          tax: toNum(p.taxAmount),
-          net: toNum(p.amount) - toNum(p.commissionAmount) - toNum(p.taxAmount),
-        })),
+        ...installmentPaymentsDetail
+          .filter((p) => p.sale?.paymentPlan === 'INSTALLMENT')
+          .map((p) => ({
+            id: p.id, type: 'INSTALLMENT_PAYMENT', date: p.paymentDate,
+            property:     p.sale?.property?.title ?? 'N/A',
+            propertyType: p.sale?.property?.type  ?? 'N/A',
+            realtor: p.sale?.realtor?.user
+              ? `${p.sale.realtor.user.firstName} ${p.sale.realtor.user.lastName}` : 'N/A',
+            salePrice:      this.toNum(p.amount),          // amount received in this payment
+            fullSalePrice:  this.toNum(p.sale?.salePrice), // full property sale price
+            commission: this.toNum(p.commissionAmount),
+            tax:        this.toNum(p.taxAmount),
+            net:        this.toNum(p.netCommission),
+          })),
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     };
   }
 
   // ─── Trend ───────────────────────────────────────────────────────────────────
 
+  /**
+   * Monthly trend — all numbers from the ledger.
+   */
   async getTrend(months = 12) {
-    const now = new Date();
-    const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-    const monthRanges = Array.from({ length: months }, (_, idx) => {
-      const i = months - 1 - idx;
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const start = new Date(d.getFullYear(), d.getMonth(), 1);
-      const end   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-      return { d, start, end };
-    });
-
-    const results: any[] = [];
-
-    for (const { d, start, end } of monthRanges) {
-      // Cash-basis: FULL plan sales by saleDate + installment payments by paymentDate
-      const [fullSales, installPayments, fullComm, fullTax, exp] = await Promise.all([
-        this.prisma.sale.aggregate({
-          where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: start, lte: end } },
-          _sum: { salePrice: true },
-        }),
-        this.prisma.payment.aggregate({
-          where: { status: 'COMPLETED', paymentDate: { gte: start, lte: end } },
-          _sum: { amount: true, commissionAmount: true, taxAmount: true },
-        }),
-        this.prisma.commission.aggregate({
-          where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: start, lte: end } } },
-          _sum: { amount: true },
-        }),
-        this.prisma.tax.aggregate({
-          where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: start, lte: end } } },
-          _sum: { amount: true },
-        }),
-        this.safeExpenseQuery(
-          () => this.prisma.expense.aggregate({
-            where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: start, lte: end } },
-            _sum: { amount: true },
-          }),
-          { _sum: { amount: null } },
-        ),
-      ]);
-
-      const revenue    = Number(fullSales._sum.salePrice ?? 0) + Number(installPayments._sum.amount ?? 0);
-      const commission = Number(fullComm._sum.amount ?? 0)    + Number(installPayments._sum.commissionAmount ?? 0);
-      const taxes      = Number(fullTax._sum.amount ?? 0)     + Number(installPayments._sum.taxAmount ?? 0);
-      const expenses   = Number(exp._sum.amount ?? 0);
-
-      results.push({
-        month: MONTH_NAMES[d.getMonth()],
-        year: d.getFullYear(),
-        monthNum: d.getMonth() + 1,
-        revenue,
-        commission,
-        tax: taxes,
-        expenses,
-        netProfit: revenue - commission - taxes - expenses,
-      });
-    }
-
-    return results;
+    return this.ledger.getMonthlyBreakdown(months);
   }
 
   // ─── Expense Breakdown ───────────────────────────────────────────────────────
@@ -468,11 +228,7 @@ export class AccountingService {
   async getExpenseBreakdown(startDate: string, endDate: string) {
     const start  = new Date(startDate);
     const end    = new Date(endDate);
-    const filter = {
-      approvalStatus: 'APPROVED' as const,
-      deletedAt: null,
-      expenseDate: { gte: start, lte: end },
-    };
+    const filter = { approvalStatus: 'APPROVED' as const, deletedAt: null, expenseDate: { gte: start, lte: end } };
 
     const [byCategory, byPaymentMethod, recentExpenses] = await Promise.all([
       this.prisma.expense.groupBy({
@@ -510,23 +266,25 @@ export class AccountingService {
     const catMap = new Map(categories.map((c) => [c.id, c]));
 
     return {
+      // Total from ledger (single source)
+      totalFromLedger: await this.ledger.getExpenseTotal(start, end),
       byCategory: byCategory.map((c) => ({
         categoryId:   c.categoryId,
         categoryName: catMap.get(c.categoryId)?.name ?? 'Unknown',
         categoryType: catMap.get(c.categoryId)?.type ?? 'OTHER',
-        total: Number(c._sum.amount ?? 0),
+        total: this.toNum(c._sum.amount),
         count: c._count,
       })),
       byPaymentMethod: byPaymentMethod.map((p) => ({
         method: p.paymentMethod,
-        total:  Number(p._sum.amount ?? 0),
+        total:  this.toNum(p._sum.amount),
         count:  p._count,
       })),
       recentExpenses: recentExpenses.map((e) => ({
         id:              e.id,
         title:           e.title,
         category:        e.category,
-        amount:          Number(e.amount),
+        amount:          this.toNum(e.amount),
         paymentMethod:   e.paymentMethod,
         expenseDate:     e.expenseDate,
         createdBy:       e.createdBy ? `${e.createdBy.firstName} ${e.createdBy.lastName}` : 'N/A',
@@ -538,60 +296,41 @@ export class AccountingService {
 
   // ─── Revenue Summary ─────────────────────────────────────────────────────────
 
+  /**
+   * Revenue detail rows.
+   * Totals come from the ledger; rows are fetched from Sale/Payment tables.
+   */
   async getRevenueSummary(startDate: string, endDate: string) {
     const start = new Date(startDate);
     const end   = new Date(endDate);
 
-    const [fullSales, installmentPayments] = await Promise.all([
-      // FULL plan completed sales
+    const [ledgerRevenue, fullSales, installmentPayments] = await Promise.all([
+      // Authoritative total from ledger
+      this.ledger.getRevenue(start, end),
+      // FULL plan completed sales in period
       this.prisma.sale.findMany({
         where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: start, lte: end } },
         select: {
-          id: true,
-          saleDate: true,
-          salePrice: true,
-          commissionAmount: true,
-          taxAmount: true,
-          netAmount: true,
-          paymentPlan: true,
+          id: true, saleDate: true, salePrice: true,
+          commissionAmount: true, taxAmount: true, netAmount: true, paymentPlan: true,
           property: { select: { title: true, type: true, address: true, city: true } },
-          realtor: {
-            select: {
-              user: { select: { firstName: true, lastName: true, email: true } },
-              loyaltyTier: true,
-            },
-          },
-          client: {
-            select: { user: { select: { firstName: true, lastName: true } } },
-          },
+          realtor:  { select: { user: { select: { firstName: true, lastName: true, email: true } }, loyaltyTier: true } },
+          client:   { select: { user: { select: { firstName: true, lastName: true } } } },
         },
         orderBy: { saleDate: 'desc' },
       }),
-      // Installment payments received
+      // Installment payments received in period — use paymentDate, not saleDate
       this.prisma.payment.findMany({
         where: { status: 'COMPLETED', paymentDate: { gte: start, lte: end } },
         select: {
-          id: true,
-          paymentDate: true,
-          amount: true,
-          commissionAmount: true,
-          taxAmount: true,
-          netCommission: true,
-          paymentMethod: true,
+          id: true, paymentDate: true, amount: true,
+          commissionAmount: true, taxAmount: true, netCommission: true, paymentMethod: true,
           sale: {
             select: {
-              id: true,
-              paymentPlan: true,
+              id: true, paymentPlan: true,
               property: { select: { title: true, type: true, address: true, city: true } },
-              realtor: {
-                select: {
-                  user: { select: { firstName: true, lastName: true, email: true } },
-                  loyaltyTier: true,
-                },
-              },
-              client: {
-                select: { user: { select: { firstName: true, lastName: true } } },
-              },
+              realtor:  { select: { user: { select: { firstName: true, lastName: true, email: true } }, loyaltyTier: true } },
+              client:   { select: { user: { select: { firstName: true, lastName: true } } } },
             },
           },
         },
@@ -599,56 +338,49 @@ export class AccountingService {
       }),
     ]);
 
-    const toNum = (v: any) => Number(v ?? 0);
-
     const rows = [
       ...fullSales.map((s) => ({
-        id: s.id,
-        source: 'FULL_SALE' as const,
-        date: s.saleDate,
-        property: s.property?.title ?? 'N/A',
+        id: s.id, source: 'FULL_SALE' as const, date: s.saleDate,
+        property:    s.property?.title ?? 'N/A',
         propertyType: s.property?.type,
-        location: s.property ? `${s.property.address}, ${s.property.city}` : 'N/A',
-        realtor: s.realtor?.user
-          ? `${s.realtor.user.firstName} ${s.realtor.user.lastName}` : 'N/A',
+        location:    s.property ? `${s.property.address}, ${s.property.city}` : 'N/A',
+        realtor:     s.realtor?.user ? `${s.realtor.user.firstName} ${s.realtor.user.lastName}` : 'N/A',
         realtorTier: s.realtor?.loyaltyTier,
-        client: s.client?.user
-          ? `${s.client.user.firstName} ${s.client.user.lastName}` : 'N/A',
-        salePrice:  toNum(s.salePrice),
-        commission: toNum(s.commissionAmount),
-        tax:        toNum(s.taxAmount),
-        net:        toNum(s.netAmount),
+        client:      s.client?.user  ? `${s.client.user.firstName} ${s.client.user.lastName}` : 'N/A',
+        salePrice:   this.toNum(s.salePrice),
+        commission:  this.toNum(s.commissionAmount),
+        tax:         this.toNum(s.taxAmount),
+        net:         this.toNum(s.netAmount),
         paymentPlan: s.paymentPlan,
       })),
-      ...installmentPayments.map((p) => ({
-        id: p.id,
-        source: 'INSTALLMENT_PAYMENT' as const,
-        date: p.paymentDate,
-        property: p.sale?.property?.title ?? 'N/A',
-        propertyType: p.sale?.property?.type,
-        location: p.sale?.property
-          ? `${p.sale.property.address}, ${p.sale.property.city}` : 'N/A',
-        realtor: p.sale?.realtor?.user
-          ? `${p.sale.realtor.user.firstName} ${p.sale.realtor.user.lastName}` : 'N/A',
-        realtorTier: p.sale?.realtor?.loyaltyTier,
-        client: p.sale?.client?.user
-          ? `${p.sale.client.user.firstName} ${p.sale.client.user.lastName}` : 'N/A',
-        salePrice:   toNum(p.amount),
-        commission:  toNum(p.commissionAmount),
-        tax:         toNum(p.taxAmount),
-        net:         toNum(p.amount) - toNum(p.commissionAmount) - toNum(p.taxAmount),
-        paymentPlan: 'INSTALLMENT',
-      })),
+      ...installmentPayments
+        .filter((p) => p.sale?.paymentPlan === 'INSTALLMENT')
+        .map((p) => ({
+          id: p.id, source: 'INSTALLMENT_PAYMENT' as const, date: p.paymentDate,
+          property:    p.sale?.property?.title ?? 'N/A',
+          propertyType: p.sale?.property?.type,
+          location:    p.sale?.property ? `${p.sale.property.address}, ${p.sale.property.city}` : 'N/A',
+          realtor:     p.sale?.realtor?.user ? `${p.sale.realtor.user.firstName} ${p.sale.realtor.user.lastName}` : 'N/A',
+          realtorTier: p.sale?.realtor?.loyaltyTier,
+          client:      p.sale?.client?.user  ? `${p.sale.client.user.firstName} ${p.sale.client.user.lastName}` : 'N/A',
+          salePrice:   this.toNum(p.amount),
+          commission:  this.toNum(p.commissionAmount),
+          tax:         this.toNum(p.taxAmount),
+          net:         this.toNum(p.netCommission),
+          paymentPlan: 'INSTALLMENT',
+        })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    const total           = rows.reduce((s, r) => s + r.salePrice, 0);
-    const totalCommission = rows.reduce((s, r) => s + r.commission, 0);
-    const totalTax        = rows.reduce((s, r) => s + r.tax, 0);
 
     return {
       period: { startDate: start.toISOString(), endDate: end.toISOString() },
       basis: 'CASH',
-      summary: { total, totalCommission, totalTax, count: rows.length },
+      // Totals authoritative from ledger
+      summary: {
+        total:           ledgerRevenue,
+        totalCommission: rows.reduce((s, r) => s + r.commission, 0),
+        totalTax:        rows.reduce((s, r) => s + r.tax, 0),
+        count:           rows.length,
+      },
       sales: rows,
     };
   }
@@ -656,35 +388,25 @@ export class AccountingService {
   // ─── Balance Sheet ────────────────────────────────────────────────────────────
 
   async getBalanceSheet(asOfDate?: string) {
-    const asOf  = asOfDate ? new Date(asOfDate) : new Date();
-    const toNum = (v: any) => Number(v ?? 0);
+    const asOf = asOfDate ? new Date(asOfDate) : new Date();
+    const epoch = new Date('2020-01-01T00:00:00Z');
 
     const [
-      completedFullSales,
-      completedPayments,
-      inProgressSalesDetail,
+      // Assets: cash received (from ledger) up to asOf
+      cashFromLedger,
+      // Receivables: installment sales with outstanding balances
+      inProgressSales,
+      // Liabilities
       unpaidCommissions,
-      pendingExpensesAgg,
+      pendingExpenses,
       taxLiabilities,
     ] = await Promise.all([
-      this.prisma.sale.aggregate({
-        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { lte: asOf } },
-        _sum: { salePrice: true },
-        _count: true,
-      }),
-      this.prisma.payment.aggregate({
-        where: { status: 'COMPLETED', paymentDate: { lte: asOf } },
-        _sum: { amount: true },
-        _count: true,
-      }),
+      this.ledger.getRevenue(epoch, asOf),
       this.prisma.sale.findMany({
         where: { status: 'IN_PROGRESS', saleDate: { lte: asOf } },
         select: {
           salePrice: true,
-          payments: {
-            where: { status: 'COMPLETED' },
-            select: { amount: true },
-          },
+          payments: { where: { status: 'COMPLETED' }, select: { amount: true } },
         },
       }),
       this.prisma.commission.aggregate({
@@ -706,52 +428,32 @@ export class AccountingService {
       }),
     ]);
 
-    const receivables = inProgressSalesDetail.reduce((sum, s) => {
-      const paid = s.payments.reduce((p, pay) => p + toNum(pay.amount), 0);
-      return sum + (toNum(s.salePrice) - paid);
+    const receivables = inProgressSales.reduce((sum, s) => {
+      const paid = s.payments.reduce((p, pay) => p + this.toNum(pay.amount), 0);
+      return sum + (this.toNum(s.salePrice) - paid);
     }, 0);
 
-    const cashFromFullSales     = toNum(completedFullSales._sum.salePrice);
-    const cashFromInstallments  = toNum(completedPayments._sum.amount);
-    const totalCash             = cashFromFullSales + cashFromInstallments;
-    const totalAssets           = totalCash + receivables;
+    const totalAssets = cashFromLedger + receivables;
 
-    const unpaidCommissionsTotal = toNum(unpaidCommissions._sum.amount);
-    const pendingExpensesTotal   = toNum(pendingExpensesAgg._sum.amount);
-    const taxPayable             = toNum(taxLiabilities._sum.amount);
+    const unpaidCommissionsTotal = this.toNum(unpaidCommissions._sum.amount);
+    const pendingExpensesTotal   = this.toNum(pendingExpenses._sum.amount);
+    const taxPayable             = this.toNum(taxLiabilities._sum.amount);
     const totalLiabilities       = unpaidCommissionsTotal + pendingExpensesTotal + taxPayable;
-
-    const equity = totalAssets - totalLiabilities;
 
     return {
       asOf: asOf.toISOString(),
       assets: {
-        cash: {
-          fromFullSales:            cashFromFullSales,
-          fullSalesCount:           toNum(completedFullSales._count),
-          fromInstallments:         cashFromInstallments,
-          installmentPaymentsCount: toNum(completedPayments._count),
-          total:                    totalCash,
-        },
-        receivables: {
-          total: receivables,
-          count: inProgressSalesDetail.length,
-        },
+        cash: { fromLedger: cashFromLedger, total: cashFromLedger },
+        receivables: { total: receivables, count: inProgressSales.length },
         total: totalAssets,
       },
       liabilities: {
-        unpaidCommissions: {
-          total: unpaidCommissionsTotal,
-          count: toNum(unpaidCommissions._count),
-        },
-        pendingExpenses: {
-          total: pendingExpensesTotal,
-          count: toNum(pendingExpensesAgg._count),
-        },
-        taxPayable: { total: taxPayable },
+        unpaidCommissions: { total: unpaidCommissionsTotal, count: unpaidCommissions._count ?? 0 },
+        pendingExpenses:   { total: pendingExpensesTotal,   count: (pendingExpenses as any)._count ?? 0 },
+        taxPayable:        { total: taxPayable },
         total: totalLiabilities,
       },
-      equity,
+      equity: totalAssets - totalLiabilities,
     };
   }
 
@@ -760,70 +462,69 @@ export class AccountingService {
   async getCashFlow(startDate: string, endDate: string) {
     const start = new Date(startDate);
     const end   = new Date(endDate);
-    const toNum = (v: any) => Number(v ?? 0);
 
     const [
-      installmentPayments,
-      fullSales,
-      commissionsPaid,
-      approvedExpenses,
-      taxesFromSales,
+      totalInflows,
+      totalExpenseOutflows,
+      commissionOutflows,
+      taxOutflows,
+      installmentDetail,
+      fullSaleDetail,
     ] = await Promise.all([
-      this.prisma.payment.aggregate({
-        where: { status: 'COMPLETED', paymentDate: { gte: start, lte: end } },
-        _sum: { amount: true },
-        _count: true,
-      }),
-      this.prisma.sale.aggregate({
-        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: start, lte: end } },
-        _sum: { salePrice: true },
-        _count: true,
-      }),
+      // All cash received → from ledger
+      this.ledger.getRevenue(start, end),
+      // Expenses paid → from ledger
+      this.ledger.getExpenseTotal(start, end),
+      // Commission paid out (not accrued — only when disbursed)
       this.prisma.commission.aggregate({
         where: { status: 'PAID', paidAt: { gte: start, lte: end } },
         _sum: { amount: true },
         _count: true,
       }),
-      this.safeExpenseQuery(
-        () => this.prisma.expense.aggregate({
-          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: start, lte: end } },
-          _sum: { amount: true },
-          _count: true,
-        }),
-        { _sum: { amount: null }, _count: 0 },
-      ),
+      // Tax from completed full sales in period
       this.prisma.tax.aggregate({
         where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: start, lte: end } } },
         _sum: { amount: true },
       }),
+      // Installment payment count for inflow breakdown
+      this.prisma.payment.aggregate({
+        where: { status: 'COMPLETED', paymentDate: { gte: start, lte: end } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      // Full sale count
+      this.prisma.sale.aggregate({
+        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: start, lte: end } },
+        _sum: { salePrice: true },
+        _count: true,
+      }),
     ]);
 
-    const installmentInflows = toNum(installmentPayments._sum.amount);
-    const fullSaleInflows    = toNum(fullSales._sum.salePrice);
-    const totalInflows       = installmentInflows + fullSaleInflows;
-
-    const commissionOutflows = toNum(commissionsPaid._sum.amount);
-    const expenseOutflows    = toNum(approvedExpenses._sum.amount);
-    const taxOutflows        = toNum(taxesFromSales._sum.amount);
-    const totalOutflows      = commissionOutflows + expenseOutflows + taxOutflows;
-
-    const netCashFlow = totalInflows - totalOutflows;
+    const commissionOutflowTotal = this.toNum(commissionOutflows._sum.amount);
+    const taxOutflowTotal        = this.toNum(taxOutflows._sum.amount);
+    const totalOutflows          = totalExpenseOutflows + commissionOutflowTotal + taxOutflowTotal;
 
     return {
       period: { startDate: start.toISOString(), endDate: end.toISOString() },
       inflows: {
-        installmentPayments: { total: installmentInflows, count: toNum(installmentPayments._count) },
-        fullPaymentSales:    { total: fullSaleInflows,    count: toNum(fullSales._count) },
+        installmentPayments: {
+          total: this.toNum(installmentDetail._sum.amount),
+          count: installmentDetail._count ?? 0,
+        },
+        fullPaymentSales: {
+          total: this.toNum(fullSaleDetail._sum.salePrice),
+          count: fullSaleDetail._count ?? 0,
+        },
         total: totalInflows,
       },
       outflows: {
-        commissions: { total: commissionOutflows, count: toNum(commissionsPaid._count) },
-        expenses:    { total: expenseOutflows,    count: toNum(approvedExpenses._count) },
-        taxes:       { total: taxOutflows },
+        commissions: { total: commissionOutflowTotal, count: commissionOutflows._count ?? 0 },
+        expenses:    { total: totalExpenseOutflows },
+        taxes:       { total: taxOutflowTotal },
         total: totalOutflows,
       },
-      netCashFlow,
-      isPositive: netCashFlow >= 0,
+      netCashFlow: totalInflows - totalOutflows,
+      isPositive:  totalInflows - totalOutflows >= 0,
     };
   }
 
@@ -844,59 +545,17 @@ export class AccountingService {
       value?: number;
     }> = [];
 
-    const toNum = (v: any) => Number(v ?? 0);
-
+    // Use ledger for month comparisons — consistent with all other reports
     const [
-      currentMonthExp,
-      prev3MonthsExp,
-      lastMonthFullSales,
-      lastMonthInstallPayments,
-      lastMonthCommFullAgg,
-      lastMonthTaxFullAgg,
-      lastMonthExpAgg,
+      currentMonthExpenses,
+      prev3MonthExpenses,
+      lastMonthSummary,
       recentCommissions,
       avgSaleAgg,
     ] = await Promise.all([
-      this.safeExpenseQuery(
-        () => this.prisma.expense.aggregate({
-          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: startOfMonth } },
-          _sum: { amount: true },
-        }),
-        { _sum: { amount: null } },
-      ),
-      this.safeExpenseQuery(
-        () => this.prisma.expense.aggregate({
-          where: {
-            approvalStatus: 'APPROVED', deletedAt: null,
-            expenseDate: { gte: startOf3MonthsAgo, lt: startOfMonth },
-          },
-          _sum: { amount: true },
-        }),
-        { _sum: { amount: null } },
-      ),
-      this.prisma.sale.aggregate({
-        where: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: startOfLastMonth, lte: endOfLastMonth } },
-        _sum: { salePrice: true },
-      }),
-      this.prisma.payment.aggregate({
-        where: { status: 'COMPLETED', paymentDate: { gte: startOfLastMonth, lte: endOfLastMonth } },
-        _sum: { amount: true, commissionAmount: true, taxAmount: true },
-      }),
-      this.prisma.commission.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: startOfLastMonth, lte: endOfLastMonth } } },
-        _sum: { amount: true },
-      }),
-      this.prisma.tax.aggregate({
-        where: { sale: { status: 'COMPLETED', paymentPlan: 'FULL', saleDate: { gte: startOfLastMonth, lte: endOfLastMonth } } },
-        _sum: { amount: true },
-      }),
-      this.safeExpenseQuery(
-        () => this.prisma.expense.aggregate({
-          where: { approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: startOfLastMonth, lte: endOfLastMonth } },
-          _sum: { amount: true },
-        }),
-        { _sum: { amount: null } },
-      ),
+      this.ledger.getExpenseTotal(startOfMonth, now),
+      this.ledger.getExpenseTotal(startOf3MonthsAgo, startOfMonth),
+      this.ledger.getPeriodSummary(startOfLastMonth, endOfLastMonth),
       this.prisma.commission.findMany({
         where: { sale: { status: 'COMPLETED' } },
         select: { id: true, amount: true, rate: true, sale: { select: { salePrice: true } } },
@@ -909,49 +568,44 @@ export class AccountingService {
       }),
     ]);
 
-    // 1. Expense spike
-    const currentExp = toNum(currentMonthExp._sum.amount);
-    const prev3Avg   = toNum(prev3MonthsExp._sum.amount) / 3;
-    if (prev3Avg > 0 && currentExp > prev3Avg * 1.45) {
-      const pct = Math.round(((currentExp - prev3Avg) / prev3Avg) * 100);
+    // 1. Expense spike (>45% above 3-month average)
+    const prev3Avg = prev3MonthExpenses / 3;
+    if (prev3Avg > 0 && currentMonthExpenses > prev3Avg * 1.45) {
+      const pct = Math.round(((currentMonthExpenses - prev3Avg) / prev3Avg) * 100);
       anomalies.push({
         type: 'EXPENSE_SPIKE', severity: 'WARNING',
         title: 'Expense Spike Detected',
         message: `Expenses this month are ${pct}% above the 3-month average`,
-        value: currentExp,
+        value: currentMonthExpenses,
       });
     }
 
-    // 2. Negative profit last month (cash basis)
-    const lastRev    = toNum(lastMonthFullSales._sum.salePrice) + toNum(lastMonthInstallPayments._sum.amount);
-    const lastComm   = toNum(lastMonthCommFullAgg._sum.amount)  + toNum(lastMonthInstallPayments._sum.commissionAmount);
-    const lastTax    = toNum(lastMonthTaxFullAgg._sum.amount)   + toNum(lastMonthInstallPayments._sum.taxAmount);
-    const lastProfit = lastRev - lastComm - lastTax - toNum(lastMonthExpAgg._sum.amount);
-    if (lastRev > 0 && lastProfit < 0) {
+    // 2. Negative profit last month
+    if (lastMonthSummary.revenue > 0 && lastMonthSummary.netProfit < 0) {
       anomalies.push({
         type: 'NEGATIVE_PROFIT', severity: 'CRITICAL',
         title: 'Negative Profit Last Month',
         message: 'Last month resulted in a net loss',
-        value: lastProfit,
+        value: lastMonthSummary.netProfit,
       });
     }
 
     // 3. High commission ratio (>50% of sale price)
     for (const comm of recentCommissions) {
-      const ratio = toNum(comm.amount) / toNum(comm.sale.salePrice);
+      const ratio = this.toNum(comm.amount) / this.toNum(comm.sale.salePrice);
       if (ratio > 0.5) {
         anomalies.push({
           type: 'HIGH_COMMISSION', severity: 'WARNING',
           title: 'High Commission Rate',
           message: `A commission of ${(ratio * 100).toFixed(1)}% of sale price was recorded — verify this is correct`,
-          value: toNum(comm.amount),
+          value: this.toNum(comm.amount),
         });
         break;
       }
     }
 
-    // 4. Unusually large transaction (>3× average sale price)
-    const avgSalePrice = toNum(avgSaleAgg._avg?.salePrice);
+    // 4. Unusually large transaction (>3× average)
+    const avgSalePrice = this.toNum(avgSaleAgg._avg?.salePrice);
     if (avgSalePrice > 0) {
       const largeSales = await this.prisma.sale.findMany({
         where: { status: 'COMPLETED', saleDate: { gte: startOf3MonthsAgo } },
@@ -959,29 +613,27 @@ export class AccountingService {
         orderBy: { salePrice: 'desc' },
         take: 1,
       });
-      if (largeSales.length && toNum(largeSales[0].salePrice) > avgSalePrice * 3) {
-        const pct = Math.round((toNum(largeSales[0].salePrice) / avgSalePrice - 1) * 100);
+      if (largeSales.length && this.toNum(largeSales[0].salePrice) > avgSalePrice * 3) {
+        const pct = Math.round((this.toNum(largeSales[0].salePrice) / avgSalePrice - 1) * 100);
         anomalies.push({
           type: 'LARGE_TRANSACTION', severity: 'INFO',
           title: 'Unusually Large Transaction',
           message: `A recent sale is ${pct}% above the average sale price`,
-          value: toNum(largeSales[0].salePrice),
+          value: this.toNum(largeSales[0].salePrice),
         });
       }
     }
 
-    return { anomalies, count: anomalies.length, checkedAt: new Date().toISOString() };
+    return { anomalies, count: anomalies.length, checkedAt: now.toISOString() };
   }
 
   // ─── AI Financial Insights ────────────────────────────────────────────────────
 
   async getInsights() {
-    const trendData = await this.getTrend(4);
+    // Trend from ledger — consistent with all other reports
+    const trendData = await this.ledger.getMonthlyBreakdown(4);
 
-    const insights: Array<{
-      type: 'POSITIVE' | 'NEGATIVE' | 'WARNING' | 'INFO' | 'NEUTRAL';
-      message: string;
-    }> = [];
+    const insights: Array<{ type: 'POSITIVE' | 'NEGATIVE' | 'WARNING' | 'INFO' | 'NEUTRAL'; message: string }> = [];
 
     if (trendData.length >= 2) {
       const current  = trendData[trendData.length - 1];
@@ -1039,5 +691,112 @@ export class AccountingService {
     }
 
     return { insights, generatedAt: new Date().toISOString() };
+  }
+
+  // ─── Recalculate All Financials ───────────────────────────────────────────────
+
+  async recalculateAllFinancials() {
+    const [commissionRates, taxRate] = await Promise.all([
+      this.settingsService.getCommissionRates(),
+      this.settingsService.getMainTaxRate(),
+    ]);
+
+    const sales = await this.prisma.sale.findMany({
+      where: { status: { notIn: ['PENDING', 'CANCELLED'] as any[] }, realtorId: { not: null } },
+      include: {
+        realtor: { select: { loyaltyTier: true } },
+        payments: { select: { id: true, amount: true } },
+      },
+    });
+
+    let updatedSales = 0;
+    let updatedPayments = 0;
+
+    for (const sale of sales) {
+      if (!sale.realtorId || !sale.realtor) continue;
+
+      const commissionRate = commissionRates[sale.realtor.loyaltyTier as string] ?? 0.03;
+      const baseAmount      = sale.paymentPlan === 'INSTALLMENT' ? Number(sale.totalPaid) : Number(sale.salePrice);
+      const totalCommission = baseAmount * commissionRate;
+      const totalTax        = totalCommission * taxRate;
+      const totalNet        = totalCommission - totalTax;
+
+      await this.prisma.sale.update({
+        where: { id: sale.id },
+        data: { commissionRate, commissionAmount: totalCommission, taxRate, taxAmount: totalTax, netAmount: totalNet },
+      });
+
+      for (const payment of sale.payments) {
+        const amt  = Number(payment.amount);
+        const comm = amt * commissionRate;
+        const tax  = comm * taxRate;
+        const net  = comm - tax;
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: { commissionRate, commissionAmount: comm, taxRate, taxAmount: tax, netCommission: net },
+        });
+        updatedPayments++;
+      }
+
+      await this.prisma.commission.updateMany({
+        where: { saleId: sale.id },
+        data: { amount: totalCommission, rate: commissionRate },
+      });
+      await this.prisma.tax.updateMany({
+        where: { saleId: sale.id },
+        data: { amount: totalTax, rate: taxRate },
+      });
+
+      updatedSales++;
+    }
+
+    // Refresh realtor aggregate stats
+    const realtorIds = [...new Set(sales.filter((s) => s.realtorId).map((s) => s.realtorId!))];
+    for (const realtorId of realtorIds) {
+      const agg = await this.prisma.sale.aggregate({
+        where: { realtorId, status: { in: ['COMPLETED', 'IN_PROGRESS'] } },
+        _count: { id: true },
+        _sum: { salePrice: true, commissionAmount: true, taxAmount: true },
+      });
+      await this.prisma.realtorProfile.update({
+        where: { id: realtorId },
+        data: {
+          totalSales:      agg._count.id,
+          totalSalesValue: agg._sum.salePrice       ?? 0,
+          totalCommission: agg._sum.commissionAmount ?? 0,
+          totalTaxPaid:    agg._sum.taxAmount        ?? 0,
+        },
+      });
+    }
+
+    // After recalculating, re-run backfill so ledger reflects updated amounts
+    const backfillResult = await this.ledger.backfill();
+
+    return {
+      success: true,
+      message: `Recalculated ${updatedSales} sales and ${updatedPayments} payments. Ledger refreshed.`,
+      updatedSales,
+      updatedPayments,
+      commissionRates,
+      taxRate,
+      ledgerBackfill: backfillResult.counts,
+    };
+  }
+
+  // ─── Ledger Operations (exposed via controller) ────────────────────────────────
+
+  /**
+   * Populate the general ledger from existing financial records.
+   * Run once after deploying this version — safe to repeat.
+   */
+  async backfillLedger() {
+    return this.ledger.backfill();
+  }
+
+  /**
+   * Cross-check ledger totals against source tables.
+   */
+  async validateConsistency() {
+    return this.ledger.validateConsistency();
   }
 }

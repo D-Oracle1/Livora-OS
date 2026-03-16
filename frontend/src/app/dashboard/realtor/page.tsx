@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
-  DollarSign,
   TrendingUp,
   Award,
   Users,
@@ -43,6 +42,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatCurrency, getTierBgClass } from '@/lib/utils';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { api, getImageUrl } from '@/lib/api';
 import { getUser } from '@/lib/auth-storage';
 import { toast } from 'sonner';
@@ -190,7 +190,7 @@ export default function RealtorDashboard() {
   const gradientCards = [
     { title: 'Total Sales', value: String(totalSales), subtitle: `${formatCurrency(stats?.totalSalesValue || 0)} value`, gradient: 'from-[#0b5c46] to-[#0e7a5e]', icon: Target },
     { title: `${periodLabel} Sales`, value: String(filteredSales), subtitle: periodLabel, gradient: 'from-[#fca639] to-[#fdb95c]', icon: TrendingUp },
-    { title: 'Commission', value: formatCurrency(filteredCommission), subtitle: periodLabel, gradient: 'from-[#0b5c46] to-[#14956e]', icon: DollarSign },
+    { title: 'Commission', value: formatCurrency(filteredCommission), subtitle: periodLabel, gradient: 'from-[#0b5c46] to-[#14956e]', icon: NairaSign },
     { title: 'Net Earnings', value: formatCurrency(filteredNetEarnings), subtitle: `After tax`, gradient: 'from-[#fca639] to-[#e8953a]', icon: Zap },
   ];
 

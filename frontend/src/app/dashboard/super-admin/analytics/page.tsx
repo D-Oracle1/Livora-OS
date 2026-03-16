@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, Users, Home, DollarSign, Loader2, RefreshCw } from 'lucide-react';
+import { Building2, Users, Home, Loader2, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { usePlatformBranding } from '@/hooks/use-platform-branding';
 
 export default function SuperAdminAnalytics() {
@@ -41,7 +42,7 @@ export default function SuperAdminAnalytics() {
   const rankingColumns = [
     { title: 'Top by Users', icon: Users, data: byUsers, key: 'users' },
     { title: 'Top by Properties', icon: Home, data: byProperties, key: 'properties' },
-    { title: 'Top by Sales', icon: DollarSign, data: bySales, key: 'sales' },
+    { title: 'Top by Sales', icon: NairaSign, data: bySales, key: 'sales' },
   ];
 
   return (

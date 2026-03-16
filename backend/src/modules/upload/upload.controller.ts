@@ -205,6 +205,27 @@ export class UploadController {
     return this.uploadService.uploadCompanyLogo(file);
   }
 
+  @Post('file')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload a single file (e.g. expense receipt)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'File uploaded successfully' })
+  async uploadFile(@UploadedFile() file: MulterFile) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.uploadService.uploadFile(file);
+  }
+
   @Post('task-files')
   @UseInterceptors(
     FilesInterceptor('files', 5, {

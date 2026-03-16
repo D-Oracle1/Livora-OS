@@ -157,6 +157,21 @@ export class TasksService {
       throw new NotFoundException('Task not found');
     }
 
+    // Enrich comments with author names (authorId is a plain User ID string)
+    if (task.comments.length > 0) {
+      const authorIds = [...new Set(task.comments.map((c) => c.authorId))];
+      const authors = await this.prisma.user.findMany({
+        where: { id: { in: authorIds } },
+        select: { id: true, firstName: true, lastName: true, avatar: true },
+      });
+      const authorMap = Object.fromEntries(authors.map((u) => [u.id, u]));
+      const enrichedComments = task.comments.map((c) => ({
+        ...c,
+        author: authorMap[c.authorId] || null,
+      }));
+      return { ...task, comments: enrichedComments };
+    }
+
     return task;
   }
 
@@ -450,10 +465,20 @@ export class TasksService {
       throw new NotFoundException('Task not found');
     }
 
-    return this.prisma.taskComment.findMany({
+    const comments = await this.prisma.taskComment.findMany({
       where: { taskId },
       orderBy: { createdAt: 'asc' },
     });
+
+    if (comments.length === 0) return comments;
+
+    const authorIds = [...new Set(comments.map((c) => c.authorId))];
+    const authors = await this.prisma.user.findMany({
+      where: { id: { in: authorIds } },
+      select: { id: true, firstName: true, lastName: true, avatar: true },
+    });
+    const authorMap = Object.fromEntries(authors.map((u) => [u.id, u]));
+    return comments.map((c) => ({ ...c, author: authorMap[c.authorId] || null }));
   }
 
   async addComment(taskId: string, authorId: string, dto: AddCommentDto) {

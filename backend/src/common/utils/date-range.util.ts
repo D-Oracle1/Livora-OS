@@ -38,96 +38,110 @@ export function getDateRange(
 interface SaleRecord {
   saleDate: Date;
   salePrice: any;
+  totalPaid?: any;
+  paymentPlan?: any;
   commissionAmount: any;
 }
 
+export interface LedgerEntry { entryDate: Date; amount: any; }
+
+/**
+ * Build chart buckets with:
+ *   - sale COUNT from Sale table (by saleDate — correct for "deals closed")
+ *   - revenue from general_ledger entries (by entryDate — correct cash-basis)
+ */
 export function groupSalesIntoChartBuckets(
   sales: SaleRecord[],
   period: DashboardPeriod,
   startDate: Date,
   endDate: Date,
+  ledgerEntries: LedgerEntry[] = [],
 ): { label: string; revenue: number; sales: number }[] {
   switch (period) {
     case 'daily':
-      return groupByHour(sales, startDate);
+      return groupByHour(sales, startDate, ledgerEntries);
     case 'weekly':
-      return groupByDay(sales, startDate, endDate);
+      return groupByDay(sales, startDate, endDate, ledgerEntries);
     case 'monthly':
-      return groupByWeek(sales, startDate, endDate);
+      return groupByWeek(sales, startDate, endDate, ledgerEntries);
     case 'yearly':
-      return groupByMonth(sales, startDate);
+      return groupByMonth(sales, startDate, ledgerEntries);
   }
 }
 
-function groupByHour(sales: SaleRecord[], startDate: Date) {
+function groupByHour(sales: SaleRecord[], startDate: Date, ledger: LedgerEntry[]) {
   const buckets: { label: string; revenue: number; sales: number }[] = [];
   for (let h = 0; h < 24; h++) {
     buckets.push({ label: `${h.toString().padStart(2, '0')}:00`, revenue: 0, sales: 0 });
   }
   for (const s of sales) {
     const d = new Date(s.saleDate);
-    if (d >= startDate) {
-      const h = d.getHours();
-      buckets[h].revenue += Number(s.salePrice) || 0;
-      buckets[h].sales += 1;
-    }
+    if (d >= startDate) buckets[d.getHours()].sales += 1;
+  }
+  for (const e of ledger) {
+    const d = new Date(e.entryDate);
+    if (d >= startDate) buckets[d.getHours()].revenue += Number(e.amount) || 0;
   }
   return buckets;
 }
 
-function groupByDay(sales: SaleRecord[], startDate: Date, endDate: Date) {
+function groupByDay(sales: SaleRecord[], startDate: Date, endDate: Date, ledger: LedgerEntry[]) {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const buckets = days.map((d) => ({ label: d, revenue: 0, sales: 0 }));
   for (const s of sales) {
     const d = new Date(s.saleDate);
     if (d >= startDate && d <= endDate) {
-      const day = d.getDay();
-      const idx = day === 0 ? 6 : day - 1;
-      buckets[idx].revenue += Number(s.salePrice) || 0;
+      const idx = d.getDay() === 0 ? 6 : d.getDay() - 1;
       buckets[idx].sales += 1;
+    }
+  }
+  for (const e of ledger) {
+    const d = new Date(e.entryDate);
+    if (d >= startDate && d <= endDate) {
+      const idx = d.getDay() === 0 ? 6 : d.getDay() - 1;
+      buckets[idx].revenue += Number(e.amount) || 0;
     }
   }
   return buckets;
 }
 
-function groupByWeek(sales: SaleRecord[], startDate: Date, endDate: Date) {
+function groupByWeek(sales: SaleRecord[], startDate: Date, endDate: Date, ledger: LedgerEntry[]) {
   const buckets: { label: string; revenue: number; sales: number }[] = [];
   const start = new Date(startDate);
   let weekNum = 1;
   while (start <= endDate) {
-    const weekEnd = new Date(start);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    if (weekEnd > endDate) weekEnd.setTime(endDate.getTime());
     buckets.push({ label: `Week ${weekNum}`, revenue: 0, sales: 0 });
     weekNum++;
     start.setDate(start.getDate() + 7);
   }
-
   for (const s of sales) {
     const d = new Date(s.saleDate);
     if (d >= startDate && d <= endDate) {
-      const daysSinceStart = Math.floor((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const weekIdx = Math.floor(daysSinceStart / 7);
-      if (weekIdx >= 0 && weekIdx < buckets.length) {
-        buckets[weekIdx].revenue += Number(s.salePrice) || 0;
-        buckets[weekIdx].sales += 1;
-      }
+      const idx = Math.floor((d.getTime() - startDate.getTime()) / (7 * 86400000));
+      if (idx >= 0 && idx < buckets.length) buckets[idx].sales += 1;
+    }
+  }
+  for (const e of ledger) {
+    const d = new Date(e.entryDate);
+    if (d >= startDate && d <= endDate) {
+      const idx = Math.floor((d.getTime() - startDate.getTime()) / (7 * 86400000));
+      if (idx >= 0 && idx < buckets.length) buckets[idx].revenue += Number(e.amount) || 0;
     }
   }
   return buckets;
 }
 
-function groupByMonth(sales: SaleRecord[], startDate: Date) {
+function groupByMonth(sales: SaleRecord[], startDate: Date, ledger: LedgerEntry[]) {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const year = startDate.getFullYear();
   const buckets = months.map((m) => ({ label: m, revenue: 0, sales: 0 }));
   for (const s of sales) {
     const d = new Date(s.saleDate);
-    if (d.getFullYear() === year) {
-      const m = d.getMonth();
-      buckets[m].revenue += Number(s.salePrice) || 0;
-      buckets[m].sales += 1;
-    }
+    if (d.getFullYear() === year) buckets[d.getMonth()].sales += 1;
+  }
+  for (const e of ledger) {
+    const d = new Date(e.entryDate);
+    if (d.getFullYear() === year) buckets[d.getMonth()].revenue += Number(e.amount) || 0;
   }
   return buckets;
 }

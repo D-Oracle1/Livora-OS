@@ -73,6 +73,11 @@ export default () => ({
     s3Bucket: process.env.AWS_S3_BUCKET || 'rms-platform-files',
   },
 
+  // CDN (optional — set to a CloudFront or custom CDN URL to rewrite blob URLs)
+  cdn: {
+    baseUrl: process.env.CDN_BASE_URL,
+  },
+
   // OpenAI
   openai: {
     apiKey: process.env.OPENAI_API_KEY,
@@ -105,5 +110,28 @@ export default () => ({
   rateLimit: {
     ttl: parseInt(process.env.RATE_LIMIT_TTL || '60', 10),
     max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+  },
+
+  // Sentry error monitoring
+  sentry: {
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
+  },
+
+  // OAuth
+  oauth: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    },
+    facebook: {
+      appId: process.env.FACEBOOK_APP_ID,
+      appSecret: process.env.FACEBOOK_APP_SECRET,
+    },
+  },
+
+  // Logging
+  logtail: {
+    token: process.env.LOGTAIL_TOKEN,
   },
 });

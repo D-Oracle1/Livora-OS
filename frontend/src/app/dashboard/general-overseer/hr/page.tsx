@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  ClipboardList, CalendarDays, DollarSign, BarChart3,
+  ClipboardList, CalendarDays, BarChart3,
   Users, CheckCircle, Clock, ArrowRight, Loader2,
 } from 'lucide-react';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';

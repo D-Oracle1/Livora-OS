@@ -14,7 +14,6 @@ import {
   XCircle,
   Loader2,
   RefreshCw,
-  DollarSign,
   Percent,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +48,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 interface HRPolicy {
   id: string;
@@ -366,7 +366,7 @@ export default function HRPoliciesPage() {
                           <div className="flex items-center gap-1">
                             {policy.penaltyType === 'fixed' ? (
                               <>
-                                <DollarSign className="w-4 h-4" />
+                                <NairaSign className="w-4 h-4" />
                                 {formatCurrency(policy.penaltyAmount)}
                               </>
                             ) : (

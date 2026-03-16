@@ -43,7 +43,7 @@ export class UsersController {
   }
 
   @Get('stats')
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'GENERAL_OVERSEER')
   @ApiOperation({ summary: 'Get user statistics' })
   @ApiResponse({ status: 200, description: 'User statistics' })
   async getStats() {

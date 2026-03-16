@@ -19,10 +19,10 @@ import {
   Phone,
   Mail,
   LayoutDashboard,
-  DollarSign,
   Lock,
 } from 'lucide-react';
 import { usePlatformBranding, getPlatformName } from '@/hooks/use-platform-branding';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
 
@@ -93,7 +93,7 @@ const FEATURES = [
 const RAIL_ITEMS = [
   { icon: LayoutDashboard, label: 'Home', href: '#hero' },
   { icon: Zap, label: 'Features', href: '#features' },
-  { icon: DollarSign, label: 'Pricing', href: '#pricing' },
+  { icon: NairaSign, label: 'Pricing', href: '#pricing' },
   { icon: Mail, label: 'Contact', href: '#contact' },
   { icon: Lock, label: 'Login', href: '/auth/login' },
 ];

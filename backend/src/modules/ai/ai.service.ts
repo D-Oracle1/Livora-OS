@@ -279,6 +279,54 @@ export class AiService {
     };
   }
 
+  /**
+   * Get comparable properties by city and type (used by AI market insights).
+   */
+  async getComparables(city: string, propertyType: string): Promise<{ price: number }[]> {
+    const properties = await this.prisma.property.findMany({
+      where: {
+        city: { contains: city, mode: 'insensitive' },
+        type: propertyType as PropertyType,
+      },
+      select: { price: true },
+      take: 50,
+    });
+    return properties.map((p) => ({ price: Number(p.price) }));
+  }
+
+  /**
+   * Build monthly sales data array for trend analysis.
+   * Returns months in descending order (most recent first).
+   */
+  async buildMonthlySalesData(
+    lookbackMonths = 6,
+  ): Promise<Array<{ month: string; count: number; value: number }>> {
+    const now = new Date();
+    const results: Array<{ month: string; count: number; value: number }> = [];
+
+    for (let i = 0; i < lookbackMonths; i++) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+
+      const agg = await this.prisma.sale.aggregate({
+        where: {
+          status: SaleStatus.COMPLETED,
+          saleDate: { gte: start, lte: end },
+        },
+        _count: { id: true },
+        _sum: { salePrice: true },
+      });
+
+      results.push({
+        month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
+        count: agg._count.id,
+        value: Number(agg._sum.salePrice ?? 0),
+      });
+    }
+
+    return results;
+  }
+
   private getPerformanceRecommendations(trend: number, tier: string): string[] {
     const recommendations = [];
 

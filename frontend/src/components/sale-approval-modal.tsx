@@ -13,10 +13,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { CheckCircle, XCircle, DollarSign, Home, Users, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Home, Users, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 interface SaleApprovalData {
   saleId: string;
@@ -84,7 +85,7 @@ export function SaleApprovalModal({ open, onClose, saleData }: SaleApprovalModal
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-[#fca639]" />
+            <NairaSign className="w-5 h-5 text-[#fca639]" />
             New Sale Report — Approval Required
           </DialogTitle>
           <DialogDescription>
@@ -102,7 +103,7 @@ export function SaleApprovalModal({ open, onClose, saleData }: SaleApprovalModal
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <DollarSign className="w-3 h-3" /> Amount
+                <NairaSign className="w-3 h-3" /> Amount
               </p>
               <p className="font-semibold text-sm text-[#0b5c46]">
                 {saleData.salePrice ? formatCurrency(saleData.salePrice) : 'N/A'}

@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   Users,
   Home,
-  DollarSign,
   Award,
   MessageSquare,
   Bell,
@@ -50,6 +49,7 @@ import {
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getImageUrl, api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { getUser, clearAuth } from '@/lib/auth-storage';
 import { useBranding, getShortName } from '@/hooks/use-branding';
 import { usePlatformBranding, getPlatformName } from '@/hooks/use-platform-branding';
@@ -93,7 +93,7 @@ const navigationConfig: Record<string, NavItem[]> = {
   ],
   realtor: [
     { name: 'Dashboard', href: '/dashboard/realtor', icon: LayoutDashboard },
-    { name: 'My Sales', href: '/dashboard/realtor/sales', icon: DollarSign },
+    { name: 'My Sales', href: '/dashboard/realtor/sales', icon: NairaSign },
     { name: 'Properties', href: '/dashboard/realtor/properties', icon: Home },
     { name: 'Clients', href: '/dashboard/realtor/clients', icon: Users },
     { name: 'Commission', href: '/dashboard/realtor/commission', icon: Calculator },
@@ -106,7 +106,7 @@ const navigationConfig: Record<string, NavItem[]> = {
   client: [
     { name: 'Dashboard', href: '/dashboard/client', icon: LayoutDashboard },
     { name: 'My Properties', href: '/dashboard/client/properties', icon: Home },
-    { name: 'Offers', href: '/dashboard/client/offers', icon: DollarSign },
+    { name: 'Offers', href: '/dashboard/client/offers', icon: NairaSign },
     { name: 'Documents', href: '/dashboard/client/documents', icon: FileText },
     { name: 'My Referrals', href: '/dashboard/client/referrals', icon: Share2 },
     { name: 'Feed', href: '/dashboard/client/feed', icon: Newspaper },
@@ -128,7 +128,7 @@ const navigationConfig: Record<string, NavItem[]> = {
   ],
   staff: [
     { name: 'Dashboard', href: '/dashboard/staff', icon: LayoutDashboard },
-    { name: 'Sales', href: '/dashboard/staff/sales', icon: DollarSign, moduleKey: 'sales' },
+    { name: 'Sales', href: '/dashboard/staff/sales', icon: NairaSign, moduleKey: 'sales' },
     { name: 'My Tasks', href: '/dashboard/staff/tasks', icon: CheckSquare, moduleKey: 'tasks' },
     { name: 'Attendance', href: '/dashboard/staff/attendance', icon: Clock, moduleKey: 'attendance' },
     { name: 'Leave', href: '/dashboard/staff/leave', icon: CalendarDays, moduleKey: 'leave' },
@@ -171,7 +171,7 @@ const groupedNavigationConfig: Record<string, NavSection[]> = {
       label: 'Sales & Finance',
       items: [
         { name: 'Properties', href: '/dashboard/admin/properties', icon: Home, moduleKey: 'properties' },
-        { name: 'Sales', href: '/dashboard/admin/sales', icon: DollarSign, moduleKey: 'sales' },
+        { name: 'Sales', href: '/dashboard/admin/sales', icon: NairaSign, moduleKey: 'sales' },
         { name: 'Commission', href: '/dashboard/admin/commission', icon: Calculator, moduleKey: 'commission' },
         { name: 'Tax Reports', href: '/dashboard/admin/tax', icon: FileText, moduleKey: 'tax' },
         { name: 'Rankings', href: '/dashboard/admin/rankings', icon: Crown, moduleKey: 'rankings' },

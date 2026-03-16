@@ -6,7 +6,6 @@ import {
   FileText,
   Search,
   Download,
-  DollarSign,
   Percent,
   Hash,
   CalendarDays,
@@ -23,6 +22,7 @@ import { ReceiptModal, ReceiptData } from '@/components/receipt';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 type TimePeriod = 'quarter' | 'year' | 'all';
 
@@ -173,7 +173,7 @@ export default function TaxPage() {
       .reduce((acc, r) => acc + (r.taxAmount || 0), 0);
 
     return [
-      { title: 'Total Tax Collected', value: formatCurrency(totalTax),                 icon: DollarSign,  color: 'text-primary',    bgColor: 'bg-primary/10' },
+      { title: 'Total Tax Collected', value: formatCurrency(totalTax),                 icon: NairaSign,  color: 'text-primary',    bgColor: 'bg-primary/10' },
       { title: 'Tax Rate',            value: taxRateLoaded ? `${taxRate}%` : '…',       icon: Percent,     color: 'text-blue-600',   bgColor: 'bg-blue-100' },
       { title: 'Total Records',       value: filteredByTime.length.toString(),          icon: Hash,        color: 'text-green-600',  bgColor: 'bg-green-100' },
       { title: 'This Year',           value: formatCurrency(thisYearTax),               icon: CalendarDays, color: 'text-orange-600', bgColor: 'bg-orange-100' },

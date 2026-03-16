@@ -9,7 +9,7 @@ const DEFAULT_COMMISSION_RATES = {
 };
 
 const DEFAULT_TAX_RATES = {
-  incomeTax: 0.15,
+  incomeTax: 0,
   withholdingTax: 0.10,
   vat: 0.075,
   stampDuty: 0.005,
@@ -120,5 +120,47 @@ export class SettingsService {
     if (settings.taxRate !== undefined) updates.push(this.upsertSetting('payroll_taxRate', settings.taxRate));
     await Promise.all(updates);
     return this.getPayrollSettings();
+  }
+
+  // ============ Notification Preferences ============
+
+  private readonly DEFAULT_NOTIFICATION_PREFS = {
+    email: true,
+    push: true,
+    sms: false,
+    systemAlerts: true,
+    salesUpdates: true,
+    commissionUpdates: true,
+    paymentReminders: true,
+    hrAlerts: true,
+    marketingEmails: false,
+  };
+
+  async getNotificationPreferences(userId: string): Promise<Record<string, boolean>> {
+    const val = await this.getSetting(`notif_prefs_${userId}`);
+    if (!val) return { ...this.DEFAULT_NOTIFICATION_PREFS };
+    return { ...this.DEFAULT_NOTIFICATION_PREFS, ...(typeof val === 'object' ? val : {}) };
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    prefs: Partial<Record<string, boolean>>,
+  ): Promise<Record<string, boolean>> {
+    const current = await this.getNotificationPreferences(userId);
+    const allowed = Object.keys(this.DEFAULT_NOTIFICATION_PREFS);
+    const sanitized: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(prefs)) {
+      if (allowed.includes(k) && typeof v === 'boolean') {
+        sanitized[k] = v;
+      }
+    }
+    const merged = { ...current, ...sanitized };
+    await this.upsertSetting(`notif_prefs_${userId}`, merged);
+    return merged;
+  }
+
+  async isNotificationEnabled(userId: string, channel: string): Promise<boolean> {
+    const prefs = await this.getNotificationPreferences(userId);
+    return prefs[channel] !== false; // default to enabled
   }
 }

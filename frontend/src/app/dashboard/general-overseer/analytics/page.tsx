@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import {
   BarChart3,
   TrendingUp,
-  DollarSign,
   Home,
   Users,
   Calendar,
@@ -22,6 +21,7 @@ import { Progress } from '@/components/ui/progress';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 type TimePeriod = 'week' | 'month' | 'quarter' | 'year';
 
@@ -154,7 +154,7 @@ export default function GOAnalyticsPage() {
   }
 
   const statsDisplay = [
-    { title: 'Total Revenue', value: data?.stats?.totalRevenue || 0, icon: DollarSign, color: 'text-primary', bgColor: 'bg-primary/10', isCurrency: true },
+    { title: 'Total Revenue', value: data?.stats?.totalRevenue || 0, icon: NairaSign, color: 'text-primary', bgColor: 'bg-primary/10', isCurrency: true },
     { title: 'Properties Sold', value: data?.stats?.propertiesSold || 0, icon: Home, color: 'text-green-600', bgColor: 'bg-green-100', isCurrency: false },
     { title: 'New Clients', value: data?.stats?.newClients || 0, icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-100', isCurrency: false },
     { title: 'Avg. Sale Price', value: data?.stats?.avgSalePrice || 0, icon: TrendingUp, color: 'text-purple-600', bgColor: 'bg-purple-100', isCurrency: true },

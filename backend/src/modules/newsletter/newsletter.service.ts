@@ -208,7 +208,10 @@ export class NewsletterService {
       return { message: 'No recipients to send to', sent: 0 };
     }
 
-    let queued = 0;
+    let sent = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
     for (const recipient of recipients) {
       const unsubscribeToken = (recipient as any).unsubscribeToken;
       const unsubscribeUrl = unsubscribeToken
@@ -221,13 +224,34 @@ export class NewsletterService {
           to: recipient.email,
           data: { subject, content, unsubscribeUrl, branding, attachments },
         });
-        queued++;
+        sent++;
       } catch (error) {
-        this.logger.error(`Failed to queue newsletter for ${recipient.email}: ${error.message}`);
+        failed++;
+        this.logger.error(`Failed to send newsletter to ${recipient.email}: ${error.message}`);
+        if (errors.length < 5) errors.push(`${recipient.email}: ${error.message}`);
       }
     }
 
-    this.logger.log(`Newsletter "${subject}" queued for ${queued}/${recipients.length} recipients (type: ${recipientType})`);
-    return { message: `Newsletter queued for ${queued} recipients`, sent: queued };
+    const total = recipients.length;
+    this.logger.log(`Newsletter "${subject}": ${sent} sent, ${failed} failed out of ${total} (type: ${recipientType})`);
+
+    if (failed > 0 && sent === 0) {
+      return {
+        message: `Newsletter failed to send. ${failed}/${total} recipients failed. Check SMTP configuration.`,
+        sent: 0,
+        failed,
+        total,
+        errors,
+      };
+    }
+
+    return {
+      message: failed > 0
+        ? `Newsletter partially sent: ${sent} succeeded, ${failed} failed`
+        : `Newsletter sent to ${sent} recipients`,
+      sent,
+      failed,
+      total,
+    };
   }
 }

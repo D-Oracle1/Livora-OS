@@ -9,7 +9,6 @@ import {
   Bed,
   Bath,
   Square,
-  DollarSign,
   Eye,
   LandPlot,
   Building2,
@@ -37,6 +36,7 @@ import {
 } from '@/components/ui/dialog';
 import { formatCurrency, formatArea, type AreaUnit, AREA_UNITS, toSqm, fromSqm } from '@/lib/utils';
 import { api, getImageUrl } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { AreaUnitSelect } from '@/components/area-unit-select';
 import { toast } from 'sonner';
 import { getToken } from '@/lib/auth-storage';
@@ -286,7 +286,7 @@ export default function RealtorPropertiesPage() {
   const statsData = [
     { title: 'Available Properties', value: availableProperties.length.toString(), icon: Home, color: 'text-blue-600', bgColor: 'bg-blue-100' },
     { title: 'My Reported Sales', value: reportedSales.length.toString(), icon: ShoppingCart, color: 'text-green-600', bgColor: 'bg-green-100' },
-    { title: 'Pending Approval', value: reportedSales.filter((s: any) => s.status === 'PENDING').length.toString(), icon: DollarSign, color: 'text-orange-600', bgColor: 'bg-orange-100' },
+    { title: 'Pending Approval', value: reportedSales.filter((s: any) => s.status === 'PENDING').length.toString(), icon: NairaSign, color: 'text-orange-600', bgColor: 'bg-orange-100' },
     { title: 'Completed Sales', value: reportedSales.filter((s: any) => s.status === 'COMPLETED').length.toString(), icon: CheckCircle, color: 'text-primary', bgColor: 'bg-primary/10' },
   ];
 
@@ -574,7 +574,7 @@ export default function RealtorPropertiesPage() {
             {/* Sale Details */}
             <div className="space-y-4">
               <h4 className="font-semibold flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
+                <NairaSign className="w-4 h-4" />
                 Sale Details
               </h4>
 

@@ -51,6 +51,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
         `${request.method} ${request.url} - ${status}`,
         JSON.stringify(errorResponse),
       );
+      // Report 5xx errors to Sentry if configured (dynamic require — safe even if not installed)
+      if (exception instanceof Error) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const Sentry = require('@sentry/node') as any;
+          Sentry.captureException(exception, {
+            extra: { url: request.url, method: request.method, status },
+          });
+        } catch { /* Sentry not installed — silently skip */ }
+      }
     } else {
       this.logger.warn(
         `${request.method} ${request.url} - ${status}: ${JSON.stringify(message)}`,

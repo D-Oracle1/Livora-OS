@@ -4,6 +4,10 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { TwoFaService } from './twofa.service';
+import { OAuthService } from './oauth.service';
+import { GoogleStrategy } from './strategies/google.strategy';
+import { FacebookStrategy } from './strategies/facebook.strategy';
 
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
@@ -41,7 +45,7 @@ import { MailService } from '../../common/services/mail.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, MailService],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, TwoFaService, OAuthService, GoogleStrategy, FacebookStrategy, JwtStrategy, LocalStrategy, MailService],
+  exports: [AuthService, TwoFaService, OAuthService, JwtModule],
 })
 export class AuthModule {}

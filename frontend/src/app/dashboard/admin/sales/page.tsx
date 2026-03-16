@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
-  DollarSign,
   Search,
   TrendingUp,
   Calendar,
@@ -45,6 +44,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { formatCurrency, formatDate, getTierBgClass, formatArea, type AreaUnit, AREA_UNITS, toSqm, fromSqm } from '@/lib/utils';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { AreaUnitSelect } from '@/components/area-unit-select';
 import { api } from '@/lib/api';
 import { ReceiptModal, ReceiptData } from '@/components/receipt';
@@ -228,7 +228,7 @@ export default function SalesPage() {
     const avgSalePrice = activeSales.length > 0 ? totalSales / activeSales.length : 0;
 
     return [
-      { title: 'Total Sales', value: formatCurrency(totalSales), change: `${activeSales.length} active`, trend: 'up', icon: DollarSign, color: 'text-primary', bgColor: 'bg-primary/10' },
+      { title: 'Total Sales', value: formatCurrency(totalSales), change: `${activeSales.length} active`, trend: 'up', icon: NairaSign, color: 'text-primary', bgColor: 'bg-primary/10' },
       { title: 'Completed', value: completedCount.toString(), change: '', trend: 'up', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' },
       { title: 'In Progress', value: inProgressCount.toString(), change: `${pendingCount} pending`, trend: 'up', icon: Clock, color: 'text-orange-600', bgColor: 'bg-orange-100' },
       { title: 'Avg. Sale Price', value: formatCurrency(avgSalePrice), change: '', trend: 'down', icon: Building2, color: 'text-purple-600', bgColor: 'bg-purple-100' },
@@ -674,7 +674,7 @@ export default function SalesPage() {
         <Card>
           <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-primary" />
+              <NairaSign className="w-5 h-5 text-primary" />
               All Reported Sales - {getPeriodLabel()}
             </CardTitle>
             <div className="flex flex-wrap gap-3">
@@ -957,7 +957,7 @@ export default function SalesPage() {
                 {/* Sale Details */}
                 <div className="p-4 bg-[#0b5c46]/5 rounded-lg border border-[#0b5c46]/20">
                   <h4 className="font-semibold mb-3 flex items-center gap-2 text-[#0b5c46]">
-                    <DollarSign className="w-4 h-4" />
+                    <NairaSign className="w-4 h-4" />
                     Sale Breakdown
                   </h4>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -1381,7 +1381,7 @@ export default function SalesPage() {
 
               {/* Sale Details */}
               <div className="space-y-3">
-                <h4 className="font-semibold text-sm flex items-center gap-2"><DollarSign className="w-4 h-4" /> Sale Details</h4>
+                <h4 className="font-semibold text-sm flex items-center gap-2"><NairaSign className="w-4 h-4" /> Sale Details</h4>
 
                 <div className="space-y-1">
                   <Label>Date of Sale *</Label>

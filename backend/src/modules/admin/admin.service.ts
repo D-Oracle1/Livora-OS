@@ -2,13 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CacheService } from '../../common/services/cache.service';
 import { SaleStatus, PropertyStatus, LoyaltyTier } from '@prisma/client';
-import { DashboardPeriod, getDateRange, groupSalesIntoChartBuckets } from '../../common/utils/date-range.util';
+import { DashboardPeriod, getDateRange, groupSalesIntoChartBuckets, LedgerEntry } from '../../common/utils/date-range.util';
+import { LedgerService } from '../accounting/ledger.service';
 
 @Injectable()
 export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly ledgerService: LedgerService,
   ) {}
 
   async getDashboardStats(
@@ -27,64 +29,61 @@ export class AdminService {
     const { startDate, endDate } = getDateRange(activePeriod, parsedMonth, parsedYear);
     const dateFilter = { gte: startDate, lte: endDate };
 
+    const allTimeStart = new Date('2000-01-01T00:00:00Z');
+    const now = new Date();
+
     const [
       totalRealtors,
       activeRealtors,
       totalClients,
+      activeClients,
+      totalStaff,
+      activeStaff,
       totalProperties,
       activeListings,
       filteredSalesCount,
-      filteredRevenueFullPlan,
-      filteredRevenueInstallment,
+      // Revenue from ledger — uses actual payment dates, not saleDate (correct cash-basis)
+      filteredRevenue,
       filteredCommission,
       pendingSales,
       salesForChart,
       recentSales,
       tierDistribution,
+      ledgerChartEntries,
+      // All-time totals for KPI overview cards
+      allTimeRevenue,
+      allTimeCommission,
+      allTimeSalesCount,
     ] = await Promise.all([
       this.prisma.realtorProfile.count(),
       this.prisma.realtorProfile.count({
         where: { user: { status: 'ACTIVE' } },
       }),
       this.prisma.clientProfile.count(),
+      this.prisma.clientProfile.count({ where: { user: { status: 'ACTIVE' } } }),
+      this.prisma.staffProfile.count(),
+      this.prisma.staffProfile.count({ where: { isActive: true, user: { status: 'ACTIVE' } } }),
       this.prisma.property.count(),
       this.prisma.property.count({ where: { isListed: true } }),
-      // Count completed + in-progress sales for the period
+      // Count active sales for the period (by saleDate — contract dates are correct here)
       this.prisma.sale.count({
         where: {
           status: { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] },
           saleDate: dateFilter,
         },
       }),
-      // Cash-basis revenue: FULL plan — revenue = salePrice (COMPLETED only)
-      this.prisma.sale.aggregate({
-        where: { status: SaleStatus.COMPLETED, paymentPlan: 'FULL', saleDate: dateFilter },
-        _sum: { salePrice: true, commissionAmount: true },
-      }),
-      // Cash-basis revenue: INSTALLMENT plan — revenue = totalPaid (actual cash received)
-      this.prisma.sale.aggregate({
-        where: {
-          status: { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] },
-          paymentPlan: 'INSTALLMENT',
-          saleDate: dateFilter,
-        },
-        _sum: { totalPaid: true, commissionAmount: true },
-      }),
-      // Commission from completed + in-progress sales in the period
-      this.prisma.commission.aggregate({
-        where: {
-          sale: { saleDate: dateFilter },
-        },
-        _sum: { amount: true },
-      }),
+      // LEDGER: cash received in period (uses actual payment dates — no date-attribution bug)
+      this.ledgerService.getRevenue(startDate, endDate),
+      // Commission from ledger — consistent with revenue
+      this.ledgerService.getCommissionTotal(startDate, endDate),
       this.prisma.sale.count({ where: { status: SaleStatus.PENDING } }),
-      // Chart data from completed + in-progress sales
+      // Chart data — sale counts by saleDate (contracts), revenue from ledger below
       this.prisma.sale.findMany({
         where: {
           status: { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] },
           saleDate: dateFilter,
         },
-        select: { saleDate: true, salePrice: true, commissionAmount: true },
+        select: { saleDate: true, salePrice: true, totalPaid: true, paymentPlan: true, commissionAmount: true },
         orderBy: { saleDate: 'asc' },
       }),
       this.prisma.sale.findMany({
@@ -101,17 +100,21 @@ export class AdminService {
         by: ['loyaltyTier'],
         _count: { id: true },
       }),
+      // Ledger entries for chart revenue (cash-basis, by payment date)
+      this.prisma.generalLedger.findMany({
+        where: { entryType: 'SALE_PAYMENT', entryDate: { gte: startDate, lte: endDate } },
+        select: { entryDate: true, amount: true },
+      }),
+      // All-time revenue and commission (no date filter)
+      this.ledgerService.getRevenue(allTimeStart, now),
+      this.ledgerService.getCommissionTotal(allTimeStart, now),
+      this.prisma.sale.count({
+        where: { status: { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] } },
+      }),
     ]);
 
-    const chartData = groupSalesIntoChartBuckets(salesForChart, activePeriod, startDate, endDate);
-
-    // Cash-basis revenue: FULL plan uses salePrice, INSTALLMENT uses totalPaid
-    const filteredRevenue =
-      Number(filteredRevenueFullPlan._sum.salePrice ?? 0) +
-      Number(filteredRevenueInstallment._sum.totalPaid ?? 0);
-    const filteredCommissionFromSales =
-      Number(filteredRevenueFullPlan._sum.commissionAmount ?? 0) +
-      Number(filteredRevenueInstallment._sum.commissionAmount ?? 0);
+    const chartData = groupSalesIntoChartBuckets(salesForChart, activePeriod, startDate, endDate, ledgerChartEntries as LedgerEntry[]);
+    const filteredCommissionFromSales = filteredCommission;
 
     // Convert tier distribution to object
     const tierDistributionMap = tierDistribution.reduce((acc, item) => {
@@ -121,18 +124,22 @@ export class AdminService {
 
     const result = {
       realtors: { total: totalRealtors, active: activeRealtors },
-      clients: { total: totalClients },
+      clients: { total: totalClients, active: activeClients },
+      staff: { total: totalStaff, active: activeStaff },
       properties: { total: totalProperties, activeListings },
       sales: {
         filtered: filteredSalesCount,
+        allTime: allTimeSalesCount,
         pending: pendingSales,
       },
       revenue: {
         filtered: filteredRevenue,
+        allTime: allTimeRevenue,
       },
       commission: {
-        filtered: filteredCommission._sum.amount || 0,
+        filtered: filteredCommission,
         filteredFromSales: filteredCommissionFromSales,
+        allTime: allTimeCommission,
       },
       chartData,
       recentSales,
@@ -407,8 +414,9 @@ export class AdminService {
       salesByRealtor,
       topProperties,
       tierDistribution,
-      totalStatsFullPlan,
-      totalStatsInstallment,
+      // LEDGER: authoritative revenue for the period (uses actual payment dates)
+      totalCashRevenue,
+      totalSalesCount,
       salesWithPropertyInfo,
       newClientsCount,
     ] = await Promise.all([
@@ -445,23 +453,16 @@ export class AdminService {
         by: ['loyaltyTier'],
         _count: { id: true },
       }),
-      // Cash-basis revenue: FULL plan — revenue = salePrice (COMPLETED only)
-      this.prisma.sale.aggregate({
-        where: { status: SaleStatus.COMPLETED, paymentPlan: 'FULL', saleDate: dateFilter },
-        _count: { id: true },
-        _sum: { salePrice: true, commissionAmount: true },
-      }),
-      // Cash-basis revenue: INSTALLMENT plan — revenue = totalPaid (actual cash received)
-      this.prisma.sale.aggregate({
+      // LEDGER: cash received in period — correct date attribution (payment date, not sale date)
+      this.ledgerService.getRevenue(startDate, endDate),
+      // Sale count (contracts — by saleDate is appropriate for "how many deals were done")
+      this.prisma.sale.count({
         where: {
           status: { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] },
-          paymentPlan: 'INSTALLMENT',
           saleDate: dateFilter,
         },
-        _count: { id: true },
-        _sum: { totalPaid: true, commissionAmount: true },
       }),
-      // Get all sales with property info for aggregation
+      // Sales with property info for type/location breakdown
       this.prisma.sale.findMany({
         where: {
           status: { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] },
@@ -545,8 +546,11 @@ export class AdminService {
       };
     });
 
-    // Process chart data based on period
-    const chartData = this.processChartData(salesForChart, period, startDate, endDate);
+    // Ledger revenue by time bucket — chart bars show actual cash received, not contract values
+    const ledgerRevenueMap = await this.ledgerService.getRevenueByPeriod(startDate, endDate, period);
+
+    // Process chart data based on period (sales COUNT from Sale table, revenue from ledger)
+    const chartData = this.processChartData(salesForChart, period, startDate, endDate, ledgerRevenueMap);
 
     // Calculate property type percentages
     const totalPropertySales = salesByPropertyType.reduce((sum, pt) => sum + pt.count, 0) || 1;
@@ -557,18 +561,12 @@ export class AdminService {
       revenue: pt.revenue,
     }));
 
-    // Cash-basis revenue: FULL plan salePrice + INSTALLMENT plan totalPaid
-    const totalCashRevenue =
-      Number(totalStatsFullPlan._sum.salePrice ?? 0) +
-      Number(totalStatsInstallment._sum.totalPaid ?? 0);
-    const totalSalesCount = (totalStatsFullPlan._count.id || 0) + (totalStatsInstallment._count.id || 0);
-
-    // Summary stats
+    // Summary stats — totalRevenue from ledger (single source of truth)
     const stats = {
-      totalRevenue: totalCashRevenue,
+      totalRevenue:   totalCashRevenue,
       propertiesSold: totalSalesCount,
-      newClients: newClientsCount,
-      avgSalePrice: totalSalesCount > 0 ? totalCashRevenue / totalSalesCount : 0,
+      newClients:     newClientsCount,
+      avgSalePrice:   totalSalesCount > 0 ? totalCashRevenue / totalSalesCount : 0,
     };
 
     const result = {
@@ -593,79 +591,56 @@ export class AdminService {
     return result;
   }
 
+  /**
+   * Build chart data buckets.
+   * - sales COUNT comes from the Sale table (contract dates — correct for "how many deals")
+   * - revenue comes from the ledger revenue map (actual cash received, correct date attribution)
+   */
   private processChartData(
     sales: { saleDate: Date; salePrice: any }[],
     period: string,
     startDate: Date,
     endDate: Date,
+    ledgerRevenue?: Map<string, number>,
   ) {
+    const rev = (label: string) => ledgerRevenue?.get(label) ?? 0;
     const chartData: { label: string; sales: number; revenue: number }[] = [];
 
     if (period === 'week') {
-      // Group by day
       for (let i = 0; i < 7; i++) {
         const date = new Date(startDate);
         date.setDate(startDate.getDate() + i);
         const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
-        const daySales = sales.filter((s) => {
-          const saleDate = new Date(s.saleDate);
-          return saleDate.toDateString() === date.toDateString();
-        });
-        chartData.push({
-          label: dayLabel,
-          sales: daySales.length,
-          revenue: daySales.reduce((sum, s) => sum + Number(s.salePrice || 0), 0),
-        });
+        const daySales = sales.filter((s) => new Date(s.saleDate).toDateString() === date.toDateString());
+        chartData.push({ label: dayLabel, sales: daySales.length, revenue: rev(dayLabel) });
       }
     } else if (period === 'month') {
-      // Group by week
-      const weeks = 4;
-      for (let i = 0; i < weeks; i++) {
+      for (let i = 0; i < 4; i++) {
+        const label = `Week ${i + 1}`;
         const weekStart = new Date(startDate);
         weekStart.setDate(startDate.getDate() + i * 7);
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
-
         const weekSales = sales.filter((s) => {
-          const saleDate = new Date(s.saleDate);
-          return saleDate >= weekStart && saleDate <= weekEnd;
+          const d = new Date(s.saleDate);
+          return d >= weekStart && d <= weekEnd;
         });
-        chartData.push({
-          label: `Week ${i + 1}`,
-          sales: weekSales.length,
-          revenue: weekSales.reduce((sum, s) => sum + Number(s.salePrice || 0), 0),
-        });
+        chartData.push({ label, sales: weekSales.length, revenue: rev(label) });
       }
     } else if (period === 'quarter') {
-      // Group by month
       const quarterStart = startDate.getMonth();
       for (let i = 0; i < 3; i++) {
-        const monthSales = sales.filter((s) => {
-          const saleDate = new Date(s.saleDate);
-          return saleDate.getMonth() === quarterStart + i;
-        });
         const monthName = new Date(startDate.getFullYear(), quarterStart + i, 1)
           .toLocaleDateString('en-US', { month: 'short' });
-        chartData.push({
-          label: monthName,
-          sales: monthSales.length,
-          revenue: monthSales.reduce((sum, s) => sum + Number(s.salePrice || 0), 0),
-        });
+        const monthSales = sales.filter((s) => new Date(s.saleDate).getMonth() === quarterStart + i);
+        chartData.push({ label: monthName, sales: monthSales.length, revenue: rev(monthName) });
       }
     } else if (period === 'year') {
-      // Group by month
       for (let i = 0; i < 12; i++) {
-        const monthSales = sales.filter((s) => {
-          const saleDate = new Date(s.saleDate);
-          return saleDate.getMonth() === i;
-        });
         const monthName = new Date(startDate.getFullYear(), i, 1)
           .toLocaleDateString('en-US', { month: 'short' });
-        chartData.push({
-          label: monthName,
-          sales: monthSales.length,
-          revenue: monthSales.reduce((sum, s) => sum + Number(s.salePrice || 0), 0),
-        });
+        const monthSales = sales.filter((s) => new Date(s.saleDate).getMonth() === i);
+        chartData.push({ label: monthName, sales: monthSales.length, revenue: rev(monthName) });
       }
     }
 

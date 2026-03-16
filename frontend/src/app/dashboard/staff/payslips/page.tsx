@@ -7,7 +7,6 @@ import {
   Download,
   Calendar,
   TrendingUp,
-  DollarSign,
   Loader2,
   RefreshCw,
   FileText,
@@ -25,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 interface PayrollRecord {
   id: string;
@@ -403,7 +403,7 @@ export default function PayslipsPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-red-600">
-                      <DollarSign className="w-5 h-5" />
+                      <NairaSign className="w-5 h-5" />
                       Deductions
                     </CardTitle>
                   </CardHeader>

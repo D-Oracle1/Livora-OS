@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import {
   Users,
   Home,
-  DollarSign,
   TrendingUp,
   Activity,
   Award,
@@ -58,6 +57,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatCurrency, getTierBgClass } from '@/lib/utils';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { api } from '@/lib/api';
 import { AwardBanner } from '@/components/award-banner';
 import {
@@ -188,7 +188,7 @@ const consoleSections: ConsoleSection[] = [
         name: 'Sales',
         description: 'Transactions & deals',
         href: '/dashboard/admin/sales',
-        icon: DollarSign,
+        icon: NairaSign,
         color: 'bg-green-100 dark:bg-green-900/40',
         iconColor: 'text-green-600 dark:text-green-400',
       },
@@ -373,15 +373,20 @@ export default function AdminDashboard() {
 
   // Extract data from API response
   const chartData = dashboardData?.chartData || [];
-  const revenue = Number(dashboardData?.revenue?.filtered) || 0;
-  const salesCount = dashboardData?.sales?.filtered || 0;
-  // Use commission from sales (filteredFromSales) to match revenue/sales period
-  // Commission table (filtered) may have records from different periods
-  const commissionFromSales = Number(dashboardData?.commission?.filteredFromSales) || 0;
-  const commissionPaid = commissionFromSales;
+  // KPI cards always show all-time totals (overview of full system performance)
+  const revenue = Number(dashboardData?.revenue?.allTime) || 0;
+  const salesCount = dashboardData?.sales?.allTime || 0;
+  const commissionPaid = Number(dashboardData?.commission?.allTime) || 0;
+  // Period-filtered values used for the chart section
+  const filteredRevenue = Number(dashboardData?.revenue?.filtered) || 0;
+  const filteredSalesCount = dashboardData?.sales?.filtered || 0;
+  const filteredCommission = Number(dashboardData?.commission?.filteredFromSales) || 0;
   const totalRealtors = dashboardData?.realtors?.total || 0;
   const activeRealtors = dashboardData?.realtors?.active || 0;
   const totalClients = dashboardData?.clients?.total || 0;
+  const activeClients = dashboardData?.clients?.active || 0;
+  const totalStaff = dashboardData?.staff?.total || 0;
+  const activeStaff = dashboardData?.staff?.active || 0;
   const totalProperties = dashboardData?.properties?.total || 0;
   const activeListings = dashboardData?.properties?.activeListings || 0;
   const pendingSales = dashboardData?.sales?.pending || 0;
@@ -440,9 +445,9 @@ export default function AdminDashboard() {
     {
       label: 'Total Revenue',
       value: formatCurrency(revenue),
-      icon: DollarSign,
+      icon: NairaSign,
       color: '#0b5c46',
-      subtext: `${salesCount} sales this period`
+      subtext: `${salesCount} completed sales`
     },
     {
       label: 'Total Realtors',
@@ -456,13 +461,20 @@ export default function AdminDashboard() {
       value: String(totalClients),
       icon: Briefcase,
       color: '#fca639',
-      subtext: 'All time'
+      subtext: `${activeClients} active`
+    },
+    {
+      label: 'Total Staff',
+      value: String(totalStaff),
+      icon: UserCog,
+      color: '#0b5c46',
+      subtext: `${activeStaff} active`
     },
     {
       label: 'Total Properties',
       value: String(totalProperties),
       icon: Home,
-      color: '#0b5c46',
+      color: '#fca639',
       subtext: `${activeListings} listed`
     },
   ];
@@ -503,7 +515,7 @@ export default function AdminDashboard() {
       <AwardBanner />
 
       {/* 2. KPI Stats Row */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {mainStats.map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -782,16 +794,16 @@ export default function AdminDashboard() {
                 <div className="grid md:grid-cols-[200px_1fr] gap-6">
                   <div className="space-y-6">
                     <div>
-                      <p className="text-3xl font-bold">{formatCurrency(revenue)}</p>
-                      <p className="text-sm text-muted-foreground">Total Revenue</p>
+                      <p className="text-3xl font-bold">{formatCurrency(filteredRevenue)}</p>
+                      <p className="text-sm text-muted-foreground">Revenue ({periodLabel})</p>
                     </div>
                     <div>
-                      <p className="text-3xl font-bold">{salesCount}</p>
-                      <p className="text-sm text-muted-foreground">Completed Sales</p>
+                      <p className="text-3xl font-bold">{filteredSalesCount}</p>
+                      <p className="text-sm text-muted-foreground">Sales ({periodLabel})</p>
                     </div>
                     <div>
-                      <p className="text-xl font-bold text-[#fca639]">{formatCurrency(commissionPaid)}</p>
-                      <p className="text-sm text-muted-foreground">Commission Paid</p>
+                      <p className="text-xl font-bold text-[#fca639]">{formatCurrency(filteredCommission)}</p>
+                      <p className="text-sm text-muted-foreground">Commission ({periodLabel})</p>
                     </div>
                     <Button className="bg-[#0b5c46] hover:bg-[#094a38] text-white rounded-full px-6" asChild>
                       <a href="/dashboard/admin/sales">View All Sales</a>

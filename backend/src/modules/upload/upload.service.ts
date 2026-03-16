@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { MasterPrismaService } from '../../database/master-prisma.service';
 import { TenantPrismaService } from '../../database/tenant-prisma.service';
+import { CdnService, ImageOptimizeOpts } from './cdn.service';
 import { put, del } from '@vercel/blob';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
@@ -24,16 +25,33 @@ export class UploadService {
     private readonly prisma: PrismaService,
     private readonly masterPrisma: MasterPrismaService,
     private readonly tenantPrisma: TenantPrismaService,
+    private readonly cdn: CdnService,
   ) {}
 
   private async uploadToBlob(
     file: MulterFile,
     folder: string,
+    imgOpts?: ImageOptimizeOpts,
   ): Promise<string> {
-    const ext = extname(file.originalname);
+    const originalExt = extname(file.originalname);
+    let uploadBuffer = file.buffer;
+    let uploadMimetype = file.mimetype;
+    let ext = originalExt;
+
+    // Optimize images when opts are provided (avatar, property, gallery, cms)
+    if (imgOpts && file.mimetype.startsWith('image/')) {
+      const result = await this.cdn.optimizeImage(file.buffer, file.mimetype, originalExt, imgOpts);
+      uploadBuffer = result.buffer;
+      uploadMimetype = result.mimetype;
+      ext = result.ext;
+    }
+
     const pathname = `${folder}/${uuidv4()}${ext}`;
-    const blob = await put(pathname, file.buffer, { access: 'public' });
-    return blob.url;
+    const blob = await put(pathname, uploadBuffer, {
+      access: 'public',
+      contentType: uploadMimetype,
+    });
+    return this.cdn.rewriteUrl(blob.url);
   }
 
   private async deleteFromBlob(url: string): Promise<void> {
@@ -83,7 +101,7 @@ export class UploadService {
       await this.deleteFromBlob(user.avatar);
     }
 
-    const avatarUrl = await this.uploadToBlob(file, 'avatars');
+    const avatarUrl = await this.uploadToBlob(file, 'avatars', { maxWidth: 400, maxHeight: 400, quality: 85 });
 
     if (isSuperAdmin) {
       await this.masterPrisma.superAdmin.update({
@@ -133,8 +151,9 @@ export class UploadService {
   }
 
   async uploadPropertyImages(files: MulterFile[]): Promise<string[]> {
+    const opts: ImageOptimizeOpts = { maxWidth: 1920, maxHeight: 1080, quality: 80 };
     const urls = await Promise.all(
-      files.map((file) => this.uploadToBlob(file, 'properties')),
+      files.map((file) => this.uploadToBlob(file, 'properties', opts)),
     );
     return urls;
   }
@@ -144,28 +163,37 @@ export class UploadService {
   }
 
   async uploadGalleryFiles(files: MulterFile[]): Promise<string[]> {
+    const opts: ImageOptimizeOpts = { maxWidth: 1920, maxHeight: 1080, quality: 80 };
     const urls = await Promise.all(
-      files.map((file) => this.uploadToBlob(file, 'gallery')),
+      files.map((file) => this.uploadToBlob(file, 'gallery', file.mimetype.startsWith('image/') ? opts : undefined)),
     );
     return urls;
   }
 
   async uploadCmsFiles(files: MulterFile[]): Promise<string[]> {
+    const opts: ImageOptimizeOpts = { maxWidth: 1920, maxHeight: 1080, quality: 80 };
     const urls = await Promise.all(
-      files.map((file) => this.uploadToBlob(file, 'cms')),
+      files.map((file) => this.uploadToBlob(file, 'cms', opts)),
     );
     return urls;
   }
 
   async uploadTaskFiles(files: MulterFile[]): Promise<string[]> {
     const urls = await Promise.all(
-      files.map((file) => this.uploadToBlob(file, 'tasks')),
+      // Task files may be docs/pdfs — only optimize images
+      files.map((file) => this.uploadToBlob(file, 'tasks', file.mimetype.startsWith('image/') ? { maxWidth: 1920, maxHeight: 1080, quality: 80 } : undefined)),
     );
     return urls;
   }
 
   async uploadCompanyLogo(file: MulterFile): Promise<{ url: string }> {
-    const url = await this.uploadToBlob(file, 'company-logos');
+    const url = await this.uploadToBlob(file, 'company-logos', { maxWidth: 400, maxHeight: 400, quality: 85 });
+    return { url };
+  }
+
+  async uploadFile(file: MulterFile): Promise<{ url: string }> {
+    // Receipts / documents — skip image optimization to preserve fidelity
+    const url = await this.uploadToBlob(file, 'receipts');
     return { url };
   }
 }

@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import {
   BarChart3,
   TrendingUp,
-  DollarSign,
   Home,
   Users,
   Calendar,
@@ -18,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency } from '@/lib/utils';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
@@ -154,7 +154,7 @@ export default function AnalyticsPage() {
     {
       title: 'Total Revenue',
       value: data?.stats?.totalRevenue || 0,
-      icon: DollarSign,
+      icon: NairaSign,
       color: 'text-primary',
       bgColor: 'bg-primary/10',
       isCurrency: true,

@@ -15,7 +15,6 @@ import {
   Settings,
   LogOut,
   ChevronDown,
-  DollarSign,
   Home,
   Award,
   AlertCircle,
@@ -28,6 +27,7 @@ import { useNotifications } from '@/contexts/notification-context';
 import { CalloutButton } from '@/components/callout/callout-button';
 import { cn } from '@/lib/utils';
 import { getImageUrl } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { getUser, clearAuth } from '@/lib/auth-storage';
 
 // ---------------------------------------------------------------------------
@@ -45,9 +45,9 @@ interface HeaderProps {
 const getNotificationIcon = (type: string) => {
   switch (type) {
     case 'SALE':
-      return <DollarSign className="w-3.5 h-3.5 text-emerald-600" />;
+      return <NairaSign className="w-3.5 h-3.5 text-emerald-600" />;
     case 'COMMISSION':
-      return <DollarSign className="w-3.5 h-3.5 text-primary" />;
+      return <NairaSign className="w-3.5 h-3.5 text-primary" />;
     case 'PROPERTY':
     case 'LISTING':
     case 'PRICE_CHANGE':
@@ -58,7 +58,7 @@ const getNotificationIcon = (type: string) => {
     case 'CHAT':
       return <MessageSquare className="w-3.5 h-3.5 text-blue-600" />;
     case 'OFFER':
-      return <DollarSign className="w-3.5 h-3.5 text-orange-600" />;
+      return <NairaSign className="w-3.5 h-3.5 text-orange-600" />;
     case 'SYSTEM':
       return <AlertCircle className="w-3.5 h-3.5 text-red-600" />;
     default:

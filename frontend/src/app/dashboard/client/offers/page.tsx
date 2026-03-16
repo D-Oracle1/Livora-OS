@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import {
   FileText,
   Search,
-  DollarSign,
   Clock,
   CheckCircle,
   XCircle,
@@ -21,6 +20,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { ReceiptModal, ReceiptData } from '@/components/receipt';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 type TimePeriod = 'month' | 'quarter' | 'year' | 'all';
 
@@ -96,7 +96,7 @@ export default function ClientOffersPage() {
       { title: 'Total Offers', value: filteredOffers.length.toString(), icon: FileText, color: 'text-blue-600', bgColor: 'bg-blue-100' },
       { title: 'Pending', value: pendingCount.toString(), icon: Clock, color: 'text-orange-600', bgColor: 'bg-orange-100' },
       { title: 'Accepted', value: acceptedCount.toString(), icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' },
-      { title: 'Total Value', value: formatCurrency(totalValue), icon: DollarSign, color: 'text-primary', bgColor: 'bg-primary/10' },
+      { title: 'Total Value', value: formatCurrency(totalValue), icon: NairaSign, color: 'text-primary', bgColor: 'bg-primary/10' },
     ];
   }, [filteredOffers]);
 

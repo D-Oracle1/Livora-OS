@@ -106,6 +106,13 @@ export class AttendanceController {
     return this.attendanceService.update(id, dto);
   }
 
+  @Post('mark-absent')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
+  @ApiOperation({ summary: 'Mark all staff with no record on a date as absent' })
+  markAbsent(@Body() body: { date: string }) {
+    return this.attendanceService.markAbsent(body.date);
+  }
+
   @Get('report')
   @Roles('SUPER_ADMIN', 'ADMIN', 'HR')
   @ApiOperation({ summary: 'Get attendance report' })

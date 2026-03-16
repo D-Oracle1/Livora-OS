@@ -64,29 +64,56 @@ export default function ProfitLossPage() {
 
   // ─── Print ────────────────────────────────────────────────────────────────────
 
-  const handlePrint = () => {
+  // Shared: render report off-screen at fixed A4-ish width, return canvas
+  const captureCanvas = async () => {
+    if (!reportRef.current) return null;
+    const html2canvas = (await import('html2canvas')).default;
+
+    // Clone into an off-screen container at fixed 794px width so Tailwind
+    // layout is fully applied and not clipped by the card's scroll context.
+    const clone = reportRef.current.cloneNode(true) as HTMLElement;
+    const wrap = document.createElement('div');
+    Object.assign(wrap.style, {
+      position: 'fixed', top: '0', left: '-9999px',
+      width: '794px', background: '#ffffff',
+      zIndex: '-1', overflow: 'visible', padding: '40px 48px',
+    });
+    wrap.appendChild(clone);
+    document.body.appendChild(wrap);
+
+    const canvas = await html2canvas(wrap, {
+      scale: 2, useCORS: true, logging: false,
+      backgroundColor: '#ffffff', width: 794,
+    });
+    document.body.removeChild(wrap);
+    return canvas;
+  };
+
+  // ─── Print ────────────────────────────────────────────────────────────────────
+
+  const handlePrint = async () => {
     if (!reportRef.current) return;
-    const win = window.open('', '_blank');
-    if (!win) return toast.error('Allow popups to print');
-    win.document.write(`<!DOCTYPE html><html><head><title>Profit & Loss Report</title>
-      <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; padding: 32px; color: #111; font-size: 13px; }
-        h1 { font-size: 20px; margin-bottom: 4px; }
-        h2 { font-size: 14px; font-weight: 600; margin: 24px 0 8px; color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
-        .header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #111; padding-bottom: 16px; }
-        .row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f3f4f6; }
-        .row.sub { padding-left: 16px; color: #4b5563; }
-        .row.total { font-weight: 700; border-top: 2px solid #111; margin-top: 8px; padding-top: 8px; font-size: 15px; }
-        .row.profit { font-weight: 700; font-size: 16px; color: #059669; background: #f0fdf4; padding: 12px 8px; border-radius: 4px; margin-top: 16px; }
-        .row.loss { color: #dc2626; background: #fef2f2; }
-        .meta { text-align: right; font-size: 11px; color: #6b7280; margin-bottom: 24px; }
-        @media print { body { padding: 16px; } }
-      </style></head><body>
-      ${reportRef.current.innerHTML}
-    </body></html>`);
-    win.document.close();
-    win.onload = () => { win.print(); win.close(); };
+    try {
+      const canvas = await captureCanvas();
+      if (!canvas) return;
+      const imgUrl = canvas.toDataURL('image/png');
+      const win = window.open('', '_blank');
+      if (!win) return toast.error('Allow popups to print');
+      win.document.write(`<!DOCTYPE html><html><head><title>Profit &amp; Loss Report</title>
+        <style>
+          *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+          body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          img { width: 100%; display: block; }
+          @page { margin: 8mm; }
+        </style>
+      </head><body><img src="${imgUrl}" /></body></html>`);
+      win.document.close();
+      win.addEventListener('load', () => {
+        setTimeout(() => { win.focus(); win.print(); win.close(); }, 250);
+      });
+    } catch {
+      toast.error('Failed to print');
+    }
   };
 
   // ─── PDF Export ───────────────────────────────────────────────────────────────
@@ -94,14 +121,35 @@ export default function ProfitLossPage() {
   const handlePdf = async () => {
     if (!reportRef.current || !data) return;
     try {
-      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await captureCanvas();
+      if (!canvas) return;
       const jsPDF = (await import('jspdf')).default;
-      const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true, logging: false });
-      const imgData = canvas.toDataURL('image/png');
+
+      const margin = 10; // mm
+      const pageW = 210;
+      const pageH = 297;
+      const usableW = pageW - margin * 2;
+      const imgH = (canvas.height * usableW) / canvas.width;
+
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const imgWidth = 210;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      let remaining = imgH;
+      let yPos = margin;
+
+      while (remaining > 0) {
+        const sliceH = Math.min(remaining, pageH - margin * 2);
+        const srcY = (imgH - remaining) * (canvas.height / imgH);
+        const srcH = sliceH * (canvas.height / imgH);
+
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width;
+        slice.height = Math.round(srcH);
+        slice.getContext('2d')!.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+        pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, yPos, usableW, sliceH);
+
+        remaining -= sliceH;
+        if (remaining > 0) { pdf.addPage(); yPos = margin; }
+      }
+
       pdf.save(`profit-loss-${data.period?.startDate?.slice(0, 10)}-to-${data.period?.endDate?.slice(0, 10)}.pdf`);
       toast.success('PDF downloaded');
     } catch {
@@ -360,19 +408,19 @@ export default function ProfitLossPage() {
                             <td className="px-3 py-2 text-gray-500">{new Date(s.date).toLocaleDateString()}</td>
                             <td className="px-3 py-2">
                               <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                                s.type === 'INSTALLMENT_SALE'
+                                s.type === 'INSTALLMENT_PAYMENT'
                                   ? 'bg-blue-100 text-blue-700'
                                   : 'bg-green-100 text-green-700'
                               }`}>
-                                {s.type === 'INSTALLMENT_SALE' ? 'Instalment' : 'Full Sale'}
+                                {s.type === 'INSTALLMENT_PAYMENT' ? 'Instalment' : 'Full Sale'}
                               </span>
                             </td>
                             <td className="px-3 py-2 text-gray-700 max-w-[130px] truncate">{s.property}</td>
                             <td className="px-3 py-2 text-gray-600">{s.realtor}</td>
                             <td className="px-3 py-2 text-right font-medium">
-                              {formatCurrency(s.type === 'INSTALLMENT_SALE' ? s.totalPaid : s.salePrice)}
-                              {s.type === 'INSTALLMENT_SALE' && s.salePrice !== s.totalPaid && (
-                                <span className="block text-xs text-gray-400">of {formatCurrency(s.salePrice)}</span>
+                              {formatCurrency(s.salePrice)}
+                              {s.type === 'INSTALLMENT_PAYMENT' && s.fullSalePrice > s.salePrice && (
+                                <span className="block text-xs text-gray-400">of {formatCurrency(s.fullSalePrice)}</span>
                               )}
                             </td>
                             <td className="px-3 py-2 text-right text-red-600">{formatCurrency(s.commission)}</td>

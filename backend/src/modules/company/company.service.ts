@@ -375,10 +375,12 @@ export class CompanyService {
   private async getCompanyQuickStats(companyId: string) {
     try {
       const client = await this.tenantPrisma.getClient(companyId);
+      const ACTIVE_STATUS = { in: ['COMPLETED', 'IN_PROGRESS'] as any[] };
       const [users, properties, sales] = await Promise.all([
         client.user.count(),
         client.property.count(),
-        client.sale.count(),
+        // Only count approved/active sales — exclude PENDING and CANCELLED
+        client.sale.count({ where: { status: ACTIVE_STATUS } }),
       ]);
       return { users, properties, sales };
     } catch {
@@ -389,32 +391,38 @@ export class CompanyService {
   private async getCompanyDetailedStats(companyId: string) {
     try {
       const client = await this.tenantPrisma.getClient(companyId);
-      const [users, realtors, clients, properties, sales, revenue] =
+      // Cash-basis: FULL plan revenue = salePrice (COMPLETED only)
+      //             INSTALLMENT revenue = totalPaid (COMPLETED + IN_PROGRESS)
+      const INSTALL_STATUS = { in: ['COMPLETED', 'IN_PROGRESS'] as any[] };
+
+      const [users, realtors, clients, properties, countFull, countInstall, revFull, revInstall] =
         await Promise.all([
           client.user.count(),
           client.realtorProfile.count(),
           client.clientProfile.count(),
           client.property.count(),
-          client.sale.count(),
-          client.sale.aggregate({ _sum: { salePrice: true } }),
+          client.sale.count({ where: { status: 'COMPLETED', paymentPlan: 'FULL' } }),
+          client.sale.count({ where: { status: INSTALL_STATUS, paymentPlan: 'INSTALLMENT' } }),
+          client.sale.aggregate({
+            where: { status: 'COMPLETED', paymentPlan: 'FULL' },
+            _sum: { salePrice: true },
+          }),
+          client.sale.aggregate({
+            where: { status: INSTALL_STATUS, paymentPlan: 'INSTALLMENT' },
+            _sum: { totalPaid: true },
+          }),
         ]);
+
       return {
         users,
         realtors,
         clients,
         properties,
-        sales,
-        revenue: revenue._sum.salePrice || 0,
+        sales:   countFull + countInstall,
+        revenue: Number(revFull._sum.salePrice ?? 0) + Number(revInstall._sum.totalPaid ?? 0),
       };
     } catch {
-      return {
-        users: 0,
-        realtors: 0,
-        clients: 0,
-        properties: 0,
-        sales: 0,
-        revenue: 0,
-      };
+      return { users: 0, realtors: 0, clients: 0, properties: 0, sales: 0, revenue: 0 };
     }
   }
 

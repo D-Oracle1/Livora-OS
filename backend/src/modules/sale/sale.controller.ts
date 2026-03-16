@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -163,5 +164,13 @@ export class SaleController {
     @Body() body: { reason?: string },
   ) {
     return this.saleService.rejectSale(id, body?.reason);
+  }
+
+  @Delete(':id')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Permanently delete a cancelled sale' })
+  @ApiResponse({ status: 200, description: 'Sale deleted' })
+  async deleteCancelledSale(@Param('id') id: string) {
+    return this.saleService.deleteCancelledSale(id);
   }
 }

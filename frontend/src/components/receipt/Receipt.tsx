@@ -155,6 +155,7 @@ export const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(
         style={{
           fontFamily: 'Arial, Helvetica, sans-serif',
           background: '#fff',
+          color: '#111111',
           maxWidth: '794px',
           margin: '0 auto',
           position: 'relative',

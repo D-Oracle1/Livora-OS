@@ -11,12 +11,16 @@ import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { ExpenseQueryDto } from './dto/expense-query.dto';
 import { ExpenseApprovalStatus, Prisma } from '@prisma/client';
+import { LedgerService } from '../accounting/ledger.service';
 
 @Injectable()
 export class ExpenseService {
   private readonly logger = new Logger(ExpenseService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ledgerService: LedgerService,
+  ) {}
 
   // ─── Create ─────────────────────────────────────────────────────────────────
 
@@ -53,6 +57,15 @@ export class ExpenseService {
       amount: expense.amount,
       category: expense.category.name,
       expenseDate: expense.expenseDate,
+    });
+
+    // Post to general ledger — expenses are auto-approved on creation
+    await this.ledgerService.postExpense({
+      referenceId: expense.id,
+      amount:      Number(expense.amount),
+      entryDate:   expense.expenseDate,
+      description: expense.title,
+      metadata:    { categoryId: expense.categoryId },
     });
 
     return expense;

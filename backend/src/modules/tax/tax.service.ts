@@ -1,11 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { SaleStatus } from '@prisma/client';
 
 @Injectable()
 export class TaxService {
-  private readonly DEFAULT_TAX_RATE = 0.15; // 15%
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly settingsService: SettingsService,
@@ -59,7 +58,7 @@ export class TaxService {
           realtor: {
             include: {
               user: {
-                select: { firstName: true, lastName: true },
+                select: { firstName: true, lastName: true, email: true },
               },
             },
           },
@@ -242,12 +241,89 @@ export class TaxService {
     };
   }
 
-  calculateTax(commissionAmount: number): number {
-    return commissionAmount * this.DEFAULT_TAX_RATE;
-  }
-
   async calculateTaxFromSettings(commissionAmount: number): Promise<number> {
     const rate = await this.settingsService.getMainTaxRate();
     return commissionAmount * rate;
+  }
+
+  /**
+   * Use approved/completed Sales (with a realtorId) as the authoritative source.
+   * This handles sales that were approved before the commission table was populated.
+   * For each qualifying sale:
+   *   - Ensures a Commission record exists (upserts it)
+   *   - Upserts the Tax record using the CURRENT settings rate
+   *   - Corrects sale.taxRate / taxAmount / netAmount for consistency
+   */
+  async updateAllTaxRecords(): Promise<{ updated: number; created: number }> {
+    const taxRate = await this.settingsService.getMainTaxRate();
+
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        realtorId: { not: null },
+        status: { in: [SaleStatus.COMPLETED, SaleStatus.IN_PROGRESS] },
+      },
+      select: {
+        id: true,
+        realtorId: true,
+        commissionAmount: true,
+        commissionRate: true,
+        saleDate: true,
+      },
+    });
+
+    let updated = 0;
+    let created = 0;
+
+    for (const sale of sales) {
+      const commissionAmount = Number(sale.commissionAmount ?? 0);
+      const taxAmount        = commissionAmount * taxRate;
+      const netAmount        = commissionAmount - taxAmount;
+      const saleDate         = sale.saleDate ? new Date(sale.saleDate) : new Date();
+      const year             = saleDate.getFullYear();
+      const quarter          = Math.floor(saleDate.getMonth() / 3) + 1;
+
+      // Correct the sale's tax figures
+      await this.prisma.sale.update({
+        where: { id: sale.id },
+        data: { taxRate, taxAmount, netAmount },
+      });
+
+      // Ensure a Commission record exists for this sale
+      await this.prisma.commission.upsert({
+        where: { saleId: sale.id },
+        update: { amount: commissionAmount },
+        create: {
+          saleId: sale.id,
+          realtorId: sale.realtorId!,
+          amount: commissionAmount,
+          rate: sale.commissionRate,
+          status: 'PENDING',
+        },
+      });
+
+      // Upsert the Tax record
+      const existing = await this.prisma.tax.findUnique({ where: { saleId: sale.id } });
+      if (existing) {
+        await this.prisma.tax.update({
+          where: { saleId: sale.id },
+          data: { amount: taxAmount, rate: taxRate },
+        });
+        updated++;
+      } else {
+        await this.prisma.tax.create({
+          data: {
+            saleId: sale.id,
+            realtorId: sale.realtorId!,
+            amount: taxAmount,
+            rate: taxRate,
+            year,
+            quarter,
+          },
+        });
+        created++;
+      }
+    }
+
+    return { updated, created };
   }
 }

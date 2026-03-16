@@ -6,7 +6,6 @@ import {
   Home,
   Search,
   MapPin,
-  DollarSign,
   Eye,
   Tag,
   FileText,
@@ -20,6 +19,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { ReceiptModal, ReceiptData } from '@/components/receipt';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 type PropertyFilter = 'all' | 'owned' | 'listed';
 
@@ -80,7 +80,7 @@ export default function ClientPropertiesPage() {
 
     return [
       { title: 'Total Properties', value: filteredProperties.length.toString(), icon: Home, color: 'text-blue-600', bgColor: 'bg-blue-100' },
-      { title: 'Portfolio Value', value: formatCurrency(totalValue), icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-100' },
+      { title: 'Portfolio Value', value: formatCurrency(totalValue), icon: NairaSign, color: 'text-green-600', bgColor: 'bg-green-100' },
       { title: 'Listed for Sale', value: listedCount.toString(), icon: Tag, color: 'text-orange-600', bgColor: 'bg-orange-100' },
     ];
   }, [filteredProperties]);

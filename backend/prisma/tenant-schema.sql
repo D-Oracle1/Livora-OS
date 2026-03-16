@@ -2035,6 +2035,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS "users_referralCode_key"
 CREATE INDEX IF NOT EXISTS "users_referralCode_idx" ON "users"("referralCode");
 
 -- ============================================================
+-- Two-Factor Authentication (added 2026-03-14)
+-- ============================================================
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "twoFactorEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "twoFactorSecret" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "twoFactorRecoveryCodes" JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+-- ============================================================
 -- Accounting & Financial Reporting module (added 2026-02-26)
 -- ============================================================
 
@@ -2185,3 +2192,32 @@ END $$;
 CREATE INDEX IF NOT EXISTS "purchase_enquiries_propertyId_idx" ON "purchase_enquiries"("propertyId");
 CREATE INDEX IF NOT EXISTS "purchase_enquiries_userId_idx" ON "purchase_enquiries"("userId");
 CREATE INDEX IF NOT EXISTS "purchase_enquiries_status_idx" ON "purchase_enquiries"("status");
+
+-- ─── General Ledger ───────────────────────────────────────────────────────────
+
+DO $$ BEGIN
+  CREATE TYPE "LedgerEntryType" AS ENUM ('SALE_PAYMENT', 'EXPENSE', 'COMMISSION', 'COMMISSION_PAYOUT', 'TAX');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "general_ledger" (
+  "id"            TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "entryType"     "LedgerEntryType" NOT NULL,
+  "referenceId"   TEXT NOT NULL,
+  "referenceType" TEXT NOT NULL,
+  "debitAccount"  TEXT NOT NULL,
+  "creditAccount" TEXT NOT NULL,
+  "amount"        DECIMAL(15,2) NOT NULL,
+  "entryDate"     TIMESTAMP(3) NOT NULL,
+  "description"   TEXT,
+  "metadata"      JSONB,
+  "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "general_ledger_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "general_ledger_referenceId_referenceType_entryType_key"
+  ON "general_ledger"("referenceId", "referenceType", "entryType");
+
+CREATE INDEX IF NOT EXISTS "general_ledger_entryType_idx"   ON "general_ledger"("entryType");
+CREATE INDEX IF NOT EXISTS "general_ledger_referenceId_idx" ON "general_ledger"("referenceId");
+CREATE INDEX IF NOT EXISTS "general_ledger_entryDate_idx"   ON "general_ledger"("entryDate");

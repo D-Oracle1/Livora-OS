@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { api, getImageUrl } from '@/lib/api';
 import { getUser, updateUser, getToken } from '@/lib/auth-storage';
-import { invalidatePlatformBranding, usePlatformBranding } from '@/hooks/use-platform-branding';
+import { updatePlatformBranding, usePlatformBranding } from '@/hooks/use-platform-branding';
 
 type Tab = 'profile' | 'branding' | 'cms' | 'security';
 
@@ -32,11 +32,13 @@ export default function SuperAdminSettings() {
 
   // Platform Branding
   const [branding, setBranding] = useState({
-    platformName: 'RMS Platform',
+    platformName: 'Vicson Digital Hub',
     tagline: '',
     logo: '',
     favicon: '',
     primaryColor: '#f59e0b',
+    sidebarColor: '#fafaf9',
+    sidebarTextColor: '',
   });
   const [brandingLoading, setBrandingLoading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -113,6 +115,7 @@ export default function SuperAdminSettings() {
       if (url) {
         setAvatar(url);
         await api.patch('/auth/profile', { avatar: url });
+        updateUser({ avatar: url });
         toast.success('Avatar updated');
       }
     } catch (e: any) { toast.error(e.message || 'Avatar upload failed'); }
@@ -213,8 +216,8 @@ export default function SuperAdminSettings() {
     setBrandingLoading(true);
     try {
       await api.put('/master/platform-settings/branding', branding);
-      invalidatePlatformBranding();
-      toast.success('Platform branding saved — refresh sidebar to see changes');
+      updatePlatformBranding(branding);
+      toast.success('Platform branding saved');
     } catch (e: any) { toast.error(e.message || 'Failed'); }
     finally { setBrandingLoading(false); }
   };
@@ -395,8 +398,8 @@ export default function SuperAdminSettings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="sm:col-span-2">
               <label className={labelCls}>Platform Name</label>
-              <input value={branding.platformName} onChange={e => setBranding(b => ({ ...b, platformName: e.target.value }))} className={inputCls} placeholder="RMS Platform" />
-              <p className="text-xs text-gray-400 mt-1">Shown in the sidebar, platform page, and browser tabs.</p>
+              <input value={branding.platformName} onChange={e => setBranding(b => ({ ...b, platformName: e.target.value }))} className={inputCls} placeholder="Vicson Digital Hub" />
+              <p className="text-xs text-gray-400 mt-1">Controls the browser tab title, sidebar heading, and login page name.</p>
             </div>
             <div className="sm:col-span-2">
               <label className={labelCls}>Tagline / Subtitle</label>
@@ -404,6 +407,7 @@ export default function SuperAdminSettings() {
             </div>
             <div>
               <label className={labelCls}>Primary Accent Color</label>
+              <p className="text-xs text-gray-400 mb-2">Drives nav highlights, buttons, and active states.</p>
               <div className="flex flex-wrap items-center gap-3">
                 <input
                   type="color"
@@ -420,6 +424,100 @@ export default function SuperAdminSettings() {
                 <div className="w-8 h-8 rounded-lg shadow-sm border border-gray-100 shrink-0" style={{ backgroundColor: accent }} />
               </div>
             </div>
+            <div>
+              <label className={labelCls}>Sidebar Background Color</label>
+              <p className="text-xs text-gray-400 mb-2">Pick any color — text auto-adjusts for light or dark backgrounds.</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="color"
+                  value={branding.sidebarColor || '#fafaf9'}
+                  onChange={e => setBranding(b => ({ ...b, sidebarColor: e.target.value }))}
+                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer bg-transparent p-0.5 shrink-0"
+                />
+                <input
+                  value={branding.sidebarColor}
+                  onChange={e => setBranding(b => ({ ...b, sidebarColor: e.target.value }))}
+                  className={`${inputCls} w-32 shrink-0`}
+                  placeholder="#fafaf9"
+                />
+                <div className="w-8 h-8 rounded-lg shadow-sm border border-gray-100 shrink-0" style={{ backgroundColor: branding.sidebarColor || '#fafaf9' }} />
+              </div>
+              {/* Quick presets */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {[
+                  { label: 'Light', color: '#fafaf9' },
+                  { label: 'White', color: '#ffffff' },
+                  { label: 'Slate', color: '#1e293b' },
+                  { label: 'Dark', color: '#0f172a' },
+                  { label: 'Navy', color: '#0d1b2a' },
+                  { label: 'Forest', color: '#14532d' },
+                  { label: 'Purple', color: '#3b0764' },
+                ].map(p => (
+                  <button
+                    key={p.color}
+                    onClick={() => setBranding(b => ({ ...b, sidebarColor: p.color }))}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all hover:scale-105"
+                    style={{
+                      backgroundColor: p.color,
+                      color: ['#fafaf9','#ffffff'].includes(p.color) ? '#374151' : '#f9fafb',
+                      borderColor: branding.sidebarColor === p.color ? accent : 'transparent',
+                      boxShadow: branding.sidebarColor === p.color ? `0 0 0 2px ${accent}` : '0 1px 3px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Sidebar Text Color</label>
+              <p className="text-xs text-gray-400 mb-2">
+                Override sidebar text. Leave blank to auto-detect from background (recommended for dark sidebars).
+                Set manually when you have a light sidebar with a light accent color.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="color"
+                  value={branding.sidebarTextColor || '#111827'}
+                  onChange={e => setBranding(b => ({ ...b, sidebarTextColor: e.target.value }))}
+                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer bg-transparent p-0.5 shrink-0"
+                />
+                <input
+                  value={branding.sidebarTextColor}
+                  onChange={e => setBranding(b => ({ ...b, sidebarTextColor: e.target.value }))}
+                  className={`${inputCls} w-32 shrink-0`}
+                  placeholder="Auto (leave blank)"
+                />
+                {branding.sidebarTextColor && (
+                  <div className="w-8 h-8 rounded-lg shadow-sm border border-gray-100 shrink-0" style={{ backgroundColor: branding.sidebarTextColor }} />
+                )}
+              </div>
+              {/* Quick presets */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {[
+                  { label: 'Auto', color: '' },
+                  { label: 'Dark', color: '#111827' },
+                  { label: 'Gray', color: '#374151' },
+                  { label: 'White', color: '#f9fafb' },
+                  { label: 'Slate', color: '#94a3b8' },
+                ].map(p => (
+                  <button
+                    key={p.label}
+                    onClick={() => setBranding(b => ({ ...b, sidebarTextColor: p.color }))}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all hover:scale-105"
+                    style={{
+                      backgroundColor: p.color || '#f3f4f6',
+                      color: ['', '#f9fafb'].includes(p.color) ? '#374151' : '#f9fafb',
+                      borderColor: branding.sidebarTextColor === p.color ? accent : 'transparent',
+                      boxShadow: branding.sidebarTextColor === p.color ? `0 0 0 2px ${accent}` : '0 1px 3px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className={labelCls}>Favicon</label>
               <div className="flex items-center gap-4">

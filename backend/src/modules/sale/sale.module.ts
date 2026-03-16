@@ -8,6 +8,7 @@ import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ClientModule } from '../client/client.module';
 import { SettingsModule } from '../settings/settings.module';
+import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { SettingsModule } from '../settings/settings.module';
     forwardRef(() => NotificationModule),
     forwardRef(() => ClientModule),
     SettingsModule,
+    AccountingModule,
   ],
   controllers: [SaleController],
   providers: [SaleService, SaleOverdueService],

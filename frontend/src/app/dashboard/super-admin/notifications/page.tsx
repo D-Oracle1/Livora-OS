@@ -6,7 +6,6 @@ import {
   Bell,
   Check,
   CheckCheck,
-  DollarSign,
   Home,
   Award,
   AlertCircle,
@@ -16,16 +15,17 @@ import {
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import { useNotifications } from '@/contexts/notification-context';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { usePlatformBranding } from '@/hooks/use-platform-branding';
 
 const getIcon = (type: string) => {
   switch (type) {
-    case 'SALE': return <DollarSign className="w-5 h-5 text-emerald-600" />;
-    case 'COMMISSION': return <DollarSign className="w-5 h-5 text-blue-600" />;
+    case 'SALE': return <NairaSign className="w-5 h-5 text-emerald-600" />;
+    case 'COMMISSION': return <NairaSign className="w-5 h-5 text-blue-600" />;
     case 'PROPERTY': case 'LISTING': case 'PRICE_CHANGE': return <Home className="w-5 h-5 text-purple-600" />;
     case 'RANKING': case 'LOYALTY': return <Award className="w-5 h-5 text-yellow-600" />;
     case 'CHAT': return <MessageSquare className="w-5 h-5 text-blue-600" />;
-    case 'OFFER': return <DollarSign className="w-5 h-5 text-orange-600" />;
+    case 'OFFER': return <NairaSign className="w-5 h-5 text-orange-600" />;
     case 'SYSTEM': return <AlertCircle className="w-5 h-5 text-red-600" />;
     default: return <Bell className="w-5 h-5 text-gray-500" />;
   }

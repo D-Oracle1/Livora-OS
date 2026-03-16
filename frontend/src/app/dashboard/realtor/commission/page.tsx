@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Calculator,
-  DollarSign,
   TrendingUp,
   Calendar,
   Clock,
@@ -21,6 +20,7 @@ import { ReceiptModal, ReceiptData } from '@/components/receipt';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 type TimePeriod = 'month' | 'quarter' | 'year' | 'all';
 
@@ -156,7 +156,7 @@ export default function RealtorCommissionPage() {
       .reduce((sum, item) => sum + item.net, 0);
 
     return [
-      { title: 'Total Earned', value: formatCurrency(paidAmount), icon: DollarSign, color: 'text-primary', bgColor: 'bg-primary/10' },
+      { title: 'Total Earned', value: formatCurrency(paidAmount), icon: NairaSign, color: 'text-primary', bgColor: 'bg-primary/10' },
       { title: 'This Month', value: formatCurrency(thisMonthAmount), icon: TrendingUp, color: 'text-green-600', bgColor: 'bg-green-100' },
       { title: 'Pending', value: formatCurrency(earningsBreakdown.pendingPayment), icon: Clock, color: 'text-orange-600', bgColor: 'bg-orange-100' },
       { title: 'Tax Deducted', value: formatCurrency(earningsBreakdown.taxDeducted), icon: Calculator, color: 'text-red-600', bgColor: 'bg-red-100' },
@@ -333,7 +333,7 @@ export default function RealtorCommissionPage() {
           <Card>
             <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-primary" />
+                <NairaSign className="w-5 h-5 text-primary" />
                 Commission History
                 <Badge variant="outline" className="ml-2">{getTimePeriodLabel()}</Badge>
               </CardTitle>

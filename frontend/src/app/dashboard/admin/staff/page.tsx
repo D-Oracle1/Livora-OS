@@ -22,9 +22,10 @@ import {
   Upload,
   FileSpreadsheet,
   Copy,
-  DollarSign,
   ShieldCheck,
   ShieldOff,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { getToken } from '@/lib/auth-storage';
 import { Switch } from '@/components/ui/switch';
 
@@ -188,6 +190,7 @@ function AdminStaffPage() {
   const [positionFilter, setPositionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [meta, setMeta] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
+  const [allTimeActive, setAllTimeActive] = useState<number | null>(null);
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -286,18 +289,27 @@ function AdminStaffPage() {
     fetchDepartments();
   }, [fetchStaff, fetchDepartments]);
 
+  useEffect(() => {
+    // Get all-time active staff count (not limited to current page)
+    api.get('/staff?isActive=true&limit=1').then((res: any) => {
+      const d = res?.data?.data !== undefined ? res.data : res?.data || res;
+      const m = d?.meta || res?.data?.meta;
+      setAllTimeActive(m?.total ?? null);
+    }).catch(() => {});
+  }, []);
+
   const stats = useMemo(() => {
-    const activeCount = staff.filter(s => s.isActive && s.user.status === 'ACTIVE').length;
-    const inactiveCount = staff.filter(s => !s.isActive || s.user.status !== 'ACTIVE').length;
+    const activeCount = allTimeActive ?? staff.filter(s => s.isActive && s.user.status === 'ACTIVE').length;
+    const inactiveCount = allTimeActive !== null ? meta.total - allTimeActive : staff.filter(s => !s.isActive || s.user.status !== 'ACTIVE').length;
     const uniqueDepartments = new Set(staff.map(s => s.department?.id).filter(Boolean)).size;
 
     return [
       { label: 'Total Staff', value: meta.total.toString(), change: `${staff.length} loaded`, color: 'text-blue-600', bg: 'bg-blue-100' },
-      { label: 'Active', value: activeCount.toString(), change: staff.length > 0 ? `${((activeCount / staff.length) * 100).toFixed(1)}%` : '0%', color: 'text-green-600', bg: 'bg-green-100' },
-      { label: 'Inactive', value: inactiveCount.toString(), change: staff.length > 0 ? `${((inactiveCount / staff.length) * 100).toFixed(1)}%` : '0%', color: 'text-yellow-600', bg: 'bg-yellow-100' },
+      { label: 'Active', value: activeCount.toString(), change: meta.total > 0 ? `${((activeCount / meta.total) * 100).toFixed(1)}%` : '0%', color: 'text-green-600', bg: 'bg-green-100' },
+      { label: 'Inactive', value: inactiveCount.toString(), change: meta.total > 0 ? `${((inactiveCount / meta.total) * 100).toFixed(1)}%` : '0%', color: 'text-yellow-600', bg: 'bg-yellow-100' },
       { label: 'Departments', value: uniqueDepartments.toString(), change: '', color: 'text-purple-600', bg: 'bg-purple-100' },
     ];
-  }, [staff, meta.total]);
+  }, [staff, meta.total, allTimeActive]);
 
   const handleAddStaff = async () => {
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.employeeId) {
@@ -805,7 +817,7 @@ function AdminStaffPage() {
                               Edit Details
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openSalaryDialog(member)}>
-                              <DollarSign className="w-4 h-4 mr-2" />
+                              <NairaSign className="w-4 h-4 mr-2" />
                               Update Salary
                             </DropdownMenuItem>
                             <DropdownMenuItem
@@ -858,6 +870,55 @@ function AdminStaffPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Pagination */}
+      {meta.totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1 pb-4">
+          <button
+            onClick={() => setMeta(p => ({ ...p, page: p.page - 1 }))}
+            disabled={meta.page <= 1}
+            className="w-8 h-8 flex items-center justify-center rounded text-sm text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          {(() => {
+            const items: (number | 'ellipsis')[] = [];
+            if (meta.totalPages <= 7) {
+              for (let i = 1; i <= meta.totalPages; i++) items.push(i);
+            } else {
+              items.push(1);
+              if (meta.page > 3) items.push('ellipsis');
+              for (let i = Math.max(2, meta.page - 1); i <= Math.min(meta.totalPages - 1, meta.page + 1); i++) items.push(i);
+              if (meta.page < meta.totalPages - 2) items.push('ellipsis');
+              items.push(meta.totalPages);
+            }
+            return items.map((item, idx) =>
+              item === 'ellipsis' ? (
+                <span key={`e-${idx}`} className="w-8 h-8 flex items-center justify-center text-sm text-muted-foreground">…</span>
+              ) : (
+                <button
+                  key={item}
+                  onClick={() => setMeta(p => ({ ...p, page: item as number }))}
+                  className={`w-8 h-8 flex items-center justify-center rounded text-sm font-medium transition-colors ${
+                    item === meta.page
+                      ? 'bg-primary/15 text-primary font-semibold'
+                      : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {item}
+                </button>
+              )
+            );
+          })()}
+          <button
+            onClick={() => setMeta(p => ({ ...p, page: p.page + 1 }))}
+            disabled={meta.page >= meta.totalPages}
+            className="w-8 h-8 flex items-center justify-center rounded text-sm text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Add Staff Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>

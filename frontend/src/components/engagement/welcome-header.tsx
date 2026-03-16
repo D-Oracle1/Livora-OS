@@ -6,7 +6,6 @@ import {
   Home,
   TrendingUp,
   FileText,
-  DollarSign,
   Newspaper,
   MessageSquare,
   Bell,
@@ -17,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn, formatCurrency } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { getUser } from '@/lib/auth-storage';
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ export default function WelcomeHeader() {
     {
       label: 'Portfolio Value',
       value: loading ? '—' : formatCurrency(stats?.totalPropertyValue ?? 0),
-      icon: DollarSign,
+      icon: NairaSign,
       color: 'text-amber-600',
       bg: 'bg-amber-50 dark:bg-amber-950/30',
     },

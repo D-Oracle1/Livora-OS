@@ -85,6 +85,15 @@ import { QueueModule } from './common/services/queue.module';
 // Multi-tenancy
 import { CompanyModule } from './modules/company/company.module';
 
+// Contact form (public enquiry endpoint)
+import { ContactModule } from './modules/contact/contact.module';
+
+// Global search
+import { SearchModule } from './modules/search/search.module';
+
+// Export system (CSV/XLSX)
+import { ExportModule } from './modules/export/export.module';
+
 // Master support (admin → super admin cross-tenant chat)
 import { MasterSupportModule } from './modules/master-support/master-support.module';
 
@@ -194,6 +203,15 @@ import { MasterPlatformModule } from './modules/master-platform/master-platform.
 
     // Health Check
     HealthModule,
+
+    // Contact Form (public SaaS enquiry)
+    ContactModule,
+
+    // Global Search
+    SearchModule,
+
+    // Export System (CSV / XLSX)
+    ExportModule,
   ],
   providers: [
     {

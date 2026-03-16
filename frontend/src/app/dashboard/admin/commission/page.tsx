@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import {
   Calculator,
   Search,
-  DollarSign,
   TrendingUp,
   CheckCircle,
   Clock,
@@ -35,6 +34,7 @@ import { formatCurrency, formatDate, getTierBgClass } from '@/lib/utils';
 import { ReceiptModal, ReceiptData } from '@/components/receipt';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { NairaSign } from '@/components/icons/naira-sign';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 
 type TimePeriod = 'month' | 'quarter' | 'year' | 'all';
@@ -399,7 +399,7 @@ export default function CommissionPage() {
           <Card>
             <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-primary" />
+                <NairaSign className="w-5 h-5 text-primary" />
                 Commission Payments - {getPeriodLabel()}
               </CardTitle>
               <div className="flex flex-wrap gap-3">

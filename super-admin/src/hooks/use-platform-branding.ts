@@ -11,6 +11,8 @@ export interface PlatformBrandingData {
   primaryColor?: string;
   tagline?: string;
   favicon?: string;
+  sidebarColor?: string;
+  sidebarTextColor?: string;
 }
 
 // Module-level cache — survives component mounts within a page session
@@ -50,8 +52,25 @@ function fetchPlatformBranding(): Promise<void> {
 }
 
 /**
+ * Immediately updates the in-memory cache + localStorage and broadcasts
+ * a 'branding-updated' event so every mounted usePlatformBranding consumer
+ * re-renders instantly — no page refresh required.
+ * Call this after successfully saving branding settings.
+ */
+export function updatePlatformBranding(data: PlatformBrandingData): void {
+  cache.data = data;
+  cache.promise = null;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('branding-updated', { detail: data }));
+  }
+}
+
+/**
  * Invalidates the platform branding cache so next call re-fetches.
- * Call this after saving branding settings.
+ * Prefer updatePlatformBranding() after saves for an instant update.
  */
 export function invalidatePlatformBranding(): void {
   cache.data = null;
@@ -63,6 +82,7 @@ export function invalidatePlatformBranding(): void {
 
 /**
  * Returns reactive platform branding data for the super-admin sidebar/UI.
+ * Re-renders whenever branding is saved via updatePlatformBranding().
  */
 export function usePlatformBranding(): PlatformBrandingData {
   const [branding, setBranding] = useState<PlatformBrandingData>(cache.data || {});
@@ -72,11 +92,18 @@ export function usePlatformBranding(): PlatformBrandingData {
     fetchPlatformBranding().then(() => {
       if (cache.data) setBranding(cache.data);
     });
+
+    const onBrandingUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<PlatformBrandingData>).detail;
+      if (detail) setBranding(detail);
+    };
+    window.addEventListener('branding-updated', onBrandingUpdated);
+    return () => window.removeEventListener('branding-updated', onBrandingUpdated);
   }, []);
 
   return branding;
 }
 
 export function getPlatformName(branding: PlatformBrandingData): string {
-  return branding.platformName || 'RMS Platform';
+  return branding.platformName || 'Vicson Digital Hub';
 }

@@ -11,6 +11,20 @@ export class AttendanceService {
     private readonly policyService: PolicyService,
   ) {}
 
+  private async getAttendanceThresholds() {
+    const [workStartSetting, workHoursSetting, latenessPolicy] = await Promise.all([
+      this.prisma.systemSetting.findUnique({ where: { key: 'work_start_hour' } }).catch(() => null),
+      this.prisma.systemSetting.findUnique({ where: { key: 'work_hours_per_day' } }).catch(() => null),
+      this.prisma.hRPolicy.findFirst({ where: { type: 'LATENESS', isActive: true } }).catch(() => null),
+    ]);
+
+    return {
+      workStartHour: workStartSetting ? Number(workStartSetting.value) : 9,
+      workHoursPerDay: workHoursSetting ? Number(workHoursSetting.value) : 8,
+      graceMinutes: latenessPolicy?.graceMinutes ?? 30,
+    };
+  }
+
   async clockIn(userId: string, dto: ClockInDto, ipAddress?: string) {
     const staffProfile = await this.prisma.staffProfile.findUnique({
       where: { userId },
@@ -39,8 +53,9 @@ export class AttendanceService {
     }
 
     const now = new Date();
+    const { workStartHour, graceMinutes } = await this.getAttendanceThresholds();
     const workStartTime = new Date(today);
-    workStartTime.setHours(9, 0, 0, 0); // 9 AM standard start time
+    workStartTime.setHours(workStartHour, 0, 0, 0);
 
     // Determine status based on first clock-in time of the day
     let status: AttendanceStatus = AttendanceStatus.PRESENT;
@@ -49,7 +64,7 @@ export class AttendanceService {
     if (!existing) {
       if (now > workStartTime) {
         const minutesLate = (now.getTime() - workStartTime.getTime()) / (1000 * 60);
-        if (minutesLate > 30) {
+        if (minutesLate > graceMinutes) {
           status = AttendanceStatus.LATE;
         }
       }
@@ -144,20 +159,25 @@ export class AttendanceService {
     let totalHours = previousHours + sessionHours;
     let overtime = previousOvertime;
 
-    // Calculate overtime (standard is 8 hours per day)
-    if (totalHours > 8) {
-      overtime = totalHours - 8;
-      totalHours = 8;
+    const { workHoursPerDay } = await this.getAttendanceThresholds();
+    const halfDayThreshold = workHoursPerDay / 2;
+
+    if (totalHours > workHoursPerDay) {
+      overtime = totalHours - workHoursPerDay;
+      totalHours = workHoursPerDay;
     }
 
-    // Determine final status based on total hours
+    // Determine final status based on total hours worked.
+    // HALF_DAY takes priority over LATE when the employee works less than half a day —
+    // the late penalty is already recorded separately via the penalty system.
     let status = attendance.status;
-    if (totalHours < 4 && attendance.status === AttendanceStatus.PRESENT) {
+    if (totalHours < halfDayThreshold) {
       status = AttendanceStatus.HALF_DAY;
-    } else if (totalHours >= 4 && attendance.status === AttendanceStatus.HALF_DAY) {
-      // Restore to original status if now have enough hours
+    } else if (attendance.status === AttendanceStatus.HALF_DAY) {
+      // Accumulated enough hours — restore to PRESENT
       status = AttendanceStatus.PRESENT;
     }
+    // LATE status is preserved when hours >= halfDayThreshold (already penalised at clock-in)
 
     return this.prisma.attendance.update({
       where: { id: attendance.id },
@@ -299,11 +319,28 @@ export class AttendanceService {
     if (dto.clockIn) data.clockIn = new Date(dto.clockIn);
     if (dto.clockOut) data.clockOut = new Date(dto.clockOut);
 
-    // Recalculate hours if both times are present
+    // Recalculate hours AND re-derive status when clock times are edited by admin
     if (data.clockIn && data.clockOut) {
       let hoursWorked = (data.clockOut.getTime() - data.clockIn.getTime()) / (1000 * 60 * 60);
       if (hoursWorked > 5) hoursWorked -= 1;
       data.hoursWorked = Math.round(hoursWorked * 100) / 100;
+
+      // Only recalculate status when the admin hasn't explicitly set one
+      if (!dto.status) {
+        const { workStartHour, workHoursPerDay, graceMinutes } = await this.getAttendanceThresholds();
+        const halfDayThreshold = workHoursPerDay / 2;
+        const workStartTime = new Date(attendance.date);
+        workStartTime.setHours(workStartHour, 0, 0, 0);
+        const minutesLate = (data.clockIn.getTime() - workStartTime.getTime()) / (1000 * 60);
+
+        if (data.hoursWorked < halfDayThreshold) {
+          data.status = AttendanceStatus.HALF_DAY;
+        } else if (minutesLate > graceMinutes) {
+          data.status = AttendanceStatus.LATE;
+        } else {
+          data.status = AttendanceStatus.PRESENT;
+        }
+      }
     }
 
     const updated = await this.prisma.attendance.update({
@@ -331,8 +368,9 @@ export class AttendanceService {
       dto.status === AttendanceStatus.LATE &&
       attendance.status !== AttendanceStatus.LATE
     ) {
+      const { workStartHour } = await this.getAttendanceThresholds();
       const workStartTime = new Date(attendance.date);
-      workStartTime.setHours(9, 0, 0, 0);
+      workStartTime.setHours(workStartHour, 0, 0, 0);
       const clockInTime = dto.clockIn ? new Date(dto.clockIn) : attendance.clockIn;
       if (clockInTime && clockInTime > workStartTime) {
         const minutesLate = Math.floor((clockInTime.getTime() - workStartTime.getTime()) / (1000 * 60));
@@ -349,6 +387,55 @@ export class AttendanceService {
     }
 
     return updated;
+  }
+
+  async markAbsent(date: string) {
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const activeStaff = await this.prisma.staffProfile.findMany({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
+    const results: { staffProfileId: string; action: string }[] = [];
+
+    for (const staff of activeStaff) {
+      // Skip if attendance already recorded
+      const existing = await this.prisma.attendance.findUnique({
+        where: { staffProfileId_date: { staffProfileId: staff.id, date: targetDate } },
+      });
+      if (existing) continue;
+
+      // Skip if approved leave covers this date
+      const approvedLeave = await this.prisma.leaveRequest.findFirst({
+        where: {
+          staffProfileId: staff.id,
+          status: 'APPROVED',
+          startDate: { lte: targetDate },
+          endDate: { gte: targetDate },
+        },
+      });
+      if (approvedLeave) continue;
+
+      const record = await this.prisma.attendance.create({
+        data: {
+          staffProfileId: staff.id,
+          date: targetDate,
+          status: 'ABSENT',
+        },
+      });
+
+      try {
+        await this.policyService.calculateAbsencePenalty(staff.id, record.id);
+      } catch {
+        // penalty is best-effort
+      }
+
+      results.push({ staffProfileId: staff.id, action: 'ABSENT_CREATED' });
+    }
+
+    return { date: targetDate.toISOString().split('T')[0], processed: results.length, results };
   }
 
   async getReport(query: { departmentId?: string; startDate: string; endDate: string }) {

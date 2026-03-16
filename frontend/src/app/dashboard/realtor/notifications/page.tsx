@@ -6,7 +6,6 @@ import {
   Bell,
   Check,
   CheckCheck,
-  DollarSign,
   Home,
   Users,
   Award,
@@ -21,16 +20,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn, formatDate } from '@/lib/utils';
 import { useNotifications } from '@/contexts/notification-context';
+import { NairaSign } from '@/components/icons/naira-sign';
 
 const getIcon = (type: string) => {
   switch (type) {
-    case 'SALE': return <DollarSign className="w-5 h-5 text-green-600" />;
-    case 'COMMISSION': return <DollarSign className="w-5 h-5 text-primary" />;
+    case 'SALE': return <NairaSign className="w-5 h-5 text-green-600" />;
+    case 'COMMISSION': return <NairaSign className="w-5 h-5 text-primary" />;
     case 'PROPERTY': case 'LISTING': case 'PRICE_CHANGE': return <Home className="w-5 h-5 text-purple-600" />;
     case 'RANKING': return <Trophy className="w-5 h-5 text-orange-600" />;
     case 'LOYALTY': return <Award className="w-5 h-5 text-yellow-600" />;
     case 'CHAT': return <MessageSquare className="w-5 h-5 text-blue-600" />;
-    case 'OFFER': return <DollarSign className="w-5 h-5 text-orange-600" />;
+    case 'OFFER': return <NairaSign className="w-5 h-5 text-orange-600" />;
     case 'SYSTEM': return <AlertCircle className="w-5 h-5 text-red-600" />;
     default: return <Bell className="w-5 h-5" />;
   }

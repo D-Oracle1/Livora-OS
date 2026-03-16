@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Param,
   Query,
   UseGuards,
@@ -55,6 +56,14 @@ export class TaxController {
     @Query('year') year?: number,
   ) {
     return this.taxService.getRealtorTaxReport(realtorId, year);
+  }
+
+  @Post('recalculate')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Recalculate all tax records using the current tax rate from settings' })
+  @ApiResponse({ status: 200, description: 'Number of tax records updated/created' })
+  async recalculate() {
+    return this.taxService.updateAllTaxRecords();
   }
 
   @Get(':id')
