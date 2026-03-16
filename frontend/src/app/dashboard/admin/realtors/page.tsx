@@ -364,6 +364,12 @@ export default function RealtorsPage() {
     }
   };
 
+  const handleCopyRegistrationLink = () => {
+    const link = `${window.location.origin}/create-realtor`;
+    navigator.clipboard.writeText(link);
+    toast.success('Realtor registration link copied!');
+  };
+
   const handleExportCSV = () => {
     const headers = ['Name', 'Email', 'Phone', 'Tier', 'Sales', 'Total Value', 'Commission', 'Status'];
     const csvContent = [
@@ -468,6 +474,10 @@ export default function RealtorsPage() {
               <Button variant="outline" size="sm" onClick={fetchRealtors} disabled={loading}>
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleCopyRegistrationLink}>
+                <Copy className="w-4 h-4 mr-2" />
+                Registration Link
               </Button>
               <Button variant="outline" size="sm" onClick={handleExportCSV}>
                 <Download className="w-4 h-4 mr-2" />

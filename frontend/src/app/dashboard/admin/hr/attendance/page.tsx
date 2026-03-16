@@ -11,6 +11,7 @@ import {
   QrCode,
   RotateCw,
   X,
+  Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -98,6 +99,35 @@ export default function AdminAttendancePage() {
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [qrData, setQrData] = useState<QrData | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+
+  const handlePrintQr = () => {
+    if (!qrData?.qrCodeDataUrl) return;
+    const win = window.open('', '_blank', 'width=400,height=500');
+    if (!win) return;
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Attendance QR Code</title>
+          <style>
+            body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; background: #fff; }
+            h2 { margin-bottom: 8px; font-size: 18px; color: #111; }
+            p { margin: 4px 0; font-size: 13px; color: #555; }
+            img { border: 4px solid #000; border-radius: 12px; padding: 8px; margin: 16px 0; width: 280px; height: 280px; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <h2>Today's Attendance QR Code</h2>
+          <p>Scan to clock in</p>
+          <img src="${qrData.qrCodeDataUrl}" alt="Attendance QR Code" />
+          ${qrData.expiresAt ? `<p>Valid until ${new Date(qrData.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>` : ''}
+          <script>window.onload = () => { window.print(); }<\/script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
 
   const generateQrCode = async () => {
     setQrLoading(true);
@@ -301,19 +331,25 @@ export default function AdminAttendancePage() {
                 Valid until {new Date(qrData.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
             )}
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={generateQrCode}
-              disabled={qrLoading}
-            >
-              {qrLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RotateCw className="w-4 h-4" />
-              )}
-              Regenerate QR Code
-            </Button>
+            <div className="flex gap-2 w-full">
+              <Button
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={generateQrCode}
+                disabled={qrLoading}
+              >
+                {qrLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                Regenerate
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                onClick={handlePrintQr}
+                disabled={!qrData?.qrCodeDataUrl}
+              >
+                <Printer className="w-4 h-4" />
+                Print
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

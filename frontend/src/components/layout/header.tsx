@@ -20,15 +20,27 @@ import {
   AlertCircle,
   MessageSquare,
   Plus,
+  QrCode,
+  Loader2,
+  RotateCw,
+  Printer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useNotifications } from '@/contexts/notification-context';
 import { CalloutButton } from '@/components/callout/callout-button';
 import { cn } from '@/lib/utils';
-import { getImageUrl } from '@/lib/api';
+import { api, getImageUrl } from '@/lib/api';
 import { NairaSign } from '@/components/icons/naira-sign';
 import { getUser, clearAuth } from '@/lib/auth-storage';
+import { toast } from 'sonner';
+
+interface QrData {
+  token: string;
+  qrCodeDataUrl: string;
+  expiresAt: string;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -109,6 +121,54 @@ export function Header({ onMenuClick }: HeaderProps) {
   const notificationRef = useRef<HTMLDivElement>(null);
 
   const { notifications, unreadCount, markAsRead } = useNotifications();
+
+  // QR code state (admin only)
+  const [showQrDialog, setShowQrDialog] = useState(false);
+  const [qrData, setQrData] = useState<QrData | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+
+  const generateQrCode = async () => {
+    setQrLoading(true);
+    try {
+      const res = await api.get<any>('/hr/attendance/qr/today');
+      const data = res?.data || res;
+      setQrData(data);
+      setShowQrDialog(true);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to generate QR code');
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handlePrintQr = () => {
+    if (!qrData?.qrCodeDataUrl) return;
+    const win = window.open('', '_blank', 'width=400,height=500');
+    if (!win) return;
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Attendance QR Code</title>
+          <style>
+            body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; background: #fff; }
+            h2 { margin-bottom: 8px; font-size: 18px; color: #111; }
+            p { margin: 4px 0; font-size: 13px; color: #555; }
+            img { border: 4px solid #000; border-radius: 12px; padding: 8px; margin: 16px 0; width: 280px; height: 280px; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <h2>Today's Attendance QR Code</h2>
+          <p>Scan to clock in</p>
+          <img src="${qrData.qrCodeDataUrl}" alt="Attendance QR Code" />
+          ${qrData.expiresAt ? `<p>Valid until ${new Date(qrData.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>` : ''}
+          <script>window.onload = () => { window.print(); }<\/script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
 
   // Determine current role from pathname
   const role = pathname.includes('/dashboard/admin') || pathname.includes('/dashboard/super-admin')
@@ -275,6 +335,18 @@ export function Header({ onMenuClick }: HeaderProps) {
           <Moon className="absolute inset-0 m-auto w-5 h-5 transition-all rotate-90 scale-0 dark:rotate-0 dark:scale-100" />
         </button>
 
+        {/* QR Code button (admin only) */}
+        {role === 'admin' && (
+          <button
+            onClick={generateQrCode}
+            disabled={qrLoading}
+            title="Show Attendance QR Code"
+            className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+          >
+            {qrLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <QrCode className="w-5 h-5" />}
+          </button>
+        )}
+
         {/* Callout button (admin/staff only) */}
         {(role === 'admin' || role === 'staff') && <CalloutButton />}
 
@@ -413,6 +485,53 @@ export function Header({ onMenuClick }: HeaderProps) {
           )}
         </div>
       </div>
+
+      {/* QR Code Dialog */}
+      <Dialog open={showQrDialog} onOpenChange={setShowQrDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="w-5 h-5" />
+              Today's Attendance QR Code
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 p-2">
+            <p className="text-sm text-center text-muted-foreground">
+              Display this to staff — they scan it with their phone to clock in.
+            </p>
+            {qrData?.qrCodeDataUrl && (
+              <div className="border-4 border-black rounded-xl p-2 bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qrData.qrCodeDataUrl} alt="Attendance QR Code" className="w-64 h-64" />
+              </div>
+            )}
+            {qrData?.expiresAt && (
+              <p className="text-xs text-muted-foreground">
+                Valid until {new Date(qrData.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+            <div className="flex gap-2 w-full">
+              <Button
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={generateQrCode}
+                disabled={qrLoading}
+              >
+                {qrLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                Regenerate
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                onClick={handlePrintQr}
+                disabled={!qrData?.qrCodeDataUrl}
+              >
+                <Printer className="w-4 h-4" />
+                Print
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Mobile search bar (drops below header) */}
       {showSearch && (
