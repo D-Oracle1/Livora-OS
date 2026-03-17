@@ -75,11 +75,11 @@ export default function RegistrationsPage() {
         limit: '50',
         ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
       });
-      const res = await api.get<{ data: { data: Registration[]; meta: Meta } }>(
+      const res = await api.get<{ data: Registration[]; meta: Meta }>(
         `/events/${eventId}/registrations?${params}`,
       );
-      setRegistrations(res.data.data);
-      setMeta(res.data.meta);
+      setRegistrations(Array.isArray(res.data) ? res.data : []);
+      if (res.meta) setMeta(res.meta);
     } catch (err: any) {
       toast.error(err.message || 'Failed to load registrations');
     } finally {

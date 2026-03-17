@@ -26,6 +26,8 @@ import {
   Clock,
   LandPlot,
   Loader2,
+  Calendar,
+  Globe,
 } from 'lucide-react';
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
@@ -52,10 +54,11 @@ export default function HomePage() {
   const [totalCount, setTotalCount] = useState(0);
   const [cms, setCms] = useState<Record<string, any> | null>(null);
   const [cmsLoading, setCmsLoading] = useState(true);
+  const [events, setEvents] = useState<{ featured: any[]; upcoming: any[]; closingSoon: any[] } | null>(null);
   // Resolve tenant company ID from hostname (no-op if NEXT_PUBLIC_COMPANY_ID is set)
   const { tenantReady } = useTenantResolution();
 
-  // Step 2: fetch CMS only after tenant ID is known
+  // Step 2: fetch CMS + events in parallel once tenant ID is known
   useEffect(() => {
     if (!tenantReady) return;
     api.get('/cms/public')
@@ -65,6 +68,12 @@ export default function HomePage() {
       })
       .catch(() => {})
       .finally(() => setCmsLoading(false));
+    api.get<{ data: { featured: any[]; upcoming: any[]; closingSoon: any[] } }>('/events/homepage')
+      .then((res) => {
+        const d = res?.data;
+        if (d && (d.featured || d.upcoming)) setEvents(d);
+      })
+      .catch(() => {});
   }, [tenantReady]);
 
   const companyName = cms?.branding?.companyName || 'Real Estate Management';
@@ -174,6 +183,10 @@ export default function HomePage() {
     if (sideTimer.current) clearInterval(sideTimer.current);
     startSideCarousel();
   };
+
+  const displayEvents = events
+    ? (events.featured.length > 0 ? events.featured : events.upcoming.slice(0, 3))
+    : [];
 
   if (cmsLoading) {
     return (
@@ -422,6 +435,107 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {/* Upcoming Events Section */}
+      {displayEvents.length > 0 && (
+        <section className="py-20 px-4 bg-gray-50 dark:bg-primary-900">
+          <div className="container mx-auto">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-12">
+              <div>
+                <span className="text-accent font-semibold text-sm uppercase tracking-wider">Events</span>
+                <h2 className="text-3xl md:text-4xl font-bold mt-2 text-gray-900 dark:text-white">
+                  Upcoming Events
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 mt-2">
+                  Join us at our next events and stay connected
+                </p>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {displayEvents.map((ev: any) => {
+                const spotsLeft = ev.maxAttendees
+                  ? ev.maxAttendees - (ev._count?.registrations ?? 0)
+                  : null;
+                const featuredBadge = ev.isFeatured && (
+                  <div className="absolute top-3 left-3">
+                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-400 text-yellow-900 flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-yellow-900" /> Featured
+                    </span>
+                  </div>
+                );
+                return (
+                  <Link key={ev.id} href={`/event/${ev.slug}`} className="group">
+                    <div className="bg-white dark:bg-primary-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-primary-700 flex flex-col h-full">
+                      {ev.bannerUrl ? (
+                        <div className="relative h-44 overflow-hidden">
+                          <Image
+                            src={ev.bannerUrl}
+                            alt={ev.title}
+                            fill
+                            className="object-cover group-hover:scale-110 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                          {featuredBadge}
+                        </div>
+                      ) : (
+                        <div className="h-44 bg-gradient-to-br from-accent/20 to-primary/20 flex items-center justify-center relative">
+                          <Calendar className="w-16 h-16 text-accent/40" />
+                          {featuredBadge}
+                        </div>
+                      )}
+
+                      <div className="p-5 flex flex-col gap-3 flex-1">
+                        <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-accent transition-colors line-clamp-2 leading-snug">
+                          {ev.title}
+                        </h3>
+
+                        <div className="space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                            <span>
+                              {new Date(ev.eventDate).toLocaleDateString('en-US', {
+                                weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {ev.locationType === 'online' ? (
+                              <Globe className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                            ) : (
+                              <MapPin className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                            )}
+                            <span className="capitalize">{ev.locationType}</span>
+                            {ev.locationDetails && (
+                              <span className="truncate">— {ev.locationDetails}</span>
+                            )}
+                          </div>
+                          {ev._count?.registrations !== undefined && (
+                            <div className="flex items-center gap-2">
+                              <Users className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                              <span>
+                                {ev._count.registrations} registered
+                                {spotsLeft !== null && ` · ${spotsLeft} spots left`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-auto pt-3 border-t border-gray-100 dark:border-primary-700">
+                          <span className="text-accent text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+                            Register Now
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Featured Agents Section */}
       {agents.agents && agents.agents.length > 0 && (

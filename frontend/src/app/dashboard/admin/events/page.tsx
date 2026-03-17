@@ -77,11 +77,11 @@ export default function AdminEventsPage() {
         ...(search ? { search } : {}),
         ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
       });
-      const res = await api.get<{ data: { data: Event[]; meta: { totalPages: number } } }>(
+      const res = await api.get<{ data: Event[]; meta: { totalPages: number } }>(
         `/events?${params}`,
       );
-      setEvents(res.data.data);
-      setTotalPages(res.data.meta.totalPages);
+      setEvents(Array.isArray(res.data) ? res.data : []);
+      setTotalPages(res.meta?.totalPages ?? 1);
     } catch (err: any) {
       toast.error(err.message || 'Failed to load events');
     } finally {
