@@ -34,6 +34,19 @@ import { PublicFooter } from '@/components/layout/public-footer';
 import { api, getImageUrl } from '@/lib/api';
 import { useTenantResolution } from '@/hooks/use-tenant-resolution';
 
+interface HomepageEvent {
+  id: string;
+  title: string;
+  slug: string;
+  bannerUrl: string | null;
+  isFeatured: boolean;
+  eventDate: string;
+  locationType: 'physical' | 'online';
+  locationDetails: string | null;
+  maxAttendees: number | null;
+  _count: { registrations: number };
+}
+
 const ICON_MAP: Record<string, any> = {
   Users, Building2, TrendingUp, Award, BarChart3, MessageSquare, Shield, Zap, Star, Search,
 };
@@ -54,7 +67,7 @@ export default function HomePage() {
   const [totalCount, setTotalCount] = useState(0);
   const [cms, setCms] = useState<Record<string, any> | null>(null);
   const [cmsLoading, setCmsLoading] = useState(true);
-  const [events, setEvents] = useState<{ featured: any[]; upcoming: any[]; closingSoon: any[] } | null>(null);
+  const [events, setEvents] = useState<{ featured: HomepageEvent[]; upcoming: HomepageEvent[]; closingSoon: HomepageEvent[] } | null>(null);
   // Resolve tenant company ID from hostname (no-op if NEXT_PUBLIC_COMPANY_ID is set)
   const { tenantReady } = useTenantResolution();
 
@@ -68,7 +81,7 @@ export default function HomePage() {
       })
       .catch(() => {})
       .finally(() => setCmsLoading(false));
-    api.get<{ data: { featured: any[]; upcoming: any[]; closingSoon: any[] } }>('/events/homepage')
+    api.get<{ data: { featured: HomepageEvent[]; upcoming: HomepageEvent[]; closingSoon: HomepageEvent[] } }>('/events/homepage')
       .then((res) => {
         const d = res?.data;
         if (d && (d.featured || d.upcoming)) setEvents(d);
@@ -453,7 +466,7 @@ export default function HomePage() {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayEvents.map((ev: any) => {
+              {displayEvents.map((ev) => {
                 const spotsLeft = ev.maxAttendees
                   ? ev.maxAttendees - (ev._count?.registrations ?? 0)
                   : null;
