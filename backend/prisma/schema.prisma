@@ -2176,6 +2176,108 @@ model ExpenseAuditLog {
 }
 
 // ===========================================
+// EVENT MANAGEMENT SYSTEM
+// ===========================================
+
+enum EventStatus {
+  draft
+  published
+  closed
+}
+
+enum EventLocationType {
+  physical
+  online
+}
+
+enum RegistrationStatus {
+  pending
+  approved
+  rejected
+}
+
+enum FormFieldType {
+  text
+  email
+  phone
+  dropdown
+  checkbox
+  file
+}
+
+model Event {
+  id                   String            @id @default(uuid())
+  title                String
+  slug                 String            @unique
+  description          String?
+  bannerUrl            String?
+  locationType         EventLocationType @default(physical)
+  locationDetails      String?
+  eventDate            DateTime
+  registrationDeadline DateTime?
+  maxAttendees         Int?
+  status               EventStatus       @default(draft)
+  isFeatured           Boolean           @default(false)
+  createdBy            String?
+  formFields           EventFormField[]
+  registrations        EventRegistration[]
+  analytics            EventAnalytics?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@index([slug])
+  @@index([eventDate])
+  @@index([status])
+  @@index([isFeatured])
+  @@map("events")
+}
+
+model EventFormField {
+  id         String        @id @default(uuid())
+  eventId    String
+  event      Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  label      String
+  fieldType  FormFieldType @default(text)
+  isRequired Boolean       @default(false)
+  options    Json?
+  orderIndex Int           @default(0)
+  createdAt  DateTime      @default(now())
+
+  @@index([eventId])
+  @@map("event_form_fields")
+}
+
+model EventRegistration {
+  id               String             @id @default(uuid())
+  eventId          String
+  event            Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrationCode String             @unique
+  userData         Json
+  qrCodeToken      String             @unique
+  status           RegistrationStatus @default(pending)
+  checkedIn        Boolean            @default(false)
+  checkedInAt      DateTime?
+  createdAt        DateTime           @default(now())
+
+  @@index([eventId])
+  @@index([registrationCode])
+  @@map("event_registrations")
+}
+
+model EventAnalytics {
+  id                 String   @id @default(uuid())
+  eventId            String   @unique
+  event              Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  viewsCount         Int      @default(0)
+  registrationsCount Int      @default(0)
+  checkinsCount      Int      @default(0)
+  conversionRate     Decimal  @default(0) @db.Decimal(5, 2)
+  lastUpdated        DateTime @default(now())
+
+  @@map("event_analytics")
+}
+
+// ===========================================
 // GENERAL LEDGER — Single Financial Truth
 // Every financial transaction is recorded here.
 // No page should calculate financial data

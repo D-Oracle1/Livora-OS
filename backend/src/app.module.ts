@@ -94,6 +94,9 @@ import { SearchModule } from './modules/search/search.module';
 // Export system (CSV/XLSX)
 import { ExportModule } from './modules/export/export.module';
 
+// Event Management System
+import { EventModule } from './modules/event/event.module';
+
 // Master support (admin → super admin cross-tenant chat)
 import { MasterSupportModule } from './modules/master-support/master-support.module';
 
@@ -212,6 +215,9 @@ import { MasterPlatformModule } from './modules/master-platform/master-platform.
 
     // Export System (CSV / XLSX)
     ExportModule,
+
+    // Event Management System
+    EventModule,
   ],
   providers: [
     {

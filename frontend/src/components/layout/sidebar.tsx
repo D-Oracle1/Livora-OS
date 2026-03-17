@@ -201,6 +201,7 @@ const groupedNavigationConfig: Record<string, NavSection[]> = {
       items: [
         { name: 'CMS', href: '/dashboard/admin/cms', icon: FileEdit, moduleKey: 'cms' },
         { name: 'Gallery', href: '/dashboard/admin/gallery', icon: ImageIcon, moduleKey: 'gallery' },
+        { name: 'Events', href: '/dashboard/admin/events', icon: CalendarDays },
         { name: 'Channels', href: '/dashboard/admin/channels', icon: Hash, moduleKey: 'channels' },
         { name: 'Chat', href: '/dashboard/admin/chat', icon: MessageSquare, moduleKey: 'chat' },
         { name: 'Support Chats', href: '/dashboard/admin/support', icon: Headphones, moduleKey: 'support' },

@@ -2221,3 +2221,85 @@ CREATE UNIQUE INDEX IF NOT EXISTS "general_ledger_referenceId_referenceType_entr
 CREATE INDEX IF NOT EXISTS "general_ledger_entryType_idx"   ON "general_ledger"("entryType");
 CREATE INDEX IF NOT EXISTS "general_ledger_referenceId_idx" ON "general_ledger"("referenceId");
 CREATE INDEX IF NOT EXISTS "general_ledger_entryDate_idx"   ON "general_ledger"("entryDate");
+
+-- ===========================================
+-- EVENT MANAGEMENT SYSTEM
+-- ===========================================
+
+CREATE TYPE IF NOT EXISTS "EventStatus" AS ENUM ('draft', 'published', 'closed');
+CREATE TYPE IF NOT EXISTS "EventLocationType" AS ENUM ('physical', 'online');
+CREATE TYPE IF NOT EXISTS "RegistrationStatus" AS ENUM ('pending', 'approved', 'rejected');
+CREATE TYPE IF NOT EXISTS "FormFieldType" AS ENUM ('text', 'email', 'phone', 'dropdown', 'checkbox', 'file');
+
+CREATE TABLE IF NOT EXISTS "events" (
+  "id"                   TEXT NOT NULL,
+  "title"                TEXT NOT NULL,
+  "slug"                 TEXT NOT NULL,
+  "description"          TEXT,
+  "bannerUrl"            TEXT,
+  "locationType"         "EventLocationType" NOT NULL DEFAULT 'physical',
+  "locationDetails"      TEXT,
+  "eventDate"            TIMESTAMP(3) NOT NULL,
+  "registrationDeadline" TIMESTAMP(3),
+  "maxAttendees"         INTEGER,
+  "status"               "EventStatus" NOT NULL DEFAULT 'draft',
+  "isFeatured"           BOOLEAN NOT NULL DEFAULT false,
+  "createdBy"            TEXT,
+  "createdAt"            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt"            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "events_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "events_slug_key" ON "events"("slug");
+CREATE INDEX IF NOT EXISTS "events_slug_idx"       ON "events"("slug");
+CREATE INDEX IF NOT EXISTS "events_eventDate_idx"  ON "events"("eventDate");
+CREATE INDEX IF NOT EXISTS "events_status_idx"     ON "events"("status");
+CREATE INDEX IF NOT EXISTS "events_isFeatured_idx" ON "events"("isFeatured");
+
+CREATE TABLE IF NOT EXISTS "event_form_fields" (
+  "id"         TEXT NOT NULL,
+  "eventId"    TEXT NOT NULL,
+  "label"      TEXT NOT NULL,
+  "fieldType"  "FormFieldType" NOT NULL DEFAULT 'text',
+  "isRequired" BOOLEAN NOT NULL DEFAULT false,
+  "options"    JSONB,
+  "orderIndex" INTEGER NOT NULL DEFAULT 0,
+  "createdAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "event_form_fields_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "event_form_fields_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "event_form_fields_eventId_idx" ON "event_form_fields"("eventId");
+
+CREATE TABLE IF NOT EXISTS "event_registrations" (
+  "id"               TEXT NOT NULL,
+  "eventId"          TEXT NOT NULL,
+  "registrationCode" TEXT NOT NULL,
+  "userData"         JSONB NOT NULL,
+  "qrCodeToken"      TEXT NOT NULL,
+  "status"           "RegistrationStatus" NOT NULL DEFAULT 'pending',
+  "checkedIn"        BOOLEAN NOT NULL DEFAULT false,
+  "checkedInAt"      TIMESTAMP(3),
+  "createdAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "event_registrations_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "event_registrations_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "event_registrations_registrationCode_key" ON "event_registrations"("registrationCode");
+CREATE UNIQUE INDEX IF NOT EXISTS "event_registrations_qrCodeToken_key"      ON "event_registrations"("qrCodeToken");
+CREATE INDEX IF NOT EXISTS "event_registrations_eventId_idx"          ON "event_registrations"("eventId");
+CREATE INDEX IF NOT EXISTS "event_registrations_registrationCode_idx" ON "event_registrations"("registrationCode");
+
+CREATE TABLE IF NOT EXISTS "event_analytics" (
+  "id"                 TEXT NOT NULL,
+  "eventId"            TEXT NOT NULL,
+  "viewsCount"         INTEGER NOT NULL DEFAULT 0,
+  "registrationsCount" INTEGER NOT NULL DEFAULT 0,
+  "checkinsCount"      INTEGER NOT NULL DEFAULT 0,
+  "conversionRate"     DECIMAL(5,2) NOT NULL DEFAULT 0,
+  "lastUpdated"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "event_analytics_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "event_analytics_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "events"("id") ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "event_analytics_eventId_key" ON "event_analytics"("eventId");
