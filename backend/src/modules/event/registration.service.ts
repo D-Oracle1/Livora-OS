@@ -133,18 +133,31 @@ export class RegistrationService {
   // ── QR CHECK-IN ────────────────────────────────────────────────────────────
 
   async checkIn(dto: CheckInDto) {
-    // 1. Verify QR token integrity
-    const payload = this.qrService.verifyToken(dto.qrToken);
+    const input = dto.qrToken.trim();
+    let registration: any = null;
 
-    if (payload.type !== 'event-registration') {
-      throw new BadRequestException('Invalid QR code — not a registration QR');
+    // Registration codes are human-readable (EVT-<timestamp>-<hex>).
+    // JWT tokens contain dots and are much longer.
+    // Accept both so admins can type the code shown on the success screen.
+    const isRegistrationCode = /^EVT-\d+-[A-Z0-9]+$/i.test(input);
+
+    if (isRegistrationCode) {
+      // Manual entry path: look up directly by registration code
+      registration = await this.prisma.eventRegistration.findFirst({
+        where: { registrationCode: input.toUpperCase() },
+        include: { event: { select: { id: true, title: true, status: true } } },
+      });
+    } else {
+      // QR scan path: verify JWT integrity first
+      const payload = this.qrService.verifyToken(input);
+      if (payload.type !== 'event-registration') {
+        throw new BadRequestException('Invalid QR code — not a registration QR');
+      }
+      registration = await this.prisma.eventRegistration.findUnique({
+        where: { qrCodeToken: input },
+        include: { event: { select: { id: true, title: true, status: true } } },
+      });
     }
-
-    // 2. Find the registration by QR token (source of truth)
-    const registration = await this.prisma.eventRegistration.findUnique({
-      where: { qrCodeToken: dto.qrToken },
-      include: { event: { select: { id: true, title: true, status: true } } },
-    });
 
     if (!registration) {
       throw new NotFoundException('Registration not found — QR code is invalid');

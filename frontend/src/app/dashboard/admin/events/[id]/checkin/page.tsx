@@ -317,7 +317,7 @@ export default function CheckInPage() {
         <CardContent>
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <Input
-              placeholder="Paste QR token here..."
+              placeholder="Scan code or enter EVT-... registration code"
               value={manualToken}
               onChange={(e) => setManualToken(e.target.value)}
               className="font-mono text-xs"
