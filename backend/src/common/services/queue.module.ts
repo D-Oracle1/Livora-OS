@@ -5,6 +5,6 @@ import { MailService } from './mail.service';
 @Global()
 @Module({
   providers: [QueueService, MailService],
-  exports: [QueueService],
+  exports: [QueueService, MailService],
 })
 export class QueueModule {}

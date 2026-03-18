@@ -520,6 +520,71 @@ export class MailService {
     await this.send(to, 'We received your message', html);
   }
 
+  // ============ Event Registration Emails ============
+
+  async sendEventRegistrationEmail(
+    to: string,
+    data: {
+      eventTitle: string;
+      eventDate: Date;
+      locationType: string;
+      locationDetails?: string;
+      registrationCode: string;
+      qrCodeDataUrl: string;
+      status: string;
+      userData: Record<string, unknown>;
+    },
+    companyName?: string,
+  ): Promise<void> {
+    const dateStr = new Date(data.eventDate).toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const base64Data = data.qrCodeDataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const statusColor = data.status === 'approved' ? '#16a34a' : data.status === 'rejected' ? '#dc2626' : '#d97706';
+    const locationRow = data.locationDetails
+      ? `<tr><td style="padding:6px 0;color:#666;font-size:13px;">Location</td><td style="padding:6px 0;font-weight:600;text-align:right;font-size:13px;">${escapeHtml(data.locationDetails)}</td></tr>`
+      : '';
+    const userDataRows = Object.entries(data.userData)
+      .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => `<tr><td style="padding:6px 0;color:#666;font-size:13px;">${escapeHtml(k)}</td><td style="padding:6px 0;font-weight:600;text-align:right;font-size:13px;">${escapeHtml(String(v))}</td></tr>`)
+      .join('');
+
+    const html = this.baseTemplate(`
+      <h2 style="color:#1f2937;margin-bottom:4px;">You're registered!</h2>
+      <p style="color:#6b7280;margin-bottom:24px;">Here are your registration details for <strong>${escapeHtml(data.eventTitle)}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 24px;">
+        <tr><td style="padding:6px 0;color:#666;font-size:13px;">Event</td><td style="padding:6px 0;font-weight:600;text-align:right;font-size:13px;">${escapeHtml(data.eventTitle)}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;font-size:13px;">Date</td><td style="padding:6px 0;font-weight:600;text-align:right;font-size:13px;">${dateStr}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;font-size:13px;">Format</td><td style="padding:6px 0;font-weight:600;text-align:right;font-size:13px;text-transform:capitalize;">${escapeHtml(data.locationType)}</td></tr>
+        ${locationRow}
+        <tr><td style="padding:6px 0;color:#666;font-size:13px;">Registration Code</td><td style="padding:6px 0;font-weight:700;text-align:right;font-family:monospace;font-size:13px;color:#1f2937;">${escapeHtml(data.registrationCode)}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;font-size:13px;">Status</td><td style="padding:6px 0;font-weight:600;text-align:right;font-size:13px;color:${statusColor};text-transform:capitalize;">${escapeHtml(data.status)}</td></tr>
+        ${userDataRows}
+      </table>
+      <div style="text-align:center;margin:24px 0;">
+        <p style="color:#374151;font-size:14px;margin-bottom:12px;">Show this QR code at the event entrance</p>
+        <img src="cid:qrcode" alt="QR Code" width="200" height="200" style="border:1px solid #e5e7eb;border-radius:8px;padding:8px;" />
+        <p style="color:#9ca3af;font-size:12px;margin-top:8px;">Code: <strong style="color:#1f2937;">${escapeHtml(data.registrationCode)}</strong></p>
+      </div>
+      <p style="color:#9ca3af;font-size:12px;margin-top:16px;">Keep this email — you'll need the QR code to check in at the event.</p>
+    `);
+
+    const displayName = companyName || this.appName;
+    try {
+      await this.transporter.sendMail({
+        from: this.getFromAddress(companyName),
+        to,
+        subject: `${displayName} - Registration Confirmed: ${escapeHtml(data.eventTitle)}`,
+        html,
+        attachments: [{ filename: 'qrcode.png', content: base64Data, encoding: 'base64', cid: 'qrcode' }],
+      });
+      this.logger.log(`Event registration email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(`Failed to send event registration email to ${to}: ${error.message}`);
+      throw error;
+    }
+  }
+
   // ============ Newsletter Emails ============
 
   async sendNewsletterEmail(

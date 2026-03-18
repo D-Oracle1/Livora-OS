@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { QrService } from './qr.service';
 import { EventAnalyticsService } from './analytics.service';
+import { MailService } from '../../common/services/mail.service';
 import { CreateRegistrationDto, CheckInDto } from './dto/create-registration.dto';
 import { EventStatus, RegistrationStatus } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,6 +21,7 @@ export class RegistrationService {
     private readonly prisma: PrismaService,
     private readonly qrService: QrService,
     private readonly analyticsService: EventAnalyticsService,
+    private readonly mailService: MailService,
   ) {}
 
   // ── PUBLIC REGISTRATION ────────────────────────────────────────────────────
@@ -121,6 +123,25 @@ export class RegistrationService {
 
     // 11. Fire-and-forget analytics update
     this.analyticsService.recomputeRegistrations(eventId).catch(() => null);
+
+    // 12. Send confirmation email to registrant (fire-and-forget)
+    const registrantEmail = emailField
+      ? String(sanitizedUserData[emailField.label] ?? sanitizedUserData['email'] ?? '')
+      : String(sanitizedUserData['email'] ?? sanitizedUserData['Email'] ?? '');
+    if (registrantEmail) {
+      this.mailService
+        .sendEventRegistrationEmail(registrantEmail, {
+          eventTitle: event.title,
+          eventDate: event.eventDate,
+          locationType: event.locationType,
+          locationDetails: (event as any).locationDetails ?? undefined,
+          registrationCode: registration.registrationCode,
+          qrCodeDataUrl: qrDataUrl,
+          status: registration.status,
+          userData: sanitizedUserData,
+        })
+        .catch(() => null);
+    }
 
     return {
       registrationCode: registration.registrationCode,
