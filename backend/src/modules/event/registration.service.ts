@@ -180,12 +180,7 @@ export class RegistrationService {
       throw new NotFoundException('Registration not found — QR code is invalid');
     }
 
-    // 3. Confirm registration belongs to active event
-    if (registration.event.status === EventStatus.draft) {
-      throw new BadRequestException('Event is not active');
-    }
-
-    // 4. Reject if registration was rejected
+    // Reject if registration was explicitly rejected by an admin
     if (registration.status === RegistrationStatus.rejected) {
       throw new BadRequestException('This registration has been rejected');
     }
