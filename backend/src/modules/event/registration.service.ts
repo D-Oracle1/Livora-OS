@@ -148,11 +148,7 @@ export class RegistrationService {
         include: { event: { select: { id: true, title: true, status: true } } },
       });
     } else {
-      // QR scan path: verify JWT integrity first
-      const payload = this.qrService.verifyToken(input);
-      if (payload.type !== 'event-registration') {
-        throw new BadRequestException('Invalid QR code — not a registration QR');
-      }
+      // QR scan path: look up by stored token (token is unguessable, DB is source of truth)
       registration = await this.prisma.eventRegistration.findUnique({
         where: { qrCodeToken: input },
         include: { event: { select: { id: true, title: true, status: true } } },
