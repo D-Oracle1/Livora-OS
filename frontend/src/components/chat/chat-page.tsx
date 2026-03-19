@@ -253,14 +253,14 @@ export default function ChatPage() {
 
   return (
     <div className="h-[calc(100dvh-5rem)] md:h-[calc(100dvh-5.5rem)] overflow-hidden">
-      <Card className="h-full overflow-hidden">
-        <div className="flex h-full">
+      <Card className="h-full overflow-hidden flex flex-col">
+        <div className="flex flex-1 min-h-0">
             {/* Conversations List */}
             <div className={cn(
-              'w-full md:w-80 border-r flex flex-col',
+              'w-full md:w-80 border-r flex flex-col min-h-0',
               showMobileChat && 'hidden md:flex'
             )}>
-              <div className="p-4 border-b space-y-2">
+              <div className="p-4 border-b space-y-2 shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -345,7 +345,7 @@ export default function ChatPage() {
                 )}
               </AnimatePresence>
 
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto min-h-0">
                 {isLoadingRooms ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -410,13 +410,13 @@ export default function ChatPage() {
 
             {/* Chat Area */}
             <div className={cn(
-              'flex-1 flex flex-col',
+              'flex-1 flex flex-col min-h-0',
               !showMobileChat && 'hidden md:flex'
             )}>
               {activeRoom ? (
                 <>
                   {/* Chat Header */}
-                  <div className="p-4 border-b flex items-center justify-between">
+                  <div className="p-4 border-b flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
                       <Button
                         variant="ghost"
@@ -480,7 +480,7 @@ export default function ChatPage() {
                   </div>
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
                     {isLoadingMessages ? (
                       <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -572,7 +572,7 @@ export default function ChatPage() {
 
                   {/* Typing indicator */}
                   {activeTypingUsers.length > 0 && (
-                    <div className="px-4 pb-1">
+                    <div className="px-4 pb-1 shrink-0">
                       <p className="text-xs text-muted-foreground animate-pulse">
                         Someone is typing...
                       </p>
@@ -580,7 +580,7 @@ export default function ChatPage() {
                   )}
 
                   {/* Message Input */}
-                  <div className="p-3 border-t">
+                  <div className="p-3 border-t shrink-0">
                     {/* Attachment previews */}
                     {attachmentUrls.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2">
