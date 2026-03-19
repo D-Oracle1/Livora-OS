@@ -138,9 +138,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     // Fetch fresh messages (background refresh if cached, foreground if not)
     try {
-      const res = await api.get<any>(`/chat/rooms/${room.id}/messages?limit=30`);
+      const res = await api.get<any>(`/chat/rooms/${room.id}/messages?limit=50`);
       const raw = res?.data ?? res;
-      const msgs = Array.isArray(raw) ? raw : [];
+      // getMessages returns { data: [...], meta: {} } — unwrap the inner data array
+      const msgs = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
       console.log('[Chat] Loaded messages:', msgs.length, 'for room', room.id);
 
       // Only update if this room is still active
@@ -197,7 +198,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const res = await api.post<any>('/chat/rooms', { participantIds, name });
     const newRoom = res?.data ?? res;
     console.log('[Chat] Room created/found:', newRoom?.id);
-    setRooms((prev) => [newRoom, ...prev]);
+    // Avoid adding a duplicate if the room already exists in state (e.g. existing direct chat)
+    setRooms((prev) => {
+      if (!newRoom?.id || prev.some((r) => r.id === newRoom.id)) return prev;
+      return [{ ...newRoom, lastMessage: newRoom.lastMessage ?? null, unreadCount: newRoom.unreadCount ?? 0 }, ...prev];
+    });
     return newRoom;
   }, []);
 

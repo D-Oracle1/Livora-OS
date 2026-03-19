@@ -30,26 +30,38 @@ export class ChatService {
       throw new BadRequestException('At least 2 participants required');
     }
 
-    // Check if direct chat already exists between 2 users
+    // Check if direct chat already exists between exactly these 2 users
     if (allParticipants.length === 2) {
       const existingRoom = await this.prisma.chatRoom.findFirst({
         where: {
           type: 'DIRECT',
-          participants: {
-            every: {
-              id: { in: allParticipants },
-            },
-          },
+          // Both users must be participants AND no third participant exists
+          AND: [
+            { participants: { some: { id: allParticipants[0] } } },
+            { participants: { some: { id: allParticipants[1] } } },
+            { participants: { every: { id: { in: allParticipants } } } },
+          ],
         },
         include: {
           participants: {
             select: { id: true, firstName: true, lastName: true, avatar: true },
           },
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: {
+              sender: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+            },
+          },
         },
       });
 
       if (existingRoom) {
-        return existingRoom;
+        return {
+          ...existingRoom,
+          lastMessage: existingRoom.messages[0] || null,
+          unreadCount: 0,
+        };
       }
     }
 
@@ -68,7 +80,7 @@ export class ChatService {
       },
     });
 
-    return room;
+    return { ...room, lastMessage: null, unreadCount: 0 };
   }
 
   async getRooms(userId: string) {
