@@ -47,6 +47,9 @@ import { SharedFilesModule } from './modules/shared-files/shared-files.module';
 
 // Awards
 import { AwardModule } from './modules/award/award.module';
+
+// Raffle System
+import { RaffleModule } from './modules/raffle/raffle.module';
 import { SettingsModule } from './modules/settings/settings.module';
 
 // CMS & Gallery
@@ -218,6 +221,9 @@ import { MasterPlatformModule } from './modules/master-platform/master-platform.
 
     // Event Management System
     EventModule,
+
+    // Raffle System
+    RaffleModule,
   ],
   providers: [
     {

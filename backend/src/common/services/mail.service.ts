@@ -618,4 +618,8 @@ export class MailService {
 
     await this.send(to, subject, html, nodemailerAttachments, options?.branding?.companyName);
   }
+
+  async sendRaffleCodeEmail(to: string, raffleName: string, html: string): Promise<void> {
+    await this.send(to, `Your Raffle Code — ${raffleName}`, html);
+  }
 }

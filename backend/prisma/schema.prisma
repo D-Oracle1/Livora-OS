@@ -105,6 +105,8 @@ enum NotificationType {
   ENGAGEMENT_POST
   POST_COMMENT
   POST_MENTION
+  // Raffle system
+  RAFFLE
   EVENT_REMINDER
 }
 
@@ -399,6 +401,9 @@ model User {
 
   // Purchase enquiries
   purchaseEnquiries PurchaseEnquiry[]
+
+  // Raffle
+  raffleCodes RaffleCode[]
 
   @@index([email])
   @@index([role])
@@ -2316,4 +2321,53 @@ model GeneralLedger {
   @@index([referenceId])
   @@index([entryDate])
   @@map("general_ledger")
+}
+
+// ===========================================
+// RAFFLE SYSTEM
+// ===========================================
+
+enum RaffleStatus {
+  DRAFT
+  SENT
+  COMPLETED
+}
+
+model RaffleSession {
+  id           String       @id @default(uuid())
+  name         String
+  description  String?
+  codePrefix   String       @default("RAFFLE")
+  codeLength   Int          @default(6)
+  status       RaffleStatus @default(DRAFT)
+  targetRoles  String[]     @default([])
+  joinedAfter  DateTime?
+  joinedBefore DateTime?
+  sentAt       DateTime?
+  totalSent    Int          @default(0)
+  createdBy    String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  codes        RaffleCode[]
+
+  @@index([status])
+  @@index([createdBy])
+  @@map("raffle_sessions")
+}
+
+model RaffleCode {
+  id         String        @id @default(uuid())
+  sessionId  String
+  session    RaffleSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code       String        @unique
+  sentAt     DateTime?
+  redeemedAt DateTime?
+  createdAt  DateTime      @default(now())
+
+  @@index([sessionId])
+  @@index([userId])
+  @@map("raffle_codes")
 }
