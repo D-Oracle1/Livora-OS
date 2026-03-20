@@ -586,27 +586,88 @@ export class CompanyService {
   }
 
   async assignUserRole(companyId: string, userId: string, role: string) {
-    const allowedRoles = ['ADMIN', 'REALTOR', 'CLIENT', 'STAFF', 'GENERAL_OVERSEER'];
+    const allowedRoles = ['ADMIN', 'GENERAL_OVERSEER', 'REALTOR', 'CLIENT', 'STAFF', 'HR'];
     if (!allowedRoles.includes(role)) {
       throw new BadRequestException(`Invalid role. Allowed: ${allowedRoles.join(', ')}`);
     }
 
-    const company = await this.masterPrisma.company.findUnique({
-      where: { id: companyId },
-    });
+    const company = await this.masterPrisma.company.findUnique({ where: { id: companyId } });
     if (!company) throw new NotFoundException('Company not found');
 
-    try {
-      const client = await this.tenantPrisma.getClient(companyId);
-      const updated = await client.user.update({
-        where: { id: userId },
-        data: { role: role as any },
-        select: { id: true, firstName: true, lastName: true, email: true, role: true },
-      });
-      return updated;
-    } catch {
-      throw new NotFoundException('User not found in this company');
-    }
+    const client = await this.tenantPrisma.getClient(companyId);
+
+    // Fetch current user to know old role
+    const user = await client.user.findUnique({
+      where: { id: userId },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true },
+    });
+    if (!user) throw new NotFoundException('User not found in this company');
+
+    const oldRole = user.role as string;
+    if (oldRole === role) return user;
+
+    // Delete old profile
+    await (async () => {
+      if (oldRole === 'REALTOR') {
+        await client.realtorProfile.deleteMany({ where: { userId } });
+      } else if (oldRole === 'CLIENT') {
+        await client.clientProfile.deleteMany({ where: { userId } });
+      } else if (oldRole === 'ADMIN' || oldRole === 'GENERAL_OVERSEER') {
+        await client.adminProfile.deleteMany({ where: { userId } });
+      } else if (oldRole === 'STAFF' || oldRole === 'HR') {
+        // StaffProfile has relations; cascade handles children via schema, but we must null managerId references first
+        const sp = await client.staffProfile.findUnique({ where: { userId }, select: { id: true } });
+        if (sp) {
+          await client.staffProfile.updateMany({ where: { managerId: sp.id }, data: { managerId: null } });
+          await client.staffProfile.deleteMany({ where: { userId } });
+        }
+      }
+    })();
+
+    // Update the user's role
+    const updated = await client.user.update({
+      where: { id: userId },
+      data: { role: role as any },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true },
+    });
+
+    // Create new profile
+    await (async () => {
+      if (role === 'REALTOR') {
+        await client.realtorProfile.create({
+          data: {
+            userId,
+            licenseNumber: `LIC-${uuidv4().substring(0, 8).toUpperCase()}`,
+          },
+        });
+      } else if (role === 'CLIENT') {
+        await client.clientProfile.create({ data: { userId } });
+      } else if (role === 'ADMIN' || role === 'GENERAL_OVERSEER') {
+        await client.adminProfile.create({ data: { userId, permissions: ['all'] } });
+      } else if (role === 'STAFF' || role === 'HR') {
+        // Find or create a department to assign to
+        let dept = await client.department.findFirst({ orderBy: { createdAt: 'asc' } });
+        if (!dept) {
+          dept = await client.department.create({
+            data: { name: 'General', code: 'GEN', description: 'General department' },
+          });
+        }
+        const empCount = await client.staffProfile.count();
+        await client.staffProfile.create({
+          data: {
+            userId,
+            employeeId: `EMP-${String(empCount + 1).padStart(3, '0')}`,
+            position: 'JUNIOR',
+            title: role === 'HR' ? 'HR Staff' : 'Staff',
+            hireDate: new Date(),
+            departmentId: dept.id,
+            baseSalary: 0,
+          },
+        });
+      }
+    })();
+
+    return updated;
   }
 
   async reprovisionTenant(id: string) {

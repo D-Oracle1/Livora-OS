@@ -75,12 +75,12 @@ const PRESET_THEMES = [
 ] as const;
 
 const roleBadgeColor: Record<string, string> = {
-  ADMIN: 'bg-blue-100 text-blue-700',
-  GENERAL_OVERSEER: 'bg-purple-100 text-purple-700',
-  HR: 'bg-teal-100 text-teal-700',
-  REALTOR: 'bg-emerald-100 text-emerald-700',
-  CLIENT: 'bg-orange-100 text-orange-700',
-  STAFF: 'bg-gray-100 text-gray-700',
+  ADMIN: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+  GENERAL_OVERSEER: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
+  HR: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400',
+  REALTOR: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
+  CLIENT: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+  STAFF: 'bg-muted text-muted-foreground',
 };
 
 export default function CompaniesPage() {
@@ -590,8 +590,8 @@ export default function CompaniesPage() {
     <div className="space-y-6 p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Companies</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage tenant companies and their databases</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Companies</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage tenant companies and their databases</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -606,22 +606,22 @@ export default function CompaniesPage() {
       {/* Search + View toggle */}
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             placeholder="Search companies..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full h-10 pl-9 pr-3 text-sm neuo-inset outline-none text-gray-700 placeholder:text-gray-400 rounded-xl"
+            className="w-full h-10 pl-9 pr-3 text-sm neuo-inset outline-none text-foreground placeholder:text-muted-foreground rounded-xl"
           />
         </div>
-        <button onClick={fetchCompanies} title="Refresh" className="neuo-btn w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-700">
+        <button onClick={fetchCompanies} title="Refresh" className="neuo-btn w-10 h-10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground">
           <RefreshCw className="w-4 h-4" />
         </button>
         <button
           onClick={handleMigrateAll}
           disabled={migratingAll}
           title="Apply latest schema DDL to all active tenant databases"
-          className="neuo-btn flex items-center gap-1.5 px-3 h-10 rounded-xl text-sm font-medium text-gray-600 disabled:opacity-50"
+          className="neuo-btn flex items-center gap-1.5 px-3 h-10 rounded-xl text-sm font-medium text-muted-foreground disabled:opacity-50"
         >
           {migratingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           Migrate All
@@ -630,7 +630,7 @@ export default function CompaniesPage() {
           <button
             onClick={() => setSelectedIds(selectedIds.size === companies.length ? new Set() : new Set(companies.map((c) => c.id)))}
             title="Select / deselect all visible companies"
-            className="neuo-btn flex items-center gap-1.5 px-3 h-10 rounded-xl text-sm font-medium text-gray-600"
+            className="neuo-btn flex items-center gap-1.5 px-3 h-10 rounded-xl text-sm font-medium text-muted-foreground"
           >
             <CheckSquare className="w-4 h-4" />
             {selectedIds.size === companies.length && companies.length > 0 ? 'Deselect All' : 'Select All'}
@@ -686,9 +686,9 @@ export default function CompaniesPage() {
         </div>
       ) : companies.length === 0 ? (
         <div className="neuo-card p-12 flex flex-col items-center justify-center text-center">
-          <Building2 className="w-12 h-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No companies yet</h3>
-          <p className="text-sm text-gray-400 mb-5">Create your first company to start onboarding clients</p>
+          <Building2 className="w-12 h-12 text-muted-foreground/40 mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">No companies yet</h3>
+          <p className="text-sm text-muted-foreground mb-5">Create your first company to start onboarding clients</p>
           <button
             onClick={() => setShowCreate(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium shadow-md"
@@ -876,16 +876,16 @@ export default function CompaniesPage() {
       {/* Create / Register Company Modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-              <h2 className="font-semibold text-gray-800">Add Company</h2>
-              <button onClick={() => { setShowCreate(false); setLogoPreview(''); }} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+          <div className="bg-card w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+              <h2 className="font-semibold text-foreground">Add Company</h2>
+              <button onClick={() => { setShowCreate(false); setLogoPreview(''); }} className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Mode tabs */}
-            <div className="flex border-b border-gray-100 dark:border-gray-800 shrink-0 px-6">
+            <div className="flex border-b border-border shrink-0 px-6">
               <button
                 onClick={() => setCreateMode('new')}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${createMode === 'new' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
@@ -1137,7 +1137,7 @@ export default function CompaniesPage() {
       {/* Individual delete confirmation */}
       {confirmDeleteCompany && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                   <Trash2 className="w-5 h-5 text-red-600" />
@@ -1177,7 +1177,7 @@ export default function CompaniesPage() {
       {/* Reset tenant data confirmation */}
       {confirmResetData && showDetail && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
                 <Trash2 className="w-5 h-5 text-orange-600" />
@@ -1208,7 +1208,7 @@ export default function CompaniesPage() {
       {/* Bulk delete confirmation */}
       {confirmBulkDelete && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                   <Trash2 className="w-5 h-5 text-red-600" />
@@ -1235,7 +1235,7 @@ export default function CompaniesPage() {
       {/* User delete confirmation */}
       {confirmDeleteUser && (
         <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4">
+          <div className="bg-card w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
                 <Trash2 className="w-5 h-5 text-red-600" />
@@ -1265,23 +1265,23 @@ export default function CompaniesPage() {
       {/* Company Detail Modal */}
       {showDetail && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div className="bg-card w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
               <div className="flex items-center gap-2">
                 {showDetail.logo ? (
                   <img src={showDetail.logo} alt="" className="w-8 h-8 rounded object-contain" />
                 ) : (
-                  <Building2 className="w-5 h-5 text-gray-400" />
+                  <Building2 className="w-5 h-5 text-muted-foreground" />
                 )}
-                <span className="font-semibold text-gray-800">{showDetail.name}</span>
+                <span className="font-semibold text-foreground">{showDetail.name}</span>
               </div>
-              <button onClick={() => setShowDetail(null)} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+              <button onClick={() => setShowDetail(null)} className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-gray-100 dark:border-gray-800 shrink-0 px-6">
+            <div className="flex border-b border-border shrink-0 px-6">
               <button
                 onClick={() => setDetailTab('info')}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
