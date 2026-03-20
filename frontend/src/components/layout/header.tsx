@@ -24,6 +24,7 @@ import {
   Loader2,
   RotateCw,
   Printer,
+  Ticket,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -73,6 +74,8 @@ const getNotificationIcon = (type: string) => {
       return <NairaSign className="w-3.5 h-3.5 text-orange-600" />;
     case 'SYSTEM':
       return <AlertCircle className="w-3.5 h-3.5 text-red-600" />;
+    case 'RAFFLE':
+      return <Ticket className="w-3.5 h-3.5 text-blue-600" />;
     default:
       return <Bell className="w-3.5 h-3.5 text-muted-foreground" />;
   }

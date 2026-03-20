@@ -1,9 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { MailService } from '../../common/services/mail.service';
-import { NotificationService } from '../notification/notification.service';
 import { CreateRaffleDto } from './dto/create-raffle.dto';
-import { NotificationType, NotificationPriority } from '@prisma/client';
 
 @Injectable()
 export class RaffleService {
@@ -13,7 +11,6 @@ export class RaffleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
-    private readonly notifications: NotificationService,
   ) {}
 
   // ── Unique code generator ──────────────────────────────────────────────────
@@ -31,13 +28,12 @@ export class RaffleService {
       const exists = await this.prisma.raffleCode.findUnique({ where: { code } });
       if (!exists) return code;
     }
-    // Fallback: increase length to guarantee uniqueness
     return this.generateCode(prefix, length + 2);
   }
 
   // ── Eligible user query ────────────────────────────────────────────────────
 
-  private buildUserWhere(dto: Pick<CreateRaffleDto, 'targetRoles' | 'joinedAfter' | 'joinedBefore'>) {
+  private buildUserWhere(dto: { targetRoles?: string[]; joinedAfter?: string | null; joinedBefore?: string | null }) {
     const where: any = { status: 'ACTIVE' };
     if (dto.targetRoles && dto.targetRoles.length > 0) {
       where.role = { in: dto.targetRoles };
@@ -71,11 +67,10 @@ export class RaffleService {
   }
 
   async findAll() {
-    const sessions = await this.prisma.raffleSession.findMany({
+    return this.prisma.raffleSession.findMany({
       orderBy: { createdAt: 'desc' },
       include: { _count: { select: { codes: true } } },
     });
-    return sessions;
   }
 
   async findOne(id: string) {
@@ -129,12 +124,10 @@ export class RaffleService {
       throw new BadRequestException('No eligible users found matching the selected criteria');
     }
 
-    // Generate codes and persist in batches
     const now = new Date();
     const codeRecords: Array<{ sessionId: string; userId: string; code: string; sentAt: Date }> = [];
 
     for (const user of users) {
-      // Skip users who already have a code for this session
       const exists = await this.prisma.raffleCode.findFirst({
         where: { sessionId: id, userId: user.id },
         select: { id: true },
@@ -151,14 +144,13 @@ export class RaffleService {
 
     await this.prisma.raffleCode.createMany({ data: codeRecords });
 
-    // Update session status
     await this.prisma.raffleSession.update({
       where: { id },
       data: { status: 'SENT', sentAt: now, totalSent: { increment: codeRecords.length } },
     });
 
-    // Send emails + notifications concurrently (fire-and-forget individual failures)
-    const emailJobs = codeRecords.map(async (record) => {
+    // Send emails + notifications (fire-and-forget individual failures)
+    const jobs = codeRecords.map(async (record) => {
       const user = users.find((u) => u.id === record.userId);
       if (!user) return;
 
@@ -171,22 +163,40 @@ export class RaffleService {
       }
 
       try {
-        await this.notifications.create({
-          userId: user.id,
-          type: 'RAFFLE' as NotificationType,
-          title: `🎟️ Your Raffle Code for "${session.name}"`,
-          message: `Your unique raffle code is: ${record.code}`,
-          priority: NotificationPriority.HIGH,
-          data: { sessionId: id, code: record.code },
+        await this.prisma.notification.create({
+          data: {
+            userId: user.id,
+            type: 'RAFFLE',
+            title: `🎟️ Your Raffle Code for "${session.name}"`,
+            message: `Your unique raffle code is: ${record.code}`,
+            priority: 'HIGH',
+            data: { sessionId: id, code: record.code },
+          },
         });
       } catch (err) {
         this.logger.error(`Failed to notify ${user.id}: ${err.message}`);
       }
     });
 
-    await Promise.allSettled(emailJobs);
+    await Promise.allSettled(jobs);
 
     return { sent: codeRecords.length, sessionId: id };
+  }
+
+  async publishSession(id: string) {
+    await this.findOne(id);
+    return this.prisma.raffleSession.update({
+      where: { id },
+      data: { isPublished: true },
+    });
+  }
+
+  async unpublishSession(id: string) {
+    await this.findOne(id);
+    return this.prisma.raffleSession.update({
+      where: { id },
+      data: { isPublished: false },
+    });
   }
 
   async getCodes(id: string, page = 1, limit = 50) {
@@ -209,6 +219,21 @@ export class RaffleService {
     return { data: codes, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
+  async getMyActiveCode(userId: string) {
+    return this.prisma.raffleCode.findMany({
+      where: {
+        userId,
+        session: { isPublished: true, status: 'SENT' },
+      },
+      include: {
+        session: {
+          select: { id: true, name: true, description: true, isPublished: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async markRedeemed(code: string) {
     const record = await this.prisma.raffleCode.findUnique({ where: { code } });
     if (!record) throw new NotFoundException('Raffle code not found');
@@ -223,7 +248,7 @@ export class RaffleService {
     await this.findOne(id);
     return this.prisma.raffleSession.update({
       where: { id },
-      data: { status: 'COMPLETED' },
+      data: { status: 'COMPLETED', isPublished: false },
     });
   }
 

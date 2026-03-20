@@ -5,15 +5,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RaffleController } from './raffle.controller';
 import { RaffleService } from './raffle.service';
 
-import { DatabaseModule } from '../../database/database.module';
-import { QueueModule } from '../../common/services/queue.module';
-import { NotificationModule } from '../notification/notification.module';
-
 @Module({
   imports: [
-    DatabaseModule,
-    QueueModule,
-    NotificationModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

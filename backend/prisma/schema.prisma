@@ -2340,6 +2340,7 @@ model RaffleSession {
   codePrefix   String       @default("RAFFLE")
   codeLength   Int          @default(6)
   status       RaffleStatus @default(DRAFT)
+  isPublished  Boolean      @default(false)
   targetRoles  String[]     @default([])
   joinedAfter  DateTime?
   joinedBefore DateTime?
@@ -2352,6 +2353,7 @@ model RaffleSession {
   codes        RaffleCode[]
 
   @@index([status])
+  @@index([isPublished])
   @@index([createdBy])
   @@map("raffle_sessions")
 }

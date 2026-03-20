@@ -8,9 +8,14 @@ const CelebrationModal = dynamic(
   { ssr: false },
 );
 
+const RaffleCodeModal = dynamic(
+  () => import('@/components/raffle-code-modal').then((m) => ({ default: m.RaffleCodeModal })),
+  { ssr: false },
+);
+
 export default function RealtorLayout({ children }: { children: React.ReactNode }) {
   return (
-    <DashboardShell role="realtor" extras={<CelebrationModal />}>
+    <DashboardShell role="realtor" extras={<><CelebrationModal /><RaffleCodeModal /></>}>
       {children}
     </DashboardShell>
   );

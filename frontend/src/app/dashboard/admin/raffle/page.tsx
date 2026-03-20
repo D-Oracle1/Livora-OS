@@ -11,13 +11,14 @@ import {
   Users,
   CheckCircle2,
   Clock,
-  Eye,
   ChevronLeft,
   ChevronRight,
   X,
   RefreshCw,
   Copy,
   Trophy,
+  Globe,
+  GlobeLock,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +36,7 @@ interface RaffleSession {
   codePrefix: string;
   codeLength: number;
   status: 'DRAFT' | 'SENT' | 'COMPLETED';
+  isPublished: boolean;
   targetRoles: string[];
   joinedAfter?: string;
   joinedBefore?: string;
@@ -104,6 +106,7 @@ export default function RafflePage() {
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [completing, setCompleting] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState<string | null>(null);
 
   // Create form state
   const [form, setForm] = useState({
@@ -256,6 +259,24 @@ export default function RafflePage() {
     }
   };
 
+  // ── Publish / Unpublish session ──────────────────────────────────────────
+
+  const handlePublish = async (id: string, publish: boolean) => {
+    setPublishing(id);
+    try {
+      await api.patch(`/raffle/${id}/${publish ? 'publish' : 'unpublish'}`);
+      toast.success(publish ? 'Raffle published — users will see their codes' : 'Raffle unpublished — modal hidden from users');
+      fetchSessions();
+      if (activeSession?.id === id) {
+        setActiveSession((prev) => prev ? { ...prev, isPublished: publish } : prev);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update publish state');
+    } finally {
+      setPublishing(null);
+    }
+  };
+
   // ── Delete session ───────────────────────────────────────────────────────
 
   const handleDelete = async (id: string) => {
@@ -366,6 +387,12 @@ export default function RafflePage() {
                         <Ticket className="w-3 h-3" />
                         {session._count?.codes ?? session.totalSent} codes
                       </span>
+                      {session.isPublished && (
+                        <span className="flex items-center gap-1 text-green-600">
+                          <Globe className="w-3 h-3" />
+                          Published
+                        </span>
+                      )}
                       <span>{new Date(session.createdAt).toLocaleDateString()}</span>
                     </div>
                   </motion.div>
@@ -403,16 +430,43 @@ export default function RafflePage() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {activeSession.status === 'SENT' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 text-xs"
-                    onClick={() => handleComplete(activeSession.id)}
-                    disabled={completing === activeSession.id}
-                  >
-                    {completing === activeSession.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trophy className="w-3.5 h-3.5" />}
-                    Mark Complete
-                  </Button>
+                  <>
+                    {activeSession.isPublished ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-orange-600 border-orange-200 hover:bg-orange-50 gap-1 text-xs"
+                        onClick={() => handlePublish(activeSession.id, false)}
+                        disabled={publishing === activeSession.id}
+                        title="Hide codes from user dashboards"
+                      >
+                        {publishing === activeSession.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GlobeLock className="w-3.5 h-3.5" />}
+                        Unpublish
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-600 border-green-200 hover:bg-green-50 gap-1 text-xs"
+                        onClick={() => handlePublish(activeSession.id, true)}
+                        disabled={publishing === activeSession.id}
+                        title="Show codes on user dashboards"
+                      >
+                        {publishing === activeSession.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                        Publish
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 text-xs"
+                      onClick={() => handleComplete(activeSession.id)}
+                      disabled={completing === activeSession.id}
+                    >
+                      {completing === activeSession.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trophy className="w-3.5 h-3.5" />}
+                      Complete
+                    </Button>
+                  </>
                 )}
                 <Button
                   size="sm"
@@ -465,9 +519,17 @@ export default function RafflePage() {
                     </div>
                     <div>
                       <p className="text-muted-foreground text-xs mb-1">Status</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[activeSession.status].color}`}>
-                        {STATUS_CONFIG[activeSession.status].label}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[activeSession.status].color}`}>
+                          {STATUS_CONFIG[activeSession.status].label}
+                        </span>
+                        {activeSession.isPublished && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700 flex items-center gap-1">
+                            <Globe className="w-2.5 h-2.5" />
+                            Published
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <p className="text-muted-foreground text-xs mb-1">Target Roles</p>
@@ -664,61 +726,98 @@ export default function RafflePage() {
               </div>
 
               {/* Modal body */}
-              <form onSubmit={handleCreate} className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
-                {/* Name */}
-                <div>
-                  <label className="text-sm font-medium block mb-1">Session Name *</label>
-                  <Input
-                    placeholder="e.g. Summer 2026 Raffle"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="text-sm font-medium block mb-1">Description <span className="text-muted-foreground">(optional)</span></label>
-                  <Input
-                    placeholder="Brief description of the raffle..."
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  />
-                </div>
-
-                {/* Code format */}
-                <div className="grid grid-cols-2 gap-3">
+              <form onSubmit={handleCreate} className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+                {/* Name + Description */}
+                <div className="space-y-3">
                   <div>
-                    <label className="text-sm font-medium block mb-1">Code Prefix *</label>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+                      Session Name <span className="text-destructive">*</span>
+                    </label>
                     <Input
-                      placeholder="e.g. WIN, SUMMER2026"
-                      value={form.codePrefix}
-                      onChange={(e) => setForm((f) => ({ ...f, codePrefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
-                      className="font-mono uppercase"
-                      maxLength={12}
+                      placeholder="e.g. Summer 2026 Raffle"
+                      value={form.name}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                       required
+                      className="h-10"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium block mb-1">Code Length</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min={4}
-                        max={10}
-                        value={form.codeLength}
-                        onChange={(e) => setForm((f) => ({ ...f, codeLength: Number(e.target.value) }))}
-                        className="flex-1"
-                      />
-                      <span className="w-6 text-center text-sm font-semibold text-primary">{form.codeLength}</span>
-                    </div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+                      Description <span className="text-muted-foreground/60 normal-case font-normal">(optional)</span>
+                    </label>
+                    <Input
+                      placeholder="Brief description of the raffle..."
+                      value={form.description}
+                      onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                      className="h-10"
+                    />
                   </div>
                 </div>
-                <CodePreview prefix={form.codePrefix} length={form.codeLength} />
+
+                {/* Divider */}
+                <div className="border-t border-border" />
+
+                {/* Code format */}
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Code Format</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1.5">Prefix <span className="text-destructive">*</span></label>
+                      <Input
+                        placeholder="RAFFLE"
+                        value={form.codePrefix}
+                        onChange={(e) => setForm((f) => ({ ...f, codePrefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
+                        className="font-mono uppercase h-10 tracking-wider"
+                        maxLength={12}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1.5">
+                        Suffix Length <span className="font-semibold text-primary">{form.codeLength} chars</span>
+                      </label>
+                      <div className="flex items-center gap-3 h-10">
+                        <span className="text-xs text-muted-foreground">4</span>
+                        <input
+                          type="range"
+                          min={4}
+                          max={10}
+                          value={form.codeLength}
+                          onChange={(e) => setForm((f) => ({ ...f, codeLength: Number(e.target.value) }))}
+                          className="flex-1 accent-primary"
+                        />
+                        <span className="text-xs text-muted-foreground">10</span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Live preview */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/60 border border-border">
+                    <span className="text-xs text-muted-foreground shrink-0">Preview:</span>
+                    <code className="text-sm bg-background border border-border px-3 py-1 rounded font-mono font-bold tracking-widest text-primary">
+                      {`${(form.codePrefix || 'RAFFLE').toUpperCase() || 'RAFFLE'}-${'X'.repeat(form.codeLength)}`}
+                    </code>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-border" />
 
                 {/* Target roles */}
-                <div>
-                  <label className="text-sm font-medium block mb-2">Target User Roles *</label>
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Target Roles <span className="text-destructive">*</span>
+                    </p>
+                    {form.targetRoles.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, targetRoles: [] }))}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {ALL_ROLES.map((role) => (
                       <button
@@ -727,53 +826,60 @@ export default function RafflePage() {
                         onClick={() => toggleRole(role)}
                         className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-all ${
                           form.targetRoles.includes(role)
-                            ? `${ROLE_COLORS[role] || 'bg-primary text-primary-foreground'} border-transparent`
-                            : 'border-border text-muted-foreground hover:border-primary/50'
+                            ? `${ROLE_COLORS[role] || 'bg-primary text-primary-foreground'} border-transparent shadow-sm`
+                            : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
                         }`}
                       >
                         {role.replace(/_/g, ' ')}
                       </button>
                     ))}
                   </div>
-                  {form.targetRoles.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1.5">{form.targetRoles.length} role{form.targetRoles.length !== 1 ? 's' : ''} selected</p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {form.targetRoles.length === 0
+                      ? 'Select at least one role to send codes to'
+                      : `Codes will be sent to all active ${form.targetRoles.join(', ')} users`}
+                  </p>
                 </div>
 
+                {/* Divider */}
+                <div className="border-t border-border" />
+
                 {/* Join date filter */}
-                <div>
-                  <label className="text-sm font-medium block mb-2">Filter by Join Date <span className="text-muted-foreground">(optional)</span></label>
+                <div className="space-y-2.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Join Date Filter <span className="text-muted-foreground/60 normal-case font-normal">(optional)</span>
+                  </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Joined After</label>
+                      <label className="text-xs text-muted-foreground mb-1.5 block">Joined After</label>
                       <Input
                         type="date"
                         value={form.joinedAfter}
                         onChange={(e) => setForm((f) => ({ ...f, joinedAfter: e.target.value }))}
-                        className="text-sm"
+                        className="h-10 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Joined Before</label>
+                      <label className="text-xs text-muted-foreground mb-1.5 block">Joined Before</label>
                       <Input
                         type="date"
                         value={form.joinedBefore}
                         onChange={(e) => setForm((f) => ({ ...f, joinedBefore: e.target.value }))}
-                        className="text-sm"
+                        className="h-10 text-sm"
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Leave blank to include all users in the selected roles</p>
+                  <p className="text-xs text-muted-foreground">Leave blank to include all users matching the selected roles</p>
                 </div>
 
                 {/* Submit */}
-                <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <div className="flex justify-end gap-2 pt-2 border-t border-border sticky bottom-0 bg-card py-4 -mx-6 px-6 -mb-5">
                   <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={creating} className="gap-1.5">
-                    {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    Create Session
+                  <Button type="submit" disabled={creating || form.targetRoles.length === 0} className="gap-1.5 min-w-[130px]">
+                    {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
+                    {creating ? 'Creating…' : 'Create Session'}
                   </Button>
                 </div>
               </form>
