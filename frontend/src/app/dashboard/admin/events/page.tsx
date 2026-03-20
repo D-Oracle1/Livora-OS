@@ -20,6 +20,7 @@ import {
   Star,
   BarChart2,
   RefreshCw,
+  Unlock,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -265,6 +266,23 @@ export default function AdminEventsPage() {
                             <XCircle className="w-3 h-3" />
                           )}
                           Close
+                        </Button>
+                      )}
+                      {ev.status === 'closed' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-blue-600 border-blue-300 hover:bg-blue-50 text-xs gap-1"
+                          onClick={() => handleStatusChange(ev, 'published')}
+                          disabled={statusUpdating === ev.id}
+                          title="Reopen for on-site / walk-in registration"
+                        >
+                          {statusUpdating === ev.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Unlock className="w-3 h-3" />
+                          )}
+                          Reopen
                         </Button>
                       )}
 

@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Users,
   Clock,
+  Unlock,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +40,12 @@ interface Analytics {
   conversionRate: number;
 }
 
+interface EventInfo {
+  id: string;
+  title: string;
+  status: 'draft' | 'published' | 'closed';
+}
+
 type ScanState = 'idle' | 'processing' | 'success' | 'duplicate' | 'error';
 
 // ── RECENT CHECK-INS LIST ───────────────────────────────────────────────────
@@ -55,6 +62,8 @@ export default function CheckInPage() {
   const eventId = params?.id || '';
 
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [eventInfo, setEventInfo] = useState<EventInfo | null>(null);
+  const [reopening, setReopening] = useState(false);
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [lastResult, setLastResult] = useState<CheckInResult | null>(null);
   const [manualToken, setManualToken] = useState('');
@@ -71,11 +80,32 @@ export default function CheckInPage() {
     } catch { /* silent */ }
   }, [eventId]);
 
+  const fetchEvent = useCallback(async () => {
+    try {
+      const res = await api.get<{ data: EventInfo }>(`/events/${eventId}`);
+      setEventInfo(res.data ?? res);
+    } catch { /* silent */ }
+  }, [eventId]);
+
+  const handleReopen = async () => {
+    setReopening(true);
+    try {
+      await api.patch(`/events/${eventId}/status`, { status: 'published' });
+      toast.success('Event reopened for on-site registration');
+      fetchEvent();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reopen event');
+    } finally {
+      setReopening(false);
+    }
+  };
+
   useEffect(() => {
     fetchAnalytics();
+    fetchEvent();
     const interval = setInterval(fetchAnalytics, 10000);
     return () => clearInterval(interval);
-  }, [fetchAnalytics]);
+  }, [fetchAnalytics, fetchEvent]);
 
   // ── Process check-in (shared between manual + scanner) ───────────────────
 
@@ -211,6 +241,28 @@ export default function CheckInPage() {
           <p className="text-sm text-gray-500">Scan attendee QR codes to check them in</p>
         </div>
       </div>
+
+      {/* Closed event banner */}
+      {eventInfo?.status === 'closed' && (
+        <div className="flex items-center justify-between gap-4 p-4 rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
+          <div className="flex items-center gap-3 min-w-0">
+            <XCircle className="w-5 h-5 text-orange-500 shrink-0" />
+            <div>
+              <p className="font-semibold text-orange-800 dark:text-orange-300 text-sm">Event is closed</p>
+              <p className="text-xs text-orange-600 dark:text-orange-400">Online registration is disabled. Reopen to accept walk-in attendees on-site.</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="gap-1.5 shrink-0 bg-orange-600 hover:bg-orange-700 text-white"
+            onClick={handleReopen}
+            disabled={reopening}
+          >
+            {reopening ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
+            Reopen
+          </Button>
+        </div>
+      )}
 
       {/* Live analytics */}
       {analytics && (

@@ -245,7 +245,10 @@ export class EventService {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) throw new NotFoundException('Event not found');
 
-    if (status === EventStatus.published && event.eventDate <= new Date()) {
+    // Allow reopening a closed event (on-site registration) even if the event
+    // date has passed — the admin is intentionally re-opening it for walk-ins.
+    // Only enforce the past-date guard when publishing from draft.
+    if (status === EventStatus.published && event.status !== EventStatus.closed && event.eventDate <= new Date()) {
       throw new BadRequestException('Cannot publish an event that is already in the past');
     }
 
