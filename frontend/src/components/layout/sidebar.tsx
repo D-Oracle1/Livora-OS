@@ -47,6 +47,7 @@ import {
   Scale,
   Waves,
   Ticket,
+  Target,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getImageUrl, api } from '@/lib/api';
@@ -176,6 +177,7 @@ const groupedNavigationConfig: Record<string, NavSection[]> = {
         { name: 'Commission', href: '/dashboard/admin/commission', icon: Calculator, moduleKey: 'commission' },
         { name: 'Tax Reports', href: '/dashboard/admin/tax', icon: FileText, moduleKey: 'tax' },
         { name: 'Rankings', href: '/dashboard/admin/rankings', icon: Crown, moduleKey: 'rankings' },
+        { name: 'CRM', href: '/dashboard/admin/crm', icon: Target },
       ],
     },
     {

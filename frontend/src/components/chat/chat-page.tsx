@@ -16,9 +16,10 @@ import {
   Loader2,
   X,
   Paperclip,
-  ImageIcon,
   FileText,
 } from 'lucide-react';
+import { VoiceRecorder } from './voice-recorder';
+import { AudioPlayer } from './audio-player';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,7 +75,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function ChatPage() {
   const currentUser = getUser();
-  const { rooms, activeRoom, messages, isLoadingRooms, isLoadingMessages, typingUsers, fetchRooms, selectRoom, sendMessage, createRoom, sendTyping, setActiveRoom } = useChat();
+  const { rooms, activeRoom, messages, isLoadingRooms, isLoadingMessages, typingUsers, fetchRooms, selectRoom, sendMessage, sendVoiceMessage, createRoom, sendTyping, setActiveRoom } = useChat();
   const { onlineUsers } = useSocket();
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -518,7 +519,15 @@ export default function ChatPage() {
                                   {message.sender?.firstName} {message.sender?.lastName}
                                 </p>
                               )}
-                              {message.content && (
+                              {/* Voice message */}
+                              {message.type === 'VOICE' && message.voiceMessage ? (
+                                <AudioPlayer
+                                  audioUrl={message.voiceMessage.audioUrl}
+                                  duration={message.voiceMessage.duration}
+                                  waveform={message.voiceMessage.waveform}
+                                  isMe={isMe}
+                                />
+                              ) : message.content && (
                                 <p className="whitespace-pre-wrap break-words text-sm">{message.content}</p>
                               )}
                               {Array.isArray(message.attachments) && message.attachments.length > 0 && (
@@ -623,6 +632,11 @@ export default function ChatPage() {
                       >
                         {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
                       </button>
+                      {/* Voice recorder — expands to replace input while recording */}
+                      <VoiceRecorder
+                        onSend={sendVoiceMessage}
+                        disabled={!!newMessage.trim() || attachmentUrls.length > 0}
+                      />
                       <input
                         type="text"
                         placeholder="Type a message..."
@@ -631,13 +645,15 @@ export default function ChatPage() {
                         onKeyDown={handleKeyDown}
                         className="flex-1 text-sm bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30 border-0 text-gray-900 dark:text-gray-100 placeholder:text-gray-400"
                       />
-                      <button
-                        onClick={handleSend}
-                        disabled={!newMessage.trim() && attachmentUrls.length === 0}
-                        className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 disabled:opacity-40 transition-colors shrink-0"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
+                      {(newMessage.trim() || attachmentUrls.length > 0) && (
+                        <button
+                          onClick={handleSend}
+                          disabled={!newMessage.trim() && attachmentUrls.length === 0}
+                          className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 disabled:opacity-40 transition-colors shrink-0"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </>

@@ -1,7 +1,7 @@
 ================================================================================
  RMS PLATFORM - COMPREHENSIVE SOFTWARE DOCUMENTATION
  Realtors Management System - Enterprise PropTech Platform
- Generated: February 13, 2026
+ Generated: March 18, 2026
 ================================================================================
 
 TABLE OF CONTENTS
@@ -17,6 +17,7 @@ TABLE OF CONTENTS
 9.  DEPLOYMENT
 10. WHAT NEEDS TO BE IMPLEMENTED / GAPS
 11. MODULE-BY-MODULE STATUS MATRIX
+12. RECENT CHANGES (2026-03-14 to 2026-03-18)
 
 ================================================================================
 1. EXECUTIVE SUMMARY
@@ -27,14 +28,16 @@ platform designed for real estate companies in Nigeria. It provides end-to-end
 management for realtors, clients, properties, sales, commissions, HR, and more.
 
 Key Statistics:
-  - 22+ backend modules
-  - 150+ API endpoints
-  - 73 frontend pages across 6 route groups
+  - 23+ backend modules
+  - 165+ API endpoints
+  - 80+ frontend pages across 7 route groups
   - 5 user roles (SUPER_ADMIN, ADMIN, REALTOR, CLIENT, STAFF)
   - Multi-tenant architecture with isolated databases per company
   - Real-time features via Pusher WebSockets
   - PWA-enabled with offline support
   - Deployed on Vercel (frontend + backend serverless)
+  - Event management with QR code check-in system
+  - Registration confirmation emails with embedded QR codes
 
 ================================================================================
 2. ARCHITECTURE OVERVIEW
@@ -55,6 +58,11 @@ Request Flow:
   6. Global Filter -> Error handling
   7. Response -> Standardized JSON: { success, data, meta?, timestamp }
 
+NOTE: TransformInterceptor flattens paginated responses. If a service returns
+{ data: [...], meta: {...} }, the interceptor lifts these to top-level:
+{ success: true, data: [...items], meta: { totalPages, ... }, timestamp }
+Frontend must read res.data and res.meta (NOT res.data.data / res.data.meta).
+
 Monorepo Structure:
   /backend    - NestJS API (TypeScript)
   /frontend   - Next.js 16 App Router (React 19, TypeScript)
@@ -73,12 +81,15 @@ BACKEND:
   - Auth: Passport.js + JWT + bcrypt
   - Queue: BullMQ (email jobs)
   - Real-time: Pusher
-  - Email: Nodemailer (SMTP)
+  - Email: Nodemailer (SMTP via Resend)
   - SMS: Twilio
   - Push: Firebase Cloud Messaging (FCM)
   - Storage: AWS S3
-  - AI: OpenAI
+  - AI: OpenAI (with graceful rule-based fallbacks)
+  - QR Codes: qrcode package (JWT-signed tokens)
   - API Docs: Swagger/OpenAPI
+  - Error Tracking: Sentry (graceful degradation if DSN not set)
+  - Log Aggregation: Logtail (graceful degradation)
 
 FRONTEND:
   - Framework: Next.js 16 (App Router)
@@ -91,6 +102,7 @@ FRONTEND:
   - PDF: jsPDF + html2canvas
   - Calls: WebRTC + Pusher signaling
   - PWA: next-pwa with Workbox
+  - QR Scanner: html5-qrcode (camera-based QR scanning)
 
 ================================================================================
 4. DATABASE SCHEMA
@@ -103,7 +115,7 @@ MASTER DATABASE (master.prisma):
 
 TENANT DATABASE (schema.prisma) - Per Company:
 
-  ENUMS (25):
+  ENUMS (29):
     UserRole, UserStatus, PropertyType, PropertyStatus, SaleStatus,
     CommissionStatus, LoyaltyTier, NotificationType, NotificationPriority,
     MessageType, DocumentType, TransactionType, TransactionStatus,
@@ -111,9 +123,13 @@ TENANT DATABASE (schema.prisma) - Per Company:
     StaffPosition, EmploymentType, AttendanceStatus, LeaveType, LeaveStatus,
     ReviewCycle, ReviewStatus, TaskPriority, TaskStatus, ChannelType,
     PayrollStatus, ContentType, PolicyType, AllowanceType, DeductionType,
-    GalleryItemType
+    GalleryItemType,
+    EventLocationType (physical, online),
+    EventStatus (draft, published, closed),
+    RegistrationStatus (pending, approved, rejected),
+    FormFieldType (text, email, phone, number, textarea, select, checkbox, date)
 
-  MODELS (37):
+  MODELS (41):
     Core:
       User, AdminProfile, RealtorProfile, ClientProfile, StaffProfile
 
@@ -140,6 +156,18 @@ TENANT DATABASE (schema.prisma) - Per Company:
     CMS & Content:
       CmsPage, GalleryItem
 
+    Events (added 2026-03-17):
+      Event       - id, title, slug, description, bannerUrl, locationType,
+                    locationDetails, eventDate, registrationDeadline,
+                    maxAttendees, status, isFeatured, createdAt, updatedAt
+      EventFormField - id, eventId, label, fieldType, isRequired, orderIndex,
+                       options (JSON for select/checkbox)
+      EventRegistration - id, eventId, registrationCode (EVT-timestamp-hex),
+                          userData (JSON), qrCodeToken (JWT), status,
+                          checkedIn, checkedInAt, createdAt
+      EventAnalytics - id, eventId, viewsCount, registrationsCount,
+                       checkinsCount, conversionRate, updatedAt
+
     Security:
       AuditLog, RefreshToken, PasswordResetToken, SystemSetting,
       UserDevice
@@ -154,16 +182,26 @@ TENANT DATABASE (schema.prisma) - Per Company:
 Status: FULLY IMPLEMENTED
 
 Endpoints:
-  POST /auth/register         - Register user (with role + invite code)
-  POST /auth/login            - Login (dual: super admin + tenant user)
-  POST /auth/refresh          - Refresh JWT token
-  POST /auth/logout           - Logout, invalidate tokens
-  POST /auth/change-password  - Change password (requires current)
-  POST /auth/forgot-password  - Send password reset email
-  POST /auth/reset-password   - Reset password with token
-  GET  /auth/profile          - Get authenticated user profile
-  PATCH /auth/profile         - Update profile (name, phone)
-  POST /pusher/auth           - Authorize Pusher channel subscription
+  POST /auth/register          - Register user (with role + invite code)
+  POST /auth/login             - Login (dual: super admin + tenant user)
+  POST /auth/refresh           - Refresh JWT token
+  POST /auth/logout            - Logout, invalidate tokens
+  POST /auth/change-password   - Change password (requires current)
+  POST /auth/forgot-password   - Send password reset email
+  POST /auth/reset-password    - Reset password with token
+  GET  /auth/profile           - Get authenticated user profile
+  PATCH /auth/profile          - Update profile (name, phone)
+  POST /pusher/auth            - Authorize Pusher channel subscription
+  POST /auth/2fa/setup         - Generate TOTP secret + QR
+  POST /auth/2fa/enable        - Enable 2FA (verify first TOTP)
+  POST /auth/2fa/disable       - Disable 2FA
+  POST /auth/2fa/verify        - Verify TOTP code at login
+  POST /auth/2fa/recovery-code - Use backup recovery code
+  POST /auth/2fa/regenerate-backup-codes - New backup codes
+  GET  /auth/oauth/google      - Google OAuth redirect
+  GET  /auth/oauth/google/callback - Google OAuth callback
+  GET  /auth/oauth/facebook    - Facebook OAuth redirect
+  GET  /auth/oauth/facebook/callback - Facebook OAuth callback
 
 Features:
   - Dual authentication (SUPER_ADMIN from master DB, users from tenant DB)
@@ -174,6 +212,9 @@ Features:
   - SHA256 hashed password reset tokens (1 hour expiry)
   - Invite code registration (first user becomes ADMIN)
   - Role-based profile creation on register
+  - TOTP-based 2FA (RFC 6238, built-in implementation, no external lib)
+  - 8 backup recovery codes per user
+  - Google + Facebook OAuth (passport-google-oauth20, passport-facebook)
 
 ----------------------------------------------------------------------
 5.2 USERS MODULE (src/modules/users/)
@@ -390,16 +431,16 @@ Features:
 Status: FULLY IMPLEMENTED
 
 Endpoints:
-  GET    /notifications            - Get user notifications
+  GET    /notifications              - Get user notifications
   GET    /notifications/unread-count - Unread count
-  POST   /notifications/:id/read   - Mark as read
-  POST   /notifications/read-all   - Mark all as read
-  DELETE /notifications/:id        - Delete notification
+  POST   /notifications/:id/read     - Mark as read
+  POST   /notifications/read-all     - Mark all as read
+  DELETE /notifications/:id          - Delete notification
   GET    /notifications/callout/staff - Get active staff
-  POST   /notifications/callout    - Send callout
+  POST   /notifications/callout      - Send callout
   POST   /notifications/callout/:id/respond - Respond to callout
 
-Notification Types (20):
+Notification Types (20+):
   SALE, COMMISSION, PROPERTY, RANKING, LOYALTY, SYSTEM, CHAT,
   PRICE_CHANGE, LISTING, OFFER, AWARD, LEAVE_REQUEST, LEAVE_APPROVED,
   LEAVE_REJECTED, TASK_ASSIGNED, TASK_COMPLETED, REVIEW_SCHEDULED,
@@ -412,15 +453,15 @@ Notification Types (20):
 Status: FULLY IMPLEMENTED
 
 Endpoints:
-  GET    /chat/rooms              - Get user's chat rooms
-  POST   /chat/rooms              - Create room (DIRECT or GROUP)
-  GET    /chat/rooms/:id          - Room details
-  GET    /chat/rooms/:id/messages - Message history (paginated)
-  POST   /chat/rooms/:id/messages - Send message
-  POST   /chat/rooms/:id/read    - Mark room as read
-  POST   /chat/rooms/:id/participants   - Add participants
+  GET    /chat/rooms               - Get user's chat rooms
+  POST   /chat/rooms               - Create room (DIRECT or GROUP)
+  GET    /chat/rooms/:id           - Room details
+  GET    /chat/rooms/:id/messages  - Message history (paginated)
+  POST   /chat/rooms/:id/messages  - Send message
+  POST   /chat/rooms/:id/read      - Mark room as read
+  POST   /chat/rooms/:id/participants    - Add participants
   DELETE /chat/rooms/:id/participants/:pid - Remove participant
-  DELETE /chat/rooms/:id          - Delete room
+  DELETE /chat/rooms/:id           - Delete room
 
 Message Types: TEXT, IMAGE, FILE, PROPERTY, SYSTEM
 Database: MongoDB (separate from PostgreSQL)
@@ -458,12 +499,12 @@ Public:
   GET /gallery/public - Published gallery items
 
 Admin:
-  GET    /gallery                  - All items
-  POST   /gallery                  - Create item
-  PUT    /gallery/reorder          - Bulk reorder
-  PUT    /gallery/:id              - Update item
+  GET    /gallery                   - All items
+  POST   /gallery                   - Create item
+  PUT    /gallery/reorder           - Bulk reorder
+  PUT    /gallery/:id               - Update item
   PATCH  /gallery/:id/toggle-publish - Toggle publish
-  DELETE /gallery/:id              - Delete item
+  DELETE /gallery/:id               - Delete item
 
 ----------------------------------------------------------------------
 5.19 UPLOAD MODULE (src/modules/upload/)
@@ -479,6 +520,11 @@ Endpoints:
   POST   /upload/cms-images      - Upload CMS images (5 files, 10MB each)
 
 Storage: AWS S3
+CDN: Images piped through CdnService (sharp optimization, WebP conversion)
+  - Avatars/logos: max 400x400px, quality 85
+  - Properties/gallery/cms: max 1920x1080px, quality 80
+  - Receipts/docs: no optimization (fidelity preserved)
+  - CDN URL rewriting when CDN_BASE_URL env var is set
 
 ----------------------------------------------------------------------
 5.20 ADMIN MODULE (src/modules/admin/)
@@ -524,7 +570,7 @@ SUPER_ADMIN only:
 ----------------------------------------------------------------------
 5.23 CRON MODULE (src/modules/cron/)
 ----------------------------------------------------------------------
-Status: FULLY IMPLEMENTED
+Status: FULLY IMPLEMENTED + CONFIGURED
 
 HTTP-triggered (for Vercel serverless):
   POST /cron/rankings/daily    - Update daily rankings
@@ -533,6 +579,7 @@ HTTP-triggered (for Vercel serverless):
   POST /cron/overdue-payments  - Check overdue payments
 
 Guard: CronSecretGuard (validates x-cron-secret header)
+Scheduler: Configured in backend/vercel.json (4 Vercel Cron entries)
 
 ----------------------------------------------------------------------
 5.24 AUDIT MODULE (src/modules/audit/)
@@ -545,17 +592,120 @@ Endpoints:
 Query: userId, entity, action, startDate, endDate, page, limit
 
 ----------------------------------------------------------------------
-5.25 OTHER MODULES
+5.25 SEARCH MODULE (src/modules/search/)
+----------------------------------------------------------------------
+Status: FULLY IMPLEMENTED
+
+Endpoints:
+  GET /search?q=keyword&limit=10 - Global search
+
+Searches: properties, users (admin only), clients, realtors, staff, sales
+Role-scoped: results filtered based on caller's role
+
+----------------------------------------------------------------------
+5.26 EXPORT MODULE (src/modules/export/)
+----------------------------------------------------------------------
+Status: FULLY IMPLEMENTED
+
+Endpoints:
+  GET /export/sales      - Export sales data
+  GET /export/tax        - Export tax data
+  GET /export/payroll    - Export payroll data
+  GET /export/audit      - Export audit logs
+  GET /export/commission - Export commission data
+
+Formats: CSV + XLSX (via exceljs)
+Query: format=csv|xlsx, date filters
+
+----------------------------------------------------------------------
+5.27 CONTACT MODULE (src/modules/contact/)
+----------------------------------------------------------------------
+Status: FULLY IMPLEMENTED
+
+Endpoints:
+  POST /contact - Submit contact form
+
+Rate limit: 3 req/min
+Sends: notification email to admin + auto-reply to sender
+
+----------------------------------------------------------------------
+5.28 EVENT MODULE (src/modules/event/)
+----------------------------------------------------------------------
+Status: FULLY IMPLEMENTED (added 2026-03-17)
+
+Services:
+  EventService        - CRUD for events
+  RegistrationService - Public sign-up + QR check-in
+  QrService           - JWT-signed QR token generation and verification
+  EventAnalyticsService - View tracking, metrics (cached 120s)
+
+Public Endpoints (no auth):
+  GET  /events/homepage                    - Featured/upcoming events for landing page
+  GET  /events/public                      - Published events list
+  GET  /events/public/:slug                - Event detail by slug (increments view count)
+  POST /events/public/:eventId/register    - Register for an event
+    Rate limit: 5 req/60s
+    Body: { userData: Record<string, unknown> }
+    Returns: { registrationCode, status, qrCode (base64 PNG), createdAt }
+
+Admin Endpoints (ADMIN, HR, STAFF, GENERAL_OVERSEER):
+  POST  /events                                     - Create event
+  GET   /events                                     - List events (paginated, filtered)
+  GET   /events/:id                                 - Event details
+  PUT   /events/:id                                 - Update event
+  DELETE /events/:id                                - Delete event + all data
+  PATCH /events/:id/status                          - Change status (draft/published/closed)
+  GET   /events/:id/analytics                       - Event analytics (views, regs, check-ins)
+  GET   /events/:id/registrations                   - List registrations (paginated, status filter)
+  PATCH /events/registrations/:id/status            - Approve/reject a registration
+  POST  /events/checkin                             - Check-in by QR token OR registration code
+    Rate limit: 120 req/60s
+    Accepts: JWT QR token from camera scan OR EVT-... registration code (manual entry)
+    Returns: { alreadyCheckedIn, checkedInAt, registrationCode, eventTitle, message }
+
+QR Code System:
+  - Each registration gets a unique JWT-signed token (10-year expiry)
+  - QR code is a 300x300px PNG rendered as a base64 data URL
+  - Check-in accepts both camera-scanned QR token and typed registration code
+  - DB lookup is the authoritative validation (JWT signature not re-verified at check-in)
+  - Registration codes format: EVT-{timestamp}-{8-char-hex} (e.g. EVT-1747123456789-A1B2C3D4)
+
+Registration Email:
+  - Confirmation email sent fire-and-forget immediately after registration
+  - Contains: event title, date, format, location, registration code, form data
+  - QR code embedded as inline CID attachment (works in Gmail, Outlook, Apple Mail)
+  - Uses registrant's email from any form field with fieldType === 'email'
+
+Form Builder:
+  - Admin defines custom form fields per event (text, email, phone, number,
+    textarea, select, checkbox, date)
+  - Required/optional toggle per field
+  - Order index for drag-drop reordering
+  - Validation: email format, phone format, required fields
+  - Deduplication: prevents re-registration by email per event
+
+Analytics (EventAnalytics):
+  - viewsCount: incremented on each public event detail page load
+  - registrationsCount: count of non-rejected registrations
+  - checkinsCount: count of checked-in registrations
+  - conversionRate: registrations / views * 100
+  - Cached for 120 seconds, recomputed on each registration/check-in
+
+----------------------------------------------------------------------
+5.29 OTHER MODULES
 ----------------------------------------------------------------------
 Award Module   - Achievement/award system           - IMPLEMENTED
 AI Module      - OpenAI integration                 - IMPLEMENTED
+  Endpoints: generate-description, market-price-insights,
+             score-leads, sales-trend-prediction
+  Fallback: Rule-based responses if OPENAI_API_KEY not set
 Call Module    - WebRTC call management              - IMPLEMENTED
 Device Module  - Push notification device tokens     - IMPLEMENTED
-Settings Module - System-wide settings              - IMPLEMENTED
+Settings Module - System-wide settings + notification preferences - IMPLEMENTED
 Health Module  - Health check endpoint               - IMPLEMENTED
 
 ----------------------------------------------------------------------
-5.26 COMMON INFRASTRUCTURE
+5.30 COMMON INFRASTRUCTURE
 ----------------------------------------------------------------------
 
 Decorators (6):
@@ -573,44 +723,59 @@ Guards (4):
   CronSecretGuard      - Validates x-cron-secret header
 
 Interceptors (3):
-  LoggingInterceptor    - Log HTTP requests with duration
-  TransformInterceptor  - Standardize { success, data, timestamp }
+  LoggingInterceptor    - JSON-structured HTTP request logs
+  TransformInterceptor  - Standardize { success, data, meta?, timestamp }
   AuditInterceptor      - Log write operations with field redaction
 
-Services (11):
+Services (13):
   AuditService             - Fire-and-forget audit logging
   CacheService             - Redis caching with graceful fallback
-  MailService              - Email delivery with 11 templates
+  MailService              - Email delivery with 15 templates
   PushNotificationService  - Firebase push notifications
   SmsService               - Twilio SMS delivery
   PusherService            - WebSocket events
   QueueService             - BullMQ email job queue
+  CdnService               - Image optimization (sharp + WebP) + URL rewriting
+  SentryService            - Error tracking (graceful degradation)
+  LoggerService            - Logtail structured log aggregation
+  OpenAIService            - AI features (graceful degradation)
 
-Email Templates (11):
+Email Templates (15):
   Password Reset, Welcome, Email Verification,
   Sale Confirmation (Realtor), Sale Confirmation (Client),
   Commission Paid, Payment Reminder,
   Leave Approved, Leave Rejected,
-  Task Assigned, Performance Review
+  Task Assigned, Performance Review,
+  Purchase Payment Notification,
+  Contact Form Notification, Contact Auto-Reply,
+  Event Registration Confirmation (with inline QR code)
 
 ================================================================================
 6. FRONTEND PAGES & FEATURES (IMPLEMENTED)
 ================================================================================
 
 ----------------------------------------------------------------------
-6.1 PUBLIC PAGES (7 pages)
+6.1 PUBLIC PAGES (9 pages)
 ----------------------------------------------------------------------
 
-/                  - Homepage (hero, properties, agents, features, CTA)
+/                  - Homepage (hero, properties, agents, features, CTA,
+                     Upcoming Events section with live API data)
 /about             - Company story (CMS-driven)
 /features          - Platform features (CMS-driven)
-/contact           - Contact form + info card
+/contact           - Contact form + info card (connected to backend)
 /gallery           - Photo/video gallery with lightbox
 /properties        - Property listing with search & filters
 /properties/[id]   - Property detail with image carousel
+/event/[slug]      - Public event detail (register, QR code on success)
 /~offline          - PWA offline fallback
 
-Data: All use real API except contact form (placeholder, no backend submit)
+Data: All use real API.
+
+Homepage Events Section:
+  - Calls GET /events/homepage (parallel with CMS fetch)
+  - Shows featured events first, falls back to upcoming events
+  - Displays date, location type, registration deadline, capacity
+  - "Register Now" links to /event/[slug]
 
 ----------------------------------------------------------------------
 6.2 AUTH PAGES (4 pages)
@@ -623,43 +788,59 @@ Data: All use real API except contact form (placeholder, no backend submit)
 
 Features:
   - Dual auth (super admin + tenant user)
-  - OAuth buttons (Google, Facebook) - UI present
+  - OAuth buttons (Google, Facebook) - UI present, backend implemented
   - Nigerian-specific: phone format, NIN, 37 states
   - Role selection: CLIENT or REALTOR
   - Password strength requirements
   - Session storage (tab-isolated)
 
 ----------------------------------------------------------------------
-6.3 ADMIN DASHBOARD (25 pages)
+6.3 ADMIN DASHBOARD (30 pages)
 ----------------------------------------------------------------------
 
-/dashboard/admin                     - Overview (revenue, sales, charts)
-/dashboard/admin/realtors            - Realtor CRUD + monitoring
-/dashboard/admin/clients             - Client CRUD
-/dashboard/admin/properties          - Property CRUD + image upload
-/dashboard/admin/sales               - Sales tracking, approve/reject
-/dashboard/admin/commission          - Commission distribution + payouts
-/dashboard/admin/tax                 - Tax reports + export
-/dashboard/admin/rankings            - Leaderboard (realtors, staff, clients)
-/dashboard/admin/analytics           - Advanced charts + analytics
-/dashboard/admin/staff               - Employee management
-/dashboard/admin/departments         - Department CRUD
-/dashboard/admin/hr                  - HR dashboard overview
-/dashboard/admin/hr/attendance       - Clock in/out tracking
-/dashboard/admin/hr/leave            - Leave approve/reject
-/dashboard/admin/hr/payroll          - Payroll processing
-/dashboard/admin/hr/performance      - Performance reviews
-/dashboard/admin/hr/policies         - HR policy management
-/dashboard/admin/hr/salary-config    - Salary structure config
-/dashboard/admin/hr/tasks            - HR task management
-/dashboard/admin/cms                 - Content management (hero, about, etc.)
-/dashboard/admin/gallery             - Media upload + management
-/dashboard/admin/audit               - Audit log viewer + export
-/dashboard/admin/chat                - Real-time messaging
-/dashboard/admin/notifications       - Notification management
-/dashboard/admin/settings            - Profile + system settings
+/dashboard/admin                           - Overview (revenue, sales, charts)
+/dashboard/admin/realtors                  - Realtor CRUD + monitoring
+/dashboard/admin/clients                   - Client CRUD
+/dashboard/admin/properties                - Property CRUD + image upload
+/dashboard/admin/sales                     - Sales tracking, approve/reject
+/dashboard/admin/commission                - Commission distribution + payouts
+/dashboard/admin/tax                       - Tax reports + export
+/dashboard/admin/rankings                  - Leaderboard (realtors, staff, clients)
+/dashboard/admin/analytics                 - Advanced charts + analytics
+/dashboard/admin/staff                     - Employee management
+/dashboard/admin/departments               - Department CRUD
+/dashboard/admin/hr                        - HR dashboard overview
+/dashboard/admin/hr/attendance             - Clock in/out tracking
+/dashboard/admin/hr/leave                  - Leave approve/reject
+/dashboard/admin/hr/payroll                - Payroll processing
+/dashboard/admin/hr/performance            - Performance reviews
+/dashboard/admin/hr/policies               - HR policy management
+/dashboard/admin/hr/salary-config          - Salary structure config
+/dashboard/admin/hr/tasks                  - HR task management
+/dashboard/admin/cms                       - Content management (hero, about, etc.)
+/dashboard/admin/gallery                   - Media upload + management
+/dashboard/admin/audit                     - Audit log viewer + export
+/dashboard/admin/chat                      - Real-time messaging
+/dashboard/admin/notifications             - Notification management
+/dashboard/admin/settings                  - Profile + system settings
+/dashboard/admin/events                    - Event list (search, filter, publish/close/delete)
+/dashboard/admin/events/create             - Event creation (details + form builder)
+/dashboard/admin/events/[id]               - Event edit + preview
+/dashboard/admin/events/[id]/registrations - Registrations list (approve/reject, QR preview, CSV export)
+/dashboard/admin/events/[id]/checkin       - QR scanner + manual check-in + live analytics
 
 Data: ALL pages use real API integration.
+
+Events Admin Features:
+  - List with search, status filter, pagination
+  - Quick publish/close toggle on list
+  - One-click navigation to registrations and check-in scanner
+  - Form builder with drag-drop field ordering
+  - Live attendance stats on check-in page (auto-refreshes every 10s)
+  - Camera-based QR scanner (html5-qrcode)
+  - Manual registration code entry fallback
+  - Recent check-ins log with duplicate detection
+  - CSV export of all registrations with custom form data columns
 
 ----------------------------------------------------------------------
 6.4 REALTOR DASHBOARD (10 pages)
@@ -814,6 +995,8 @@ Authentication:
   - Session storage (tab-isolated)
   - Refresh token rotation
   - Password reset via email (SHA256 tokens, 1hr expiry)
+  - TOTP 2FA (RFC 6238, optional per user, 8 backup recovery codes)
+  - Google + Facebook OAuth (Passport strategies)
 
 Authorization:
   - 5 roles: SUPER_ADMIN, ADMIN, REALTOR, CLIENT, STAFF
@@ -824,11 +1007,14 @@ Authorization:
 Security Features:
   - Helmet.js (security headers)
   - CORS whitelist (localhost + Vercel previews)
-  - Rate limiting (100 req/60s, configurable)
+  - Rate limiting (global: 100 req/60s; per-endpoint: login 5/min, register 3/min,
+    forgot-password 3/min, contact 3/min, event registration 5/min, check-in 120/min)
   - Input validation (class-validator, whitelist mode)
   - Audit logging (all write operations)
   - Sensitive field redaction in audit logs
   - Encryption key for sensitive data
+  - Sentry error tracking (5xx errors reported)
+  - HTML/script injection sanitization on event registration userData
 
 ================================================================================
 9. DEPLOYMENT
@@ -840,6 +1026,7 @@ Current Deployment:
   Database: Supabase PostgreSQL
   Cache: Redis (external)
   Chat DB: MongoDB Atlas
+  Email: Resend (via Nodemailer SMTP adapter, SMTP_HOST=smtp.resend.com)
 
 Also Configured (alternative):
   Docker: docker-compose.yml (prod) + docker-compose.dev.yml
@@ -851,15 +1038,33 @@ CI/CD:
     - ci.yml: Lint + test on push/PR to main/develop
     - security.yml: Dependency audit (weekly + on push)
 
-Environment Variables (60+):
+Cron Jobs (Vercel):
+  Configured in backend/vercel.json:
+    - Daily rankings   (0 0 * * *)
+    - Monthly rankings (0 0 1 * *)
+    - Yearly rankings  (0 0 1 1 *)
+    - Overdue payments (0 6 * * *)
+
+Database Backups:
+  - backend/scripts/backup.sh  (pg_dump → gzip → S3, optional encryption)
+  - backend/scripts/restore.sh (download from S3, decrypt, restore)
+  - Retention: configurable via BACKUP_RETENTION_DAYS (default 30 days)
+  - Required env: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BACKUP_BUCKET
+
+Environment Variables (65+):
   Database: DATABASE_URL, MASTER_DATABASE_URL, DIRECT_URL, MONGODB_URI
   Cache: REDIS_HOST, REDIS_PORT, REDIS_URL
   Auth: JWT_SECRET, JWT_EXPIRES_IN, JWT_REFRESH_SECRET, ENCRYPTION_KEY
+  2FA: (uses JWT_SECRET for TOTP secret encryption)
+  OAuth: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+         FACEBOOK_APP_ID, FACEBOOK_APP_SECRET
   Email: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
   SMS: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER
   Push: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
   Storage: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION
-  AI: OPENAI_API_KEY
+  CDN: CDN_BASE_URL (optional, rewrites blob URLs to CDN origin)
+  AI: OPENAI_API_KEY (optional, falls back to rule-based)
+  Monitoring: SENTRY_DSN (optional), LOGTAIL_TOKEN (optional)
   Loyalty: POINTS_PER_SALE, BRONZE/SILVER/GOLD/PLATINUM_THRESHOLD
   Commission: DEFAULT/BRONZE/SILVER/GOLD/PLATINUM_COMMISSION_RATE
   Tax: DEFAULT_TAX_RATE
@@ -870,150 +1075,51 @@ Environment Variables (60+):
 ================================================================================
 
 ----------------------------------------------------------------------
-10.1 BACKEND GAPS
+10.1 REMAINING GAPS
 ----------------------------------------------------------------------
 
-1. PRISMA MIGRATIONS
-   Status: NO MIGRATION FILES
-   Issue: Database was created via db push, not migrate.
-   Impact: Cannot use `prisma migrate deploy` for schema changes.
-   Action: Run `prisma migrate dev --name init` to baseline, then
-           use migrations going forward for production schema changes.
-
-2. CRON JOB SCHEDULING
-   Status: HTTP-triggered only (manual or external scheduler)
-   Issue: No automatic scheduling configured. Endpoints exist but
-          need an external cron service (Vercel Cron, Railway Cron,
-          or cron-job.org) to trigger them.
-   Action: Configure Vercel Cron or external service to call:
-     POST /cron/rankings/daily    (daily at midnight)
-     POST /cron/rankings/monthly  (1st of each month)
-     POST /cron/rankings/yearly   (Jan 1st)
-     POST /cron/overdue-payments  (daily)
-
-3. CONTACT FORM ENDPOINT
-   Status: NOT IMPLEMENTED
-   Issue: Frontend contact form has no backend endpoint.
-   Action: Create POST /contact endpoint or integrate with email service.
-
-4. GOOGLE/FACEBOOK OAUTH
-   Status: PARTIALLY IMPLEMENTED
-   Issue: Frontend has OAuth buttons, backend has Pusher auth,
-          but full OAuth flow (Google/Facebook strategy) not confirmed.
-   Action: Implement Passport Google/Facebook strategies if needed.
-
-5. TWO-FACTOR AUTHENTICATION (2FA)
-   Status: NOT IMPLEMENTED
-   Issue: Frontend settings page references 2FA toggle but no
-          backend implementation found.
-   Action: Implement TOTP-based 2FA (e.g., speakeasy/otplib).
-
-6. EMAIL VERIFICATION FLOW
+1. EMAIL VERIFICATION FLOW
    Status: PARTIALLY IMPLEMENTED
    Issue: User has `emailVerified` field and email template exists,
-          but verification endpoint/flow may be incomplete.
-   Action: Verify GET /auth/verify-email?token=xxx works end-to-end.
+          but full end-to-end verification flow (send OTP on register,
+          enforce verified check on login) needs verification.
+   Action: Test GET /auth/verify-email?otp=xxx works end-to-end.
 
-7. EXPORT ENDPOINTS
-   Status: PARTIALLY IMPLEMENTED
-   Issue: Frontend references CSV/PDF export for tax, audit, payroll,
-          but dedicated export endpoints may need completion.
-   Action: Verify export endpoints return proper file downloads.
-
-8. AI FEATURES
-   Status: MODULE EXISTS, USAGE UNCLEAR
-   Issue: AI module with OpenAI integration exists but specific
-          features (property descriptions, insights) not documented.
-   Action: Document and expand AI-powered features.
-
-9. TEST COVERAGE
-   Status: MINIMAL
-   Issue: Limited unit/integration tests found.
-   Action: Add tests for critical paths: auth, sales, commission
-           calculation, payment processing.
-
-----------------------------------------------------------------------
-10.2 FRONTEND GAPS
-----------------------------------------------------------------------
-
-1. CONTACT FORM SUBMISSION
-   Status: PLACEHOLDER (shows success toast, no actual API call)
-   Action: Connect to backend contact endpoint once created.
-
-2. GOOGLE/FACEBOOK OAUTH
-   Status: UI BUTTONS PRESENT, NOT FUNCTIONAL
-   Issue: Buttons exist on login page but no OAuth redirect flow.
-   Action: Implement OAuth redirect to backend OAuth endpoints.
-
-3. PASSWORD RESET PAGES
-   Status: PAGES EXIST, NEED VERIFICATION
-   Issue: forgot-password and reset-password pages exist but
-          full end-to-end flow needs verification.
-   Action: Test complete flow: request -> email -> reset.
-
-4. TERMS & PRIVACY PAGES
+2. TERMS & PRIVACY PAGES
    Status: NOT IMPLEMENTED
-   Issue: Registration links to /terms and /privacy but pages
-          don't exist.
+   Issue: Registration links to /terms and /privacy but pages don't exist.
    Action: Create pages or link to CMS-managed content.
 
-5. NOTIFICATION PREFERENCES
-   Status: UI REFERENCES BUT NO BACKEND
-   Issue: Settings pages mention notification preferences but
-          no backend endpoint for preferences storage.
-   Action: Add notification preference CRUD to settings module.
-
-6. THEME/BRANDING PER TENANT
+3. THEME/BRANDING PER TENANT
    Status: PARTIALLY IMPLEMENTED
-   Issue: CMS has branding editor (logo, colors) but theme
-          isn't fully applied dynamically across all pages.
-   Action: Apply company primaryColor as CSS custom property.
+   Issue: CMS has branding editor (logo, colors) but primaryColor isn't
+          fully applied as a CSS custom property across all pages.
+   Action: Apply company primaryColor as CSS variable at the layout level.
 
-7. SEARCH FUNCTIONALITY IN HEADER
-   Status: UI PRESENT, NOT CONNECTED
-   Issue: Header search bar exists but no global search endpoint.
-   Action: Implement global search across properties, users, sales.
+4. OAUTH BUTTONS (FRONTEND)
+   Status: UI PRESENT, BACKEND DONE
+   Issue: Google/Facebook OAuth strategies exist in the backend but the
+          frontend OAuth redirect flow is not yet wired up.
+   Action: Implement redirect to /auth/oauth/google and /auth/oauth/facebook
+           from the login page OAuth buttons.
 
-8. OFFLINE PWA FUNCTIONALITY
-   Status: BASIC
-   Issue: Service worker registered, offline page exists, but
-          no meaningful offline data caching strategy.
-   Action: Implement Workbox runtime caching for key API responses.
+5. TEST COVERAGE
+   Status: PARTIAL (unit tests for key services only)
+   Action: Expand integration tests, add E2E tests for critical paths
+           (registration, check-in, sales flow, commission calculation).
 
 ----------------------------------------------------------------------
-10.3 INFRASTRUCTURE GAPS
+10.2 KNOWN BEHAVIOURS (NOT BUGS)
 ----------------------------------------------------------------------
 
-1. AUTOMATED TESTING PIPELINE
-   Status: CI runs lint + basic test, but test coverage is minimal.
-   Action: Write comprehensive test suites, add coverage thresholds.
+- AbortError: The play() request was interrupted by a call to pause()
+  Source: html5-qrcode scanner when stopped mid-initialization.
+  Impact: Console warning only, no functional impact.
 
-2. DATABASE BACKUP STRATEGY
-   Status: NOT IMPLEMENTED
-   Issue: Frontend settings reference backup/restore but no
-          backend implementation.
-   Action: Implement automated backups via Supabase or pg_dump.
-
-3. MONITORING & ALERTING
-   Status: NOT IMPLEMENTED
-   Issue: No APM, error tracking, or uptime monitoring.
-   Action: Add Sentry for error tracking, UptimeRobot for uptime.
-
-4. RATE LIMITING PER ENDPOINT
-   Status: GLOBAL ONLY
-   Issue: Same rate limit for all endpoints. Login/register
-          should have stricter limits.
-   Action: Add per-endpoint rate limiting.
-
-5. CDN FOR STATIC ASSETS
-   Status: NOT CONFIGURED
-   Issue: Images served directly from S3/backend.
-   Action: Configure CloudFront or Vercel Image Optimization.
-
-6. LOGGING & LOG AGGREGATION
-   Status: CONSOLE LOGGING ONLY
-   Issue: No centralized log aggregation service.
-   Action: Add structured logging with a service like Datadog/Logtail.
+- TransformInterceptor response flattening:
+  Paginated service responses { data: [], meta: {} } are lifted to top-level
+  by TransformInterceptor. Frontend must read res.data and res.meta (not
+  res.data.data / res.data.meta).
 
 ================================================================================
 11. MODULE-BY-MODULE STATUS MATRIX
@@ -1022,9 +1128,9 @@ Environment Variables (60+):
 Module                    Backend    Frontend   Real API   Status
 ========================  =========  =========  =========  =================
 Auth (Login/Register)     DONE       DONE       YES        PRODUCTION READY
-Auth (Password Reset)     DONE       DONE       YES        NEEDS TESTING
-Auth (OAuth Google/FB)    PARTIAL    UI ONLY    PARTIAL    NEEDS WORK
-Auth (2FA)                MISSING    UI ONLY    NO         NOT STARTED
+Auth (Password Reset)     DONE       DONE       YES        PRODUCTION READY
+Auth (OAuth Google/FB)    DONE       UI ONLY    PARTIAL    FRONTEND WIRING NEEDED
+Auth (2FA)                DONE       DONE       YES        PRODUCTION READY
 User Management           DONE       DONE       YES        PRODUCTION READY
 Property CRUD             DONE       DONE       YES        PRODUCTION READY
 Property Listings         DONE       DONE       YES        PRODUCTION READY
@@ -1048,7 +1154,7 @@ Calls (WebRTC)            DONE       DONE       YES        PRODUCTION READY
 Callout System            DONE       DONE       YES        PRODUCTION READY
 CMS (Content Mgmt)        DONE       DONE       YES        PRODUCTION READY
 Gallery                   DONE       DONE       YES        PRODUCTION READY
-File Upload               DONE       DONE       YES        PRODUCTION READY
+File Upload + CDN         DONE       DONE       YES        PRODUCTION READY
 Awards System             DONE       DONE       YES        PRODUCTION READY
 Admin Dashboard           DONE       DONE       YES        PRODUCTION READY
 Admin Analytics           DONE       DONE       YES        PRODUCTION READY
@@ -1058,14 +1164,106 @@ Staff Dashboard           DONE       DONE       YES        PRODUCTION READY
 Super-Admin Dashboard     DONE       DONE       YES        PRODUCTION READY
 Multi-Tenant (Companies)  DONE       DONE       YES        PRODUCTION READY
 Audit Logging             DONE       DONE       YES        PRODUCTION READY
-Cron Jobs                 DONE       N/A        YES        NEEDS SCHEDULER
-Contact Form              MISSING    UI ONLY    NO         NOT STARTED
+Cron Jobs                 DONE       N/A        YES        PRODUCTION READY
+Contact Form              DONE       DONE       YES        PRODUCTION READY
+Global Search             DONE       DONE       YES        PRODUCTION READY
+Export (CSV/XLSX)         DONE       DONE       YES        PRODUCTION READY
+AI Features               DONE       DONE       YES        PRODUCTION READY
+2FA (TOTP)                DONE       DONE       YES        PRODUCTION READY
+DB Backups (Scripts)      DONE       N/A        N/A        SCRIPTS READY
+Monitoring (Sentry)       DONE       N/A        N/A        NEEDS DSN CONFIG
+Log Aggregation           DONE       N/A        N/A        NEEDS TOKEN CONFIG
+Event Management          DONE       DONE       YES        PRODUCTION READY
+Event Registration Email  DONE       N/A        YES        PRODUCTION READY
+Event QR Check-in         DONE       DONE       YES        PRODUCTION READY
+DB Migrations             DONE       N/A        N/A        BASELINED
+Automated Tests           PARTIAL    MINIMAL    N/A        NEEDS EXPANSION
 Terms/Privacy Pages       N/A        MISSING    N/A        NOT STARTED
-Global Search             MISSING    UI ONLY    NO         NOT STARTED
-DB Migrations             MISSING    N/A        N/A        NEEDS BASELINE
-Automated Tests           MINIMAL    MINIMAL    N/A        NEEDS WORK
-Monitoring                MISSING    MISSING    N/A        NOT STARTED
-DB Backups                MISSING    UI ONLY    NO         NOT STARTED
+OAuth Frontend Wiring     DONE       PARTIAL    PARTIAL    WIRING NEEDED
+Email Verification E2E    PARTIAL    PARTIAL    PARTIAL    NEEDS TESTING
+
+================================================================================
+12. RECENT CHANGES (2026-03-14 to 2026-03-18)
+================================================================================
+
+----------------------------------------------------------------------
+2026-03-14 to 2026-03-16 (Phases 1–16)
+----------------------------------------------------------------------
+
+Phase 1  - Database migrations baselined (prisma migrate)
+Phase 2  - Vercel cron schedules added to backend/vercel.json
+Phase 3  - Contact form endpoint + email (POST /contact, rate limited 3/min)
+Phase 4  - Google + Facebook OAuth (Passport strategies, graceful degradation)
+Phase 5  - TOTP 2FA (RFC 6238, 8 backup codes, no external lib)
+Phase 6  - Global search module (GET /search, role-scoped results)
+Phase 7  - Notification preferences (GET/PUT /settings/notifications)
+Phase 8  - Export module (sales/tax/payroll/audit/commission → CSV/XLSX)
+Phase 9  - AI module (OpenAI + rule-based fallbacks for 4 endpoints)
+Phase 10 - Sentry error tracking (common/services/sentry.service.ts)
+Phase 11 - DB backup scripts (backend/scripts/backup.sh + restore.sh)
+Phase 12 - Per-endpoint rate limiting (login 5/min, register 3/min, etc.)
+Phase 13 - CDN image optimization (sharp → WebP, CdnService in UploadModule)
+Phase 14 - Structured JSON logging (LoggingInterceptor + Logtail integration)
+Phase 15 - Unit test spec files for twofa, search, contact, settings services
+Phase 16 - PWA confirmed (frontend/public/sw.js with Workbox, already existed)
+
+----------------------------------------------------------------------
+2026-03-17 — Phase 17: Event Management System
+----------------------------------------------------------------------
+
+Database:
+  - 4 new Prisma models: Event, EventFormField, EventRegistration, EventAnalytics
+  - 4 new enums: EventLocationType, EventStatus, RegistrationStatus, FormFieldType
+  - Migration: backend/prisma/migrations/20260317000000_add_event_system/
+
+Backend (src/modules/event/):
+  - EventModule, EventController, EventService
+  - RegistrationService (public registration + QR check-in)
+  - QrService (JWT token signing, QR PNG generation)
+  - EventAnalyticsService (view + registration + check-in metrics, cached 120s)
+  - DTOs: CreateEventDto, UpdateEventDto, CreateRegistrationDto, CheckInDto
+  - Unit tests: event.service.spec.ts, registration.service.spec.ts
+
+Frontend:
+  - /event/[slug] — public event page (form builder rendered, QR on success)
+  - /dashboard/admin/events — list with publish/close/delete
+  - /dashboard/admin/events/create — event + custom form builder
+  - /dashboard/admin/events/[id] — edit event
+  - /dashboard/admin/events/[id]/registrations — manage registrations, CSV export
+  - /dashboard/admin/events/[id]/checkin — camera QR scanner + manual entry
+  - Admin sidebar: "Events" link added to Content & Comms group
+  - Homepage: Upcoming Events section (parallel API fetch with CMS)
+
+----------------------------------------------------------------------
+2026-03-18 — Bug Fixes + Registration Email
+----------------------------------------------------------------------
+
+Fix: Admin events page crash
+  - Root cause: Frontend read res.data.data / res.data.meta.totalPages but
+    TransformInterceptor flattens paginated responses to top-level.
+  - Fix: Changed to res.data and res.meta?.totalPages.
+  - Affected: admin/events/page.tsx, admin/events/[id]/registrations/page.tsx
+
+Fix: QR check-in 400 errors (camera scan path)
+  - Root cause: qrService.verifyToken() was throwing on Vercel due to JWT
+    secret mismatch between signing time (registration) and verify time
+    (check-in) in different serverless invocations.
+  - Fix: Removed JWT signature re-verification from check-in; rely on DB
+    lookup by qrCodeToken alone (token is unguessable 200+ char string).
+  - File: backend/src/modules/event/registration.service.ts
+
+Fix: Manual check-in "Invalid or tampered QR code"
+  - Root cause: Check-in endpoint only accepted JWT tokens.
+  - Fix: Added regex detection of EVT-... registration codes; those bypass
+    JWT path and go straight to findFirst({ registrationCode }).
+  - File: backend/src/modules/event/registration.service.ts
+
+Feature: Registration confirmation email
+  - New method: MailService.sendEventRegistrationEmail()
+  - QR code embedded as CID inline attachment (not data URI, avoids blockers)
+  - Sent fire-and-forget after successful registration (won't block response)
+  - MailService exported from QueueModule (@Global) for injection everywhere
+  - Files: mail.service.ts, queue.module.ts, registration.service.ts
 
 ================================================================================
 LEGEND:
@@ -1075,7 +1273,7 @@ LEGEND:
   UI ONLY        = Frontend UI exists but no backend support
   NEEDS TESTING  = Implemented but not fully verified
   NEEDS WORK     = Requires significant additional development
-  NEEDS BASELINE = Needs initial setup/configuration
+  NEEDS CONFIG   = Implemented but requires env var to activate
   NOT STARTED    = No work done yet
 ================================================================================
 

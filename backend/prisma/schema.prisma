@@ -123,6 +123,7 @@ enum MessageType {
   FILE
   PROPERTY
   SYSTEM
+  VOICE
 }
 
 enum DocumentType {
@@ -405,6 +406,10 @@ model User {
   // Raffle
   raffleCodes RaffleCode[]
 
+  // CRM
+  crmActivitiesAsAgent  CrmActivity[] @relation("CrmAgent")
+  crmActivitiesAsClient CrmActivity[] @relation("CrmClient")
+
   @@index([email])
   @@index([role])
   @@index([status])
@@ -496,6 +501,11 @@ model ClientProfile {
   clientOfMonthCount Int             @default(0)
   clientOfYearCount  Int             @default(0)
 
+  // CRM engagement
+  lastContactedAt    DateTime?
+  lastMessageSnippet String?
+  engagementScore    Int             @default(0)
+
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
@@ -506,6 +516,8 @@ model ClientProfile {
   rankings           ClientRanking[]
 
   @@index([realtorId])
+  @@index([engagementScore])
+  @@index([lastContactedAt])
   @@map("client_profiles")
 }
 
@@ -890,24 +902,62 @@ model ChatRoom {
 }
 
 model Message {
-  id          String      @id @default(uuid())
-  roomId      String
-  room        ChatRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  senderId    String
-  sender      User        @relation("SentMessages", fields: [senderId], references: [id])
+  id           String        @id @default(uuid())
+  roomId       String
+  room         ChatRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId     String
+  sender       User          @relation("SentMessages", fields: [senderId], references: [id])
 
-  content     String
-  type        MessageType @default(TEXT)
-  attachments Json?       // Array of attachment objects
-  readBy      String[]    @default([])
+  content      String
+  type         MessageType   @default(TEXT)
+  attachments  Json?         // Array of attachment objects
+  metadata     Json?         // Extra metadata (voice duration, waveform, file size, etc.)
+  readBy       String[]      @default([])
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  voiceMessage VoiceMessage?
 
   @@index([roomId])
   @@index([senderId])
   @@index([createdAt])
   @@map("messages")
+}
+
+model VoiceMessage {
+  id            String   @id @default(uuid())
+  messageId     String   @unique
+  message       Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  audioUrl      String
+  duration      Int      // seconds
+  waveform      Json     // Float[] — 40 amplitude values 0.0–1.0 for waveform rendering
+  transcription String?  // future AI hook
+
+  createdAt     DateTime @default(now())
+
+  @@map("voice_messages")
+}
+
+model CrmActivity {
+  id           String   @id @default(uuid())
+  agentId      String   // staff/realtor/admin who initiated
+  agent        User     @relation("CrmAgent", fields: [agentId], references: [id])
+  clientId     String   // client user id
+  client       User     @relation("CrmClient", fields: [clientId], references: [id])
+
+  activityType String   // chat | voice_note | follow_up | deal_update | call
+  referenceId  String?  // roomId or messageId
+  notes        String?
+
+  createdAt    DateTime @default(now())
+
+  @@index([agentId])
+  @@index([clientId])
+  @@index([createdAt])
+  @@index([activityType])
+  @@map("crm_activities")
 }
 
 model Notification {

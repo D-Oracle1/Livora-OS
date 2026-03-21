@@ -112,6 +112,20 @@ export const api = {
     return response.json();
   },
 
+  async postForm<T = any>(endpoint: string, formData: FormData): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: formData,
+    });
+    if (response.status === 401) { handleUnauthorized(); throw new Error('Unauthorized'); }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(error.message || 'Request failed');
+    }
+    return response.json();
+  },
+
   async uploadFiles(endpoint: string, files: File[], fieldName = 'files'): Promise<string[]> {
     const formData = new FormData();
     files.forEach((file) => {

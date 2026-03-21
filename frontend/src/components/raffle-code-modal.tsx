@@ -44,8 +44,8 @@ export function RaffleCodeModal() {
 
   const fetchCodes = useCallback(async () => {
     try {
-      const res = await api.get<{ data: RaffleCode[] }>('/raffle/my-active-code');
-      const all: RaffleCode[] = res.data?.data ?? (res.data as any) ?? [];
+      const res = await api.get<any>('/raffle/my-active-code');
+      const all: RaffleCode[] = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
       const dismissed = getDismissed();
       const pending = all.filter((c) => !dismissed.includes(c.id) && c.session?.isPublished);
       setCodes(pending);

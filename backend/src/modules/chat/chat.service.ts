@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../database/prisma.service';
 import { MessageType, UserRole } from '@prisma/client';
 import { RealtimeService } from '../../common/services/realtime.service';
+import { CrmService } from './crm.service';
 
 // Default chat zone policies: which roles each role can chat with
 // SUPER_ADMIN is intentionally excluded from all tenant-visible role lists —
@@ -15,15 +16,34 @@ const DEFAULT_CHAT_ZONES: Record<string, UserRole[]> = {
   CLIENT: [UserRole.ADMIN, UserRole.STAFF, UserRole.GENERAL_OVERSEER],
 };
 
+const MESSAGE_SELECT = {
+  id: true,
+  roomId: true,
+  senderId: true,
+  content: true,
+  type: true,
+  attachments: true,
+  metadata: true,
+  readBy: true,
+  createdAt: true,
+  updatedAt: true,
+  sender: {
+    select: { id: true, firstName: true, lastName: true, avatar: true },
+  },
+  voiceMessage: {
+    select: { audioUrl: true, duration: true, waveform: true },
+  },
+} as const;
+
 @Injectable()
 export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeService: RealtimeService,
+    private readonly crmService: CrmService,
   ) {}
 
   async createRoom(creatorId: string, participantIds: string[], name?: string) {
-    // Include creator in participants
     const allParticipants = [...new Set([creatorId, ...participantIds])];
 
     if (allParticipants.length < 2) {
@@ -35,7 +55,6 @@ export class ChatService {
       const existingRoom = await this.prisma.chatRoom.findFirst({
         where: {
           type: 'DIRECT',
-          // Both users must be participants AND no third participant exists
           AND: [
             { participants: { some: { id: allParticipants[0] } } },
             { participants: { some: { id: allParticipants[1] } } },
@@ -49,9 +68,7 @@ export class ChatService {
           messages: {
             orderBy: { createdAt: 'desc' },
             take: 1,
-            include: {
-              sender: { select: { id: true, firstName: true, lastName: true, avatar: true } },
-            },
+            select: MESSAGE_SELECT,
           },
         },
       });
@@ -86,9 +103,7 @@ export class ChatService {
   async getRooms(userId: string) {
     const rooms = await this.prisma.chatRoom.findMany({
       where: {
-        participants: {
-          some: { id: userId },
-        },
+        participants: { some: { id: userId } },
         type: { not: 'SUPPORT' },
       },
       include: {
@@ -98,6 +113,7 @@ export class ChatService {
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
+          select: MESSAGE_SELECT,
         },
       },
       orderBy: { lastMessageAt: 'desc' },
@@ -105,7 +121,6 @@ export class ChatService {
 
     if (rooms.length === 0) return [];
 
-    // Batch unread counts in a single query instead of N+1
     const roomIds = rooms.map((r) => r.id);
     const unreadCounts = await this.prisma.message.groupBy({
       by: ['roomId'],
@@ -130,9 +145,7 @@ export class ChatService {
     const room = await this.prisma.chatRoom.findFirst({
       where: {
         id: roomId,
-        participants: {
-          some: { id: userId },
-        },
+        participants: { some: { id: userId } },
       },
       include: {
         participants: {
@@ -141,23 +154,45 @@ export class ChatService {
       },
     });
 
-    if (!room) {
-      throw new NotFoundException('Chat room not found');
-    }
-
+    if (!room) throw new NotFoundException('Chat room not found');
     return room;
   }
 
-  async getMessages(roomId: string, userId: string, query: {
-    page?: number;
-    limit?: number;
-  }) {
-    const page = Math.max(1, Number(query.page) || 1);
+  /**
+   * Cursor-based message pagination.
+   * cursor = ISO timestamp of the OLDEST message already loaded (go further back in time).
+   * Falls back to page-based for backwards compatibility when cursor is absent.
+   */
+  async getMessages(
+    roomId: string,
+    userId: string,
+    query: { page?: number; limit?: number; cursor?: string },
+  ) {
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
-    const skip = (page - 1) * limit;
-
-    // Verify user is participant and fetch messages in parallel
     const participantFilter = { room: { participants: { some: { id: userId } } } };
+
+    if (query.cursor) {
+      // Cursor mode: fetch messages BEFORE the cursor timestamp
+      const cursorDate = new Date(query.cursor);
+      if (isNaN(cursorDate.getTime())) throw new BadRequestException('Invalid cursor value');
+
+      const messages = await this.prisma.message.findMany({
+        where: { roomId, ...participantFilter, createdAt: { lt: cursorDate } },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: MESSAGE_SELECT,
+      });
+
+      const reversed = messages.reverse();
+      const nextCursor = reversed.length > 0 ? reversed[0].createdAt.toISOString() : null;
+      const hasMore = messages.length === limit;
+
+      return { data: reversed, meta: { cursor: nextCursor, hasMore, limit } };
+    }
+
+    // Legacy offset pagination
+    const page = Math.max(1, Number(query.page) || 1);
+    const skip = (page - 1) * limit;
 
     const [messages, total] = await Promise.all([
       this.prisma.message.findMany({
@@ -165,17 +200,12 @@ export class ChatService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          sender: {
-            select: { id: true, firstName: true, lastName: true, avatar: true },
-          },
-        },
+        select: MESSAGE_SELECT,
       }),
       this.prisma.message.count({ where: { roomId, ...participantFilter } }),
     ]);
 
     if (messages.length === 0 && total === 0 && page === 1) {
-      // Check if room exists at all — could be no messages yet or unauthorized
       const room = await this.prisma.chatRoom.findFirst({
         where: { id: roomId, participants: { some: { id: userId } } },
         select: { id: true },
@@ -185,25 +215,15 @@ export class ChatService {
 
     return {
       data: messages.reverse(),
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
 
   async sendMessage(
     roomId: string,
     senderId: string,
-    data: {
-      content: string;
-      type?: MessageType;
-      attachments?: any[];
-    },
+    data: { content: string; type?: MessageType; attachments?: any[] },
   ) {
-    // Verify user is participant
     await this.getRoom(roomId, senderId);
 
     const message = await this.prisma.message.create({
@@ -215,65 +235,106 @@ export class ChatService {
         attachments: data.attachments,
         readBy: [senderId],
       },
-      include: {
-        sender: {
-          select: { id: true, firstName: true, lastName: true, avatar: true },
-        },
-      },
+      select: MESSAGE_SELECT,
     });
 
-    // Update room's last message time
     await this.prisma.chatRoom.update({
       where: { id: roomId },
       data: { lastMessageAt: new Date() },
     });
 
-    // Get room participants to send real-time update
-    const room = await this.prisma.chatRoom.findUnique({
-      where: { id: roomId },
-      include: {
-        participants: {
-          select: { id: true },
+    await this.broadcastMessage(roomId, senderId, message);
+
+    // CRM: log if a CLIENT is in this room
+    const clientId = await this.crmService.resolveClientInRoom(roomId, senderId);
+    if (clientId) {
+      this.crmService.logActivity({
+        agentId: senderId,
+        clientId,
+        activityType: 'chat',
+        referenceId: roomId,
+        notes: data.content.slice(0, 200),
+      }).catch(() => {});
+      this.crmService.updateEngagement(clientId, data.content).catch(() => {});
+    }
+
+    return message;
+  }
+
+  /** Send a voice note message — requires pre-processed voice data from VoiceService */
+  async sendVoiceMessage(
+    roomId: string,
+    senderId: string,
+    voiceData: { audioUrl: string; duration: number; waveform: number[] },
+  ) {
+    await this.getRoom(roomId, senderId);
+
+    const message = await this.prisma.message.create({
+      data: {
+        roomId,
+        senderId,
+        content: `🎤 Voice note (${voiceData.duration}s)`,
+        type: MessageType.VOICE,
+        readBy: [senderId],
+        metadata: {
+          audioUrl: voiceData.audioUrl,
+          duration: voiceData.duration,
+          waveform: voiceData.waveform,
+        },
+        voiceMessage: {
+          create: {
+            audioUrl: voiceData.audioUrl,
+            duration: voiceData.duration,
+            waveform: voiceData.waveform,
+          },
         },
       },
+      select: MESSAGE_SELECT,
     });
 
-    // Send to all participants via realtime broadcast
-    if (room) {
-      await Promise.all(
-        room.participants
-          .filter((p) => p.id !== senderId)
-          .map((p) =>
-            this.realtimeService.sendToUser(p.id, 'chat:message', {
-              roomId,
-              message,
-            }),
-          ),
-      );
+    await this.prisma.chatRoom.update({
+      where: { id: roomId },
+      data: { lastMessageAt: new Date() },
+    });
+
+    await this.broadcastMessage(roomId, senderId, message);
+
+    // CRM: log voice note
+    const clientId = await this.crmService.resolveClientInRoom(roomId, senderId);
+    if (clientId) {
+      this.crmService.logActivity({
+        agentId: senderId,
+        clientId,
+        activityType: 'voice_note',
+        referenceId: message.id,
+        notes: `Voice note (${voiceData.duration}s)`,
+      }).catch(() => {});
+      this.crmService.updateEngagement(clientId, `Voice note (${voiceData.duration}s)`).catch(() => {});
     }
 
     return message;
   }
 
   async markAsRead(roomId: string, userId: string) {
-    // Verify user is participant
     await this.getRoom(roomId, userId);
-
-    // Mark all unread messages as read
     await this.prisma.message.updateMany({
-      where: {
-        roomId,
-        NOT: {
-          readBy: { has: userId },
-        },
-      },
-      data: {
-        readBy: {
-          push: userId,
-        },
-      },
+      where: { roomId, NOT: { readBy: { has: userId } } },
+      data: { readBy: { push: userId } },
     });
+    return { success: true };
+  }
 
+  /** Broadcast typing indicator via Supabase Realtime */
+  async broadcastTyping(roomId: string, userId: string, isTyping: boolean) {
+    try {
+      await this.realtimeService.sendToChatRoom(roomId, 'chat:typing', {
+        roomId,
+        userId,
+        isTyping,
+      });
+    } catch {
+      // Non-critical
+    }
     return { success: true };
   }
 
@@ -282,13 +343,11 @@ export class ChatService {
   }
 
   async searchUsers(currentUserId: string, callerRole: string, search: string) {
-    if (!search || search.trim().length < 2) {
-      return [];
-    }
+    if (!search || search.trim().length < 2) return [];
 
     const allowedRoles = this.getAllowedRoles(callerRole);
 
-    const users = await this.prisma.user.findMany({
+    return this.prisma.user.findMany({
       where: {
         id: { not: currentUserId },
         status: 'ACTIVE',
@@ -299,18 +358,9 @@ export class ChatService {
           { email: { contains: search, mode: 'insensitive' } },
         ],
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-        avatar: true,
-      },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, avatar: true },
       take: 20,
     });
-
-    return users;
   }
 
   async getContacts(currentUserId: string, callerRole: string) {
@@ -322,19 +372,11 @@ export class ChatService {
         status: 'ACTIVE',
         role: { in: allowedRoles },
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-        avatar: true,
-      },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, avatar: true },
       orderBy: [{ role: 'asc' }, { firstName: 'asc' }],
       take: 100,
     });
 
-    // Group by role
     const grouped: Record<string, typeof users> = {};
     for (const user of users) {
       const role = user.role;
@@ -346,30 +388,18 @@ export class ChatService {
   }
 
   async deleteRoom(roomId: string, userId: string) {
-    const room = await this.getRoom(roomId, userId);
-
-    // Only allow deletion if user is participant
-    await this.prisma.chatRoom.delete({
-      where: { id: roomId },
-    });
-
+    await this.getRoom(roomId, userId);
+    await this.prisma.chatRoom.delete({ where: { id: roomId } });
     return { message: 'Chat room deleted' };
   }
 
   async addParticipants(roomId: string, userId: string, participantIds: string[]) {
     const room = await this.getRoom(roomId, userId);
-
-    if (room.type === 'DIRECT') {
-      throw new BadRequestException('Cannot add participants to direct chat');
-    }
+    if (room.type === 'DIRECT') throw new BadRequestException('Cannot add participants to direct chat');
 
     await this.prisma.chatRoom.update({
       where: { id: roomId },
-      data: {
-        participants: {
-          connect: participantIds.map((id) => ({ id })),
-        },
-      },
+      data: { participants: { connect: participantIds.map((id) => ({ id })) } },
     });
 
     return this.getRoom(roomId, userId);
@@ -377,25 +407,17 @@ export class ChatService {
 
   async removeParticipant(roomId: string, userId: string, participantId: string) {
     const room = await this.getRoom(roomId, userId);
-
-    if (room.type === 'DIRECT') {
-      throw new BadRequestException('Cannot remove participants from direct chat');
-    }
+    if (room.type === 'DIRECT') throw new BadRequestException('Cannot remove participants from direct chat');
 
     await this.prisma.chatRoom.update({
       where: { id: roomId },
-      data: {
-        participants: {
-          disconnect: { id: participantId },
-        },
-      },
+      data: { participants: { disconnect: { id: participantId } } },
     });
 
     return this.getRoom(roomId, userId);
   }
 
   async startSupportChat(userId: string) {
-    // Check if user already has a support room
     const existingRoom = await this.prisma.chatRoom.findFirst({
       where: {
         type: 'SUPPORT',
@@ -405,31 +427,20 @@ export class ChatService {
         participants: {
           select: { id: true, firstName: true, lastName: true, avatar: true, role: true },
         },
-        messages: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-        },
+        messages: { orderBy: { createdAt: 'desc' }, take: 1, select: MESSAGE_SELECT },
       },
     });
 
     if (existingRoom) {
-      return {
-        ...existingRoom,
-        lastMessage: existingRoom.messages[0] || null,
-      };
+      return { ...existingRoom, lastMessage: existingRoom.messages[0] || null };
     }
 
-    // Get the user's info for room naming
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, firstName: true, lastName: true },
     });
+    if (!user) throw new NotFoundException('User not found');
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    // Find all active admin users
     const admins = await this.prisma.user.findMany({
       where: { role: UserRole.ADMIN, status: 'ACTIVE' },
       select: { id: true },
@@ -437,14 +448,11 @@ export class ChatService {
 
     const participantIds = [userId, ...admins.map((a) => a.id)];
 
-    // Create the support room
     const room = await this.prisma.chatRoom.create({
       data: {
         name: `Support - ${user.firstName} ${user.lastName}`,
         type: 'SUPPORT',
-        participants: {
-          connect: participantIds.map((id) => ({ id })),
-        },
+        participants: { connect: participantIds.map((id) => ({ id })) },
         lastMessageAt: new Date(),
       },
       include: {
@@ -454,7 +462,6 @@ export class ChatService {
       },
     });
 
-    // Send a system message
     await this.prisma.message.create({
       data: {
         roomId: room.id,
@@ -465,15 +472,12 @@ export class ChatService {
       },
     });
 
-    // Notify admins via realtime
     try {
       await this.realtimeService.sendToRole('ADMIN', 'support:new', {
         roomId: room.id,
         userName: `${user.firstName} ${user.lastName}`,
       });
-    } catch (e) {
-      // Non-critical, don't fail the request
-    }
+    } catch { /* non-critical */ }
 
     return { ...room, lastMessage: null };
   }
@@ -488,25 +492,17 @@ export class ChatService {
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          include: {
-            sender: {
-              select: { id: true, firstName: true, lastName: true },
-            },
-          },
+          select: MESSAGE_SELECT,
         },
       },
       orderBy: { lastMessageAt: 'desc' },
     });
 
-    // Get unread counts for all support rooms
     const roomIds = rooms.map((r) => r.id);
     const unreadCounts = roomIds.length > 0
       ? await this.prisma.message.groupBy({
           by: ['roomId'],
-          where: {
-            roomId: { in: roomIds },
-            NOT: { type: MessageType.SYSTEM },
-          },
+          where: { roomId: { in: roomIds }, NOT: { type: MessageType.SYSTEM } },
           _count: { id: true },
         })
       : [];
@@ -518,5 +514,24 @@ export class ChatService {
       lastMessage: room.messages[0] || null,
       messageCount: unreadMap.get(room.id) || 0,
     }));
+  }
+
+  // ── Private helpers ────────────────────────────────────────────────────────
+
+  private async broadcastMessage(roomId: string, senderId: string, message: any) {
+    const room = await this.prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      select: { participants: { select: { id: true } } },
+    });
+
+    if (room) {
+      await Promise.all(
+        room.participants
+          .filter((p) => p.id !== senderId)
+          .map((p) =>
+            this.realtimeService.sendToUser(p.id, 'chat:message', { roomId, message }),
+          ),
+      );
+    }
   }
 }

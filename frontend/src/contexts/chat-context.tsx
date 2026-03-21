@@ -15,6 +15,12 @@ export interface ChatParticipant {
   role?: string;
 }
 
+export interface VoiceMessageData {
+  audioUrl: string;
+  duration: number;
+  waveform: number[];
+}
+
 export interface ChatMessage {
   id: string;
   roomId: string;
@@ -23,9 +29,11 @@ export interface ChatMessage {
   content: string;
   type: string;
   attachments: any;
+  metadata: any;
   readBy: string[];
   createdAt: string;
   updatedAt: string;
+  voiceMessage?: VoiceMessageData;
 }
 
 export interface ChatRoom {
@@ -54,6 +62,7 @@ interface ChatContextValue {
   fetchRooms: () => Promise<void>;
   selectRoom: (room: ChatRoom) => Promise<void>;
   sendMessage: (content: string, type?: string, attachments?: string[]) => Promise<void>;
+  sendVoiceMessage: (blob: Blob, duration: number, mimeType: string) => Promise<void>;
   createRoom: (participantIds: string[], name?: string) => Promise<ChatRoom>;
   sendTyping: (isTyping: boolean) => void;
   setActiveRoom: (room: ChatRoom | null) => void;
@@ -194,6 +203,30 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const sendVoiceMessage = useCallback(async (blob: Blob, duration: number, mimeType: string) => {
+    if (!activeRoomRef.current) return;
+    const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'm4a' : 'webm';
+    const formData = new FormData();
+    formData.append('audio', blob, `voice.${ext}`);
+    formData.append('duration', String(duration));
+
+    const res = await api.postForm<any>(`/chat/rooms/${activeRoomRef.current}/voice`, formData);
+    const msg = res?.data ?? res;
+
+    setMessages((prev) => {
+      const updated = [...prev, msg];
+      if (activeRoomRef.current) messageCacheRef.current.set(activeRoomRef.current, updated);
+      return updated;
+    });
+    setRooms((prev) =>
+      prev.map((r) =>
+        r.id === activeRoomRef.current
+          ? { ...r, lastMessage: msg, lastMessageAt: msg.createdAt }
+          : r,
+      ),
+    );
+  }, []);
+
   const createRoom = useCallback(async (participantIds: string[], name?: string) => {
     const res = await api.post<any>('/chat/rooms', { participantIds, name });
     const newRoom = res?.data ?? res;
@@ -271,6 +304,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         fetchRooms,
         selectRoom,
         sendMessage,
+        sendVoiceMessage,
         createRoom,
         sendTyping,
         setActiveRoom,
