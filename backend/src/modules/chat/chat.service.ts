@@ -159,63 +159,64 @@ export class ChatService {
   }
 
   /**
-   * Cursor-based message pagination.
-   * cursor = ISO timestamp of the OLDEST message already loaded (go further back in time).
-   * Falls back to page-based for backwards compatibility when cursor is absent.
+   * Optimised message pagination.
+   *
+   * Access check: one fast COUNT on chatRoom (primary-key lookup + EXISTS on join table).
+   * Message fetch:  plain WHERE roomId=? — uses composite index (roomId, createdAt DESC).
+   *                 No cross-table JOIN on every message row.
+   *
+   * cursor = ISO timestamp of the OLDEST message already loaded → load older messages.
    */
   async getMessages(
     roomId: string,
     userId: string,
     query: { page?: number; limit?: number; cursor?: string },
   ) {
-    const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
-    const participantFilter = { room: { participants: { some: { id: userId } } } };
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 30));
+
+    // Single fast membership check — no JOIN on the message query itself
+    const isMember = await this.prisma.chatRoom.count({
+      where: { id: roomId, participants: { some: { id: userId } } },
+    });
+    if (!isMember) throw new NotFoundException('Chat room not found');
 
     if (query.cursor) {
-      // Cursor mode: fetch messages BEFORE the cursor timestamp
       const cursorDate = new Date(query.cursor);
       if (isNaN(cursorDate.getTime())) throw new BadRequestException('Invalid cursor value');
 
       const messages = await this.prisma.message.findMany({
-        where: { roomId, ...participantFilter, createdAt: { lt: cursorDate } },
+        where: { roomId, createdAt: { lt: cursorDate } }, // composite index hit
         take: limit,
         orderBy: { createdAt: 'desc' },
         select: MESSAGE_SELECT,
       });
 
       const reversed = messages.reverse();
-      const nextCursor = reversed.length > 0 ? reversed[0].createdAt.toISOString() : null;
-      const hasMore = messages.length === limit;
-
-      return { data: reversed, meta: { cursor: nextCursor, hasMore, limit } };
+      return {
+        data: reversed,
+        meta: {
+          cursor: reversed.length > 0 ? reversed[0].createdAt.toISOString() : null,
+          hasMore: messages.length === limit,
+          limit,
+        },
+      };
     }
 
-    // Legacy offset pagination
+    // Offset pagination (no COUNT — infer hasMore from result length)
     const page = Math.max(1, Number(query.page) || 1);
     const skip = (page - 1) * limit;
 
-    const [messages, total] = await Promise.all([
-      this.prisma.message.findMany({
-        where: { roomId, ...participantFilter },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        select: MESSAGE_SELECT,
-      }),
-      this.prisma.message.count({ where: { roomId, ...participantFilter } }),
-    ]);
-
-    if (messages.length === 0 && total === 0 && page === 1) {
-      const room = await this.prisma.chatRoom.findFirst({
-        where: { id: roomId, participants: { some: { id: userId } } },
-        select: { id: true },
-      });
-      if (!room) throw new NotFoundException('Chat room not found');
-    }
+    const messages = await this.prisma.message.findMany({
+      where: { roomId },           // composite index hit
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      select: MESSAGE_SELECT,
+    });
 
     return {
       data: messages.reverse(),
-      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      meta: { page, limit, hasMore: messages.length === limit },
     };
   }
 

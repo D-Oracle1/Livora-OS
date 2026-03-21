@@ -898,6 +898,8 @@ model ChatRoom {
   // Relations
   messages     Message[]
 
+  @@index([lastMessageAt(sort: Desc)])
+  @@index([type])
   @@map("chat_rooms")
 }
 
@@ -919,9 +921,8 @@ model Message {
 
   voiceMessage VoiceMessage?
 
-  @@index([roomId])
+  @@index([roomId, createdAt(sort: Desc)])  // composite — covers WHERE roomId=? ORDER BY createdAt DESC
   @@index([senderId])
-  @@index([createdAt])
   @@map("messages")
 }
 

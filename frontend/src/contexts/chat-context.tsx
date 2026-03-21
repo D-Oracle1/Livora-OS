@@ -80,6 +80,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const activeRoomRef = useRef<string | null>(null);
   const messageCacheRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  const cacheFetchedAtRef = useRef<Map<string, number>>(new Map()); // roomId → epoch ms
+  const CACHE_TTL_MS = 30_000; // treat cache as fresh for 30 s
 
   const isDemo = () => getToken() === 'demo-token';
 
@@ -112,9 +114,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     // Show cached messages instantly (no spinner if we have cache)
     const cached = messageCacheRef.current.get(room.id);
+    const cachedAt = cacheFetchedAtRef.current.get(room.id) ?? 0;
+    const isCacheFresh = Date.now() - cachedAt < CACHE_TTL_MS;
+
     if (cached && cached.length > 0) {
       setMessages(cached);
       setIsLoadingMessages(false);
+      if (isCacheFresh) {
+        // Skip network fetch — mark as read and return immediately
+        api.post(`/chat/rooms/${room.id}/read`).catch(() => {});
+        setRooms((prev) => prev.map((r) => (r.id === room.id ? { ...r, unreadCount: 0 } : r)));
+        return;
+      }
     } else {
       setMessages([]);
       setIsLoadingMessages(true);
@@ -157,6 +168,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (activeRoomRef.current === room.id) {
         setMessages(msgs);
         messageCacheRef.current.set(room.id, msgs);
+        cacheFetchedAtRef.current.set(room.id, Date.now());
       }
 
       // Mark as read (fire-and-forget)
@@ -185,7 +197,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       console.log('[Chat] Message sent:', msg?.id);
       setMessages((prev) => {
         const updated = [...prev, msg];
-        if (activeRoomRef.current) messageCacheRef.current.set(activeRoomRef.current, updated);
+        if (activeRoomRef.current) {
+          messageCacheRef.current.set(activeRoomRef.current, updated);
+          cacheFetchedAtRef.current.set(activeRoomRef.current, Date.now());
+        }
         return updated;
       });
 
@@ -215,7 +230,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     setMessages((prev) => {
       const updated = [...prev, msg];
-      if (activeRoomRef.current) messageCacheRef.current.set(activeRoomRef.current, updated);
+      if (activeRoomRef.current) {
+        messageCacheRef.current.set(activeRoomRef.current, updated);
+        cacheFetchedAtRef.current.set(activeRoomRef.current, Date.now());
+      }
       return updated;
     });
     setRooms((prev) =>
@@ -253,6 +271,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           if (prev.some((m) => m.id === data.message.id)) return prev;
           const updated = [...prev, data.message];
           messageCacheRef.current.set(data.roomId, updated);
+          cacheFetchedAtRef.current.set(data.roomId, Date.now());
           return updated;
         });
         api.post(`/chat/rooms/${data.roomId}/read`).catch(() => {});
