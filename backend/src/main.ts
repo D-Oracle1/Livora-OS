@@ -36,10 +36,9 @@ export async function configureApp(expressInstance?: express.Express) {
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   }));
-  // Vercel's edge CDN handles compression; skip in serverless to save CPU
-  if (!process.env.VERCEL) {
-    app.use(compression());
-  }
+  // Vercel CDN only compresses static assets — serverless JSON responses are NOT
+  // compressed automatically. Enable compression unconditionally.
+  app.use(compression());
 
   // CORS
   const allowedOrigins = [

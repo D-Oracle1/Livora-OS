@@ -18,10 +18,17 @@ import { tap } from 'rxjs/operators';
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
   private readonly SENSITIVE_PATHS = ['/auth/login', '/auth/register', '/auth/reset-password', '/auth/change-password'];
+  private readonly SKIP_PATHS = ['/health'];
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const { method, url, ip, user } = request;
+
+    // Skip logging for lightweight keepalive / health endpoints
+    if (this.SKIP_PATHS.some((p) => url.includes(p))) {
+      return next.handle() as any;
+    }
+
     const now = Date.now();
     const userId = user?.id || 'anonymous';
     const isSensitive = this.SENSITIVE_PATHS.some((p) => url.includes(p));
