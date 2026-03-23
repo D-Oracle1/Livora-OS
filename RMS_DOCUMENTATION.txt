@@ -1,7 +1,7 @@
 ================================================================================
  RMS PLATFORM - COMPREHENSIVE SOFTWARE DOCUMENTATION
  Realtors Management System - Enterprise PropTech Platform
- Generated: March 18, 2026
+ Generated: March 23, 2026
 ================================================================================
 
 TABLE OF CONTENTS
@@ -28,9 +28,9 @@ platform designed for real estate companies in Nigeria. It provides end-to-end
 management for realtors, clients, properties, sales, commissions, HR, and more.
 
 Key Statistics:
-  - 23+ backend modules
-  - 165+ API endpoints
-  - 80+ frontend pages across 7 route groups
+  - 24+ backend modules
+  - 175+ API endpoints
+  - 82+ frontend pages across 7 route groups
   - 5 user roles (SUPER_ADMIN, ADMIN, REALTOR, CLIENT, STAFF)
   - Multi-tenant architecture with isolated databases per company
   - Real-time features via Pusher WebSockets
@@ -38,6 +38,8 @@ Key Statistics:
   - Deployed on Vercel (frontend + backend serverless)
   - Event management with QR code check-in system
   - Registration confirmation emails with embedded QR codes
+  - WhatsApp-level chat: voice notes, waveform player, localStorage persistence
+  - CRM intelligence: engagement scoring, hot/cold lead ranking per client
 
 ================================================================================
 2. ARCHITECTURE OVERVIEW
@@ -46,7 +48,7 @@ Key Statistics:
 Multi-Tenant Architecture:
   - Master Database: Stores company/tenant records and super admin accounts
   - Tenant Database: Each company gets an isolated PostgreSQL database
-  - MongoDB: Used for real-time chat messages
+  - PostgreSQL: Also used for chat messages (migrated from MongoDB for consistency)
   - Redis: Caching layer and job queue (BullMQ)
 
 Request Flow:
@@ -76,7 +78,6 @@ Monorepo Structure:
 BACKEND:
   - Framework: NestJS 10 (TypeScript)
   - Database: PostgreSQL 16 (via Prisma ORM v5.22)
-  - Chat DB: MongoDB
   - Cache: Redis 7
   - Auth: Passport.js + JWT + bcrypt
   - Queue: BullMQ (email jobs)
@@ -84,7 +85,7 @@ BACKEND:
   - Email: Nodemailer (SMTP via Resend)
   - SMS: Twilio
   - Push: Firebase Cloud Messaging (FCM)
-  - Storage: AWS S3
+  - Storage: AWS S3 (images/documents), Vercel Blob (voice messages)
   - AI: OpenAI (with graceful rule-based fallbacks)
   - QR Codes: qrcode package (JWT-signed tokens)
   - API Docs: Swagger/OpenAPI
@@ -129,7 +130,7 @@ TENANT DATABASE (schema.prisma) - Per Company:
     RegistrationStatus (pending, approved, rejected),
     FormFieldType (text, email, phone, number, textarea, select, checkbox, date)
 
-  MODELS (41):
+  MODELS (43):
     Core:
       User, AdminProfile, RealtorProfile, ClientProfile, StaffProfile
 
@@ -141,7 +142,17 @@ TENANT DATABASE (schema.prisma) - Per Company:
       LoyaltyPoints, Ranking, StaffRanking, ClientRanking, MonthlyAward
 
     Communication:
-      ChatRoom, Message, Notification
+      ChatRoom, Message, Notification,
+      VoiceMessage  - 1:1 with Message; audioUrl (Vercel Blob), duration (ms),
+                      waveform (Float[], 40 amplitude bars, normalised 0.10–0.95)
+      CrmActivity   - logs every chat/voice interaction per client;
+                      fields: id, clientId, realtorId, activityType, roomId,
+                      messageId, metadata, createdAt
+
+    Chat Performance Indexes (migration 20260322000000):
+      @@index([roomId, createdAt(sort: Desc)])  -- covers hot message query
+      @@index([lastMessageAt(sort: Desc)])       -- chat_rooms ordered list
+      @@index([type])                            -- room type filter
 
     Staff & HR:
       Department, StaffPermission, Attendance, LeaveRequest,
@@ -450,21 +461,57 @@ Notification Types (20+):
 ----------------------------------------------------------------------
 5.16 CHAT MODULE (src/modules/chat/)
 ----------------------------------------------------------------------
-Status: FULLY IMPLEMENTED
+Status: FULLY IMPLEMENTED (WhatsApp-level messaging)
 
-Endpoints:
-  GET    /chat/rooms               - Get user's chat rooms
-  POST   /chat/rooms               - Create room (DIRECT or GROUP)
-  GET    /chat/rooms/:id           - Room details
-  GET    /chat/rooms/:id/messages  - Message history (paginated)
-  POST   /chat/rooms/:id/messages  - Send message
-  POST   /chat/rooms/:id/read      - Mark room as read
-  POST   /chat/rooms/:id/participants    - Add participants
-  DELETE /chat/rooms/:id/participants/:pid - Remove participant
-  DELETE /chat/rooms/:id           - Delete room
+Services:
+  ChatService   - Room CRUD, message send/fetch, read receipts, typing broadcast
+  VoiceService  - Audio upload to Vercel Blob, waveform generation (40-bar sampling)
+  CrmService    - Activity logging, engagement scoring, lead classification
 
-Message Types: TEXT, IMAGE, FILE, PROPERTY, SYSTEM
-Database: MongoDB (separate from PostgreSQL)
+Endpoints — Messaging:
+  GET    /chat/rooms                         - Get user's chat rooms (ordered by lastMessageAt)
+  POST   /chat/rooms                         - Create room (DIRECT or GROUP)
+  GET    /chat/rooms/:id                     - Room details
+  GET    /chat/rooms/:id/messages            - Message history (cursor-based pagination)
+    Query: limit (default 30), cursor (ISO timestamp of oldest loaded message)
+    Returns: messages ordered oldest→newest (reversed from DB fetch)
+  POST   /chat/rooms/:id/messages            - Send text/file/image message
+  POST   /chat/rooms/:id/voice              - Send voice message (multipart/form-data)
+    Fields: audio (Blob), duration (ms)
+    Uploads audio to Vercel Blob, generates 40-bar waveform, creates VOICE message
+  POST   /chat/rooms/:id/read               - Mark room as read (unreadCount → 0)
+  POST   /chat/rooms/:id/typing             - Broadcast typing indicator via Pusher
+  POST   /chat/rooms/:id/participants       - Add participants
+  DELETE /chat/rooms/:id/participants/:pid  - Remove participant
+  DELETE /chat/rooms/:id                    - Delete room
+
+Endpoints — CRM Intelligence (ADMIN/REALTOR only):
+  GET    /chat/crm/hot-leads                - Clients with score ≥ 50 (most engaged)
+  GET    /chat/crm/cold-leads               - Clients with score ≤ 20 (least engaged)
+  GET    /chat/crm/follow-ups               - Clients with no activity in 7+ days
+  GET    /chat/crm/client/:clientId         - Full client CRM profile + engagement score
+  GET    /chat/crm/client/:clientId/activities - Paginated activity history
+
+Message Types: TEXT, IMAGE, FILE, PROPERTY, SYSTEM, VOICE
+Database: PostgreSQL (via Prisma — consolidated from MongoDB)
+
+Performance Optimisations (added 2026-03-22):
+  - Composite index (roomId, createdAt DESC) — message query uses single index scan
+  - Membership check separated from message fetch (fast COUNT vs JOIN-heavy query)
+  - Cursor-based pagination (no offset, consistent performance at any depth)
+
+Voice Messages:
+  - Recorded in browser via MediaRecorder API (WebM/Ogg/M4A, codec=opus preferred)
+  - Uploaded to Vercel Blob storage (BLOB_READ_WRITE_TOKEN env var required)
+  - Waveform: 40 amplitude bars, byte-sampled from audio buffer, normalised 0.10–0.95
+  - Frontend: AudioPlayer renders waveform, highlights bars as audio plays, click-to-seek
+
+CRM Intelligence:
+  - Every text and voice message auto-logs a CrmActivity record
+  - Engagement score = min(100, recentActivityCount × 5) — computed from last 30 days
+  - Score 50+: hot lead | Score 21–49: warm | Score ≤ 20: cold
+  - Follow-up list: clients whose last CrmActivity is older than 7 days
+  - Admin CRM dashboard at /dashboard/admin/crm (tabs: Hot Leads, Follow-ups, Cold Leads)
 
 ----------------------------------------------------------------------
 5.17 CMS MODULE (src/modules/cms/)
@@ -723,11 +770,12 @@ Guards (4):
   CronSecretGuard      - Validates x-cron-secret header
 
 Interceptors (3):
-  LoggingInterceptor    - JSON-structured HTTP request logs
+  LoggingInterceptor    - JSON-structured HTTP request logs; skips /health endpoint
+                          so keepalive pings add zero log overhead
   TransformInterceptor  - Standardize { success, data, meta?, timestamp }
   AuditInterceptor      - Log write operations with field redaction
 
-Services (13):
+Services (15):
   AuditService             - Fire-and-forget audit logging
   CacheService             - Redis caching with graceful fallback
   MailService              - Email delivery with 15 templates
@@ -739,6 +787,8 @@ Services (13):
   SentryService            - Error tracking (graceful degradation)
   LoggerService            - Logtail structured log aggregation
   OpenAIService            - AI features (graceful degradation)
+  VoiceService             - Audio upload to Vercel Blob + 40-bar waveform generation
+  CrmService               - CRM activity logging + engagement scoring + lead queries
 
 Email Templates (15):
   Password Reset, Welcome, Email Verification,
@@ -820,7 +870,8 @@ Features:
 /dashboard/admin/cms                       - Content management (hero, about, etc.)
 /dashboard/admin/gallery                   - Media upload + management
 /dashboard/admin/audit                     - Audit log viewer + export
-/dashboard/admin/chat                      - Real-time messaging
+/dashboard/admin/chat                      - Real-time messaging (voice notes, waveform player)
+/dashboard/admin/crm                       - CRM intelligence dashboard (hot/cold/follow-up leads)
 /dashboard/admin/notifications             - Notification management
 /dashboard/admin/settings                  - Profile + system settings
 /dashboard/admin/events                    - Event list (search, filter, publish/close/delete)
@@ -830,6 +881,13 @@ Features:
 /dashboard/admin/events/[id]/checkin       - QR scanner + manual check-in + live analytics
 
 Data: ALL pages use real API integration.
+
+CRM Dashboard (/dashboard/admin/crm):
+  - Three tabs: Hot Leads (score ≥ 50) / Follow-ups (idle 7+ days) / Cold Leads (score ≤ 20)
+  - Stats row: lead count + average engagement score per tab
+  - LeadCard component: client name, score bar (color-coded), last activity timestamp
+  - Score bar: green (≥ 50), yellow (21–49), red (≤ 20)
+  - Sidebar: "CRM" link added to Sales & Finance group (Target icon)
 
 Events Admin Features:
   - List with search, status filter, pagination
@@ -912,7 +970,12 @@ Layout:
   PublicFooter  - Footer with CMS content
 
 Feature Components:
-  ChatPage           - Full chat interface (rooms + messages)
+  ChatPage           - Full chat interface (rooms + messages + voice notes)
+  VoiceRecorder      - Click-to-start/stop voice recording via MediaRecorder API;
+                       live duration counter (M:SS); cancel (X) and send buttons;
+                       MIME detection (prefers audio/webm;codecs=opus)
+  AudioPlayer        - 40-bar waveform visualization; bars highlight as audio plays;
+                       click-to-seek on waveform; play/pause toggle; time display
   IncomingCallModal  - WebRTC incoming call UI
   ActiveCallScreen   - WebRTC active call with controls
   CalloutAlertModal  - Emergency callout notification
@@ -948,9 +1011,23 @@ NotificationContext:
 
 ChatContext:
   - Chat room management
-  - Message history + pagination
-  - Typing indicators
-  - Real-time message delivery
+  - Cursor-based message pagination (30 msgs per fetch)
+  - Typing indicators (broadcast + auto-expire after 3s)
+  - Real-time message delivery via Pusher user event
+  - Voice message send (sendVoiceMessage → multipart POST)
+  - localStorage persistence (chat-storage.ts):
+      Hydrates rooms + recent messages instantly on mount (zero network latency)
+      Eagerly background-refreshes rooms after hydration
+      Persists after every send/receive/fetch event
+      Schema-versioned (SCHEMA_VERSION=2), max 20 rooms × 30 msgs per room
+  - 30 s cache TTL: switching rooms within the window skips network refetch
+  - roomsRef: always-current ref prevents stale closure bugs in callbacks
+  - subscribeToTyping() helper: extracted to avoid code duplication
+
+AuthenticatedProviders (authenticated-providers.tsx):
+  - KeepAlive component: pings GET /health every 4 min (first ping at 60 s)
+    Prevents Vercel serverless cold starts (cold boots cost 2–5 s per idle user)
+    /health is excluded from LoggingInterceptor so pings have zero log overhead
 
 CallContext:
   - WebRTC audio/video calls
@@ -1023,10 +1100,17 @@ Security Features:
 Current Deployment:
   Frontend: Vercel (Next.js serverless)
   Backend: Vercel (NestJS serverless via Express adapter)
-  Database: Supabase PostgreSQL
+  Database: Supabase PostgreSQL (all data including chat)
   Cache: Redis (external)
-  Chat DB: MongoDB Atlas
+  Voice Storage: Vercel Blob (audio files for voice messages)
   Email: Resend (via Nodemailer SMTP adapter, SMTP_HOST=smtp.resend.com)
+
+Performance Notes:
+  - Gzip compression is enabled unconditionally (Vercel CDN does NOT compress
+    serverless function responses automatically — removing the guard cuts JSON
+    payload sizes by 60–80%)
+  - KeepAlive ping every 4 min prevents serverless cold starts (2–5 s stall)
+  - LoggingInterceptor skips /health to keep keepalive pings zero-overhead
 
 Also Configured (alternative):
   Docker: docker-compose.yml (prod) + docker-compose.dev.yml
@@ -1062,6 +1146,7 @@ Environment Variables (65+):
   SMS: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER
   Push: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
   Storage: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION
+  Voice Storage: BLOB_READ_WRITE_TOKEN (Vercel Blob — required for voice messages)
   CDN: CDN_BASE_URL (optional, rewrites blob URLs to CDN origin)
   AI: OPENAI_API_KEY (optional, falls back to rule-based)
   Monitoring: SENTRY_DSN (optional), LOGTAIL_TOKEN (optional)
@@ -1150,6 +1235,8 @@ HR - Tasks                DONE       DONE       YES        PRODUCTION READY
 Department Mgmt           DONE       DONE       YES        PRODUCTION READY
 Notifications             DONE       DONE       YES        PRODUCTION READY
 Chat (Real-time)          DONE       DONE       YES        PRODUCTION READY
+Chat Voice Messages       DONE       DONE       YES        PRODUCTION READY
+Chat CRM Intelligence     DONE       DONE       YES        PRODUCTION READY
 Calls (WebRTC)            DONE       DONE       YES        PRODUCTION READY
 Callout System            DONE       DONE       YES        PRODUCTION READY
 CMS (Content Mgmt)        DONE       DONE       YES        PRODUCTION READY
@@ -1183,7 +1270,7 @@ OAuth Frontend Wiring     DONE       PARTIAL    PARTIAL    WIRING NEEDED
 Email Verification E2E    PARTIAL    PARTIAL    PARTIAL    NEEDS TESTING
 
 ================================================================================
-12. RECENT CHANGES (2026-03-14 to 2026-03-18)
+12. RECENT CHANGES (2026-03-14 to 2026-03-23)
 ================================================================================
 
 ----------------------------------------------------------------------
@@ -1264,6 +1351,91 @@ Feature: Registration confirmation email
   - Sent fire-and-forget after successful registration (won't block response)
   - MailService exported from QueueModule (@Global) for injection everywhere
   - Files: mail.service.ts, queue.module.ts, registration.service.ts
+
+----------------------------------------------------------------------
+2026-03-22 — WhatsApp-Level Chat + CRM Intelligence
+----------------------------------------------------------------------
+
+DATABASE:
+  - New model: VoiceMessage — 1:1 with Message; stores audioUrl (Vercel Blob),
+    duration (ms), waveform (Float[], 40 bars)
+  - New model: CrmActivity — logs every chat/voice message per client with
+    activityType, roomId, messageId, metadata, createdAt
+  - Composite index (roomId, createdAt DESC) on messages table — covers the hot
+    message-pagination query with single index scan; zero sort step overhead
+  - Indexes on chat_rooms.lastMessageAt and chat_rooms.type
+  - Migration: backend/prisma/migrations/20260322000000_chat_message_perf_indexes/
+
+BACKEND — Chat Module:
+  - ChatController: added POST /rooms/:id/voice (multipart), POST /rooms/:id/typing,
+    GET /crm/hot-leads, /crm/cold-leads, /crm/follow-ups, /crm/client/:id,
+    /crm/client/:id/activities
+  - ChatService.getMessages(): rewritten — separate fast COUNT membership check,
+    then plain WHERE roomId=? message query (no participant JOIN per row);
+    cursor-based pagination replaces page/offset
+  - ChatModule: added MulterModule (memoryStorage), VoiceService, CrmService
+  - VoiceService: uploads audio Blob to Vercel Blob; generates 40-bar waveform by
+    byte-sampling the audio buffer and normalising amplitudes to 0.10–0.95
+  - CrmService: auto-logs CrmActivity on every message send; computes engagement
+    score = min(100, recentActivityCount × 5); classifies hot/warm/cold leads;
+    follow-up list = clients with no CrmActivity in the last 7 days
+
+BACKEND — API (lib/api.ts):
+  - Added postForm<T>(): multipart/form-data POST with no Content-Type header
+    (browser sets multipart boundary automatically)
+
+FRONTEND — Components:
+  - VoiceRecorder (src/components/chat/voice-recorder.tsx):
+      Click-to-start / click-to-stop recording via MediaRecorder API
+      Live duration counter displayed as M:SS
+      Cancel (X) and Send buttons active during recording
+      MIME detection: prefers audio/webm;codecs=opus → ogg → m4a
+  - AudioPlayer (src/components/chat/audio-player.tsx):
+      40-bar waveform visualization; bar heights driven by amplitude array
+      Bars highlight progressively as audio plays (based on currentTime/duration)
+      Click anywhere on waveform to seek
+      Play/Pause toggle button; elapsed/total time display
+
+FRONTEND — Chat Page:
+  - VoiceRecorder placed in input bar; hidden when text is typed
+  - Send button shown only when newMessage has content or attachments exist
+  - VOICE message type renders AudioPlayer instead of text bubble
+  - sendVoiceMessage() destructured from useChat()
+
+FRONTEND — CRM Dashboard:
+  - /dashboard/admin/crm (src/app/dashboard/admin/crm/page.tsx):
+      Tabs: Hot Leads / Follow-ups / Cold Leads
+      Stats row: lead count + average engagement score
+      LeadCard with ScoreBar (green ≥ 50, yellow 21–49, red ≤ 20)
+  - Sidebar: "CRM" nav item added to Sales & Finance group (Target icon)
+
+----------------------------------------------------------------------
+2026-03-23 — System-Wide Speed Optimisations
+----------------------------------------------------------------------
+
+BACKEND:
+  - main.ts: removed !process.env.VERCEL guard from compression() — Vercel CDN
+    does NOT compress serverless JSON responses automatically; enabling gzip
+    unconditionally cuts all API response sizes by 60–80%
+  - LoggingInterceptor: added SKIP_PATHS = ['/health']; keepalive pings now
+    bypass all logging overhead with an immediate next.handle() passthrough
+
+FRONTEND:
+  - authenticated-providers.tsx: added KeepAlive component that pings
+    GET /health every 4 min (first ping at 60 s after mount); prevents Vercel
+    cold starts (idle functions go cold after ~5 min, costing 2–5 s per user)
+  - chat-storage.ts (new file): localStorage persistence utility:
+      Schema-versioned (v=2), keyed by userId
+      Stores up to 20 rooms × 30 messages each
+      loadChatStorage() / saveChatStorage() with graceful quota-exceeded handling
+  - chat-context.tsx: major rewrite for WhatsApp-like instant load:
+      Mount effect hydrates state from localStorage before any network request
+      Background fetchRooms() called immediately after hydration (non-blocking)
+      30 s cache TTL — selectRoom() skips network fetch when cache is fresh
+      roomsRef always-current ref prevents stale closure bugs in callbacks
+      persist() helper called after every send/receive/fetch event
+      subscribeToTyping() extracted as standalone helper (no duplication)
+      Real-time message handler saves to localStorage on every new message
 
 ================================================================================
 LEGEND:
