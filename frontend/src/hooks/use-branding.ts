@@ -136,11 +136,11 @@ export function useBranding(): BrandingData {
 
 /** Helper — company name with fallback */
 export function getCompanyName(branding: BrandingData): string {
-  return branding.companyName || 'RMS Platform';
+  return branding.companyName || 'Livora OS';
 }
 
 /** Helper — short name with fallback.
- *  Priority: explicit shortName → first-word of companyName → 'RMS'
+ *  Priority: explicit shortName → first-word of companyName → 'Livora OS'
  */
 export function getShortName(branding: BrandingData): string {
   if (branding.shortName) return branding.shortName;
@@ -151,5 +151,5 @@ export function getShortName(branding: BrandingData): string {
       ? words.map((w) => w[0]).join('').toUpperCase().slice(0, 4)
       : branding.companyName.slice(0, 6);
   }
-  return 'RMS';
+  return 'Livora OS';
 }

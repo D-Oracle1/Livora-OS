@@ -103,8 +103,8 @@ async function bootstrap() {
   if (nodeEnv !== 'production') {
     const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
     const config = new DocumentBuilder()
-      .setTitle('RMS Platform API')
-      .setDescription('Realtors Management System - Enterprise PropTech Platform API')
+      .setTitle('Livora OS API')
+      .setDescription('Livora OS - Enterprise PropTech Platform API')
       .setVersion('1.0')
       .addBearerAuth(
         {
@@ -141,7 +141,7 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`
-  RMS Platform - Realtors Management System
+  Livora OS
   Environment: ${nodeEnv}
   Server running on: http://localhost:${port}
   API Documentation: http://localhost:${port}/api/docs

@@ -86,7 +86,7 @@ const FEATURES = [
   { icon: Shield, title: 'Commission & Tax', desc: 'Automate commission calculations, generate tax reports, and track royalty programs.' },
   { icon: Globe, title: 'Public Website', desc: 'A fully branded public-facing website for your company with property listings and contact pages.' },
   { icon: Zap, title: 'CMS & Branding', desc: 'Customize your company website content, hero section, about page, and branding colors.' },
-  { icon: Headphones, title: 'Platform Support', desc: 'Direct support channel between your team and RMS platform administrators.' },
+  { icon: Headphones, title: 'Platform Support', desc: 'Direct support channel between your team and Livora OS platform administrators.' },
 ];
 
 // Left icon rail items (scroll-to anchors)

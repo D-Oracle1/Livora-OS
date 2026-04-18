@@ -344,7 +344,7 @@ export default function CmsPage() {
           <div className="space-y-4">
             <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
               <p className="text-sm text-amber-700 dark:text-amber-400">
-                Company name, logo, and brand colour are managed by the platform administrator. Contact your RMS Platform support to update them.
+                Company name, logo, and brand colour are managed by the platform administrator. Contact your Livora OS support to update them.
               </p>
             </div>
             <div>

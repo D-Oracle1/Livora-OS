@@ -137,8 +137,8 @@ async function main() {
       referralCode: 'REF-REALTR01',
       realtorProfile: {
         create: {
-          licenseNumber: 'RMS-LIC-001',
-          agency: 'RMS Properties',
+          licenseNumber: 'LVR-LIC-001',
+          agency: 'Livora Properties',
           bio: 'Experienced real estate professional',
           specializations: ['Residential', 'Land'],
         },

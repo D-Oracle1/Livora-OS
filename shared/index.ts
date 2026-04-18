@@ -1,5 +1,5 @@
 // ===========================================
-// RMS Platform - Shared Module Entry Point
+// Livora OS - Shared Module Entry Point
 // ===========================================
 
 export * from './types';

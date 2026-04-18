@@ -726,7 +726,7 @@ export class CompanyService {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'RMS Platform';
+    workbook.creator = 'Livora OS';
     workbook.created = new Date();
 
     const addSheet = (name: string, headers: string[], rows: any[][]) => {

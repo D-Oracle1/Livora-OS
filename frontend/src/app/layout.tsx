@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'RMS',
+    title: 'Livora OS',
   },
   formatDetection: {
     telephone: false,

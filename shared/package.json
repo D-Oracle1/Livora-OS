@@ -1,7 +1,7 @@
 {
-  "name": "@rms/shared",
+  "name": "@livora/shared",
   "version": "1.0.0",
-  "description": "Shared types, constants and utilities for RMS Platform",
+  "description": "Shared types, constants and utilities for Livora OS",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {

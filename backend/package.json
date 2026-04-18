@@ -1,7 +1,7 @@
 {
-  "name": "@rms/backend",
+  "name": "@livora/backend",
   "version": "1.0.0",
-  "description": "RMS Platform - Backend API Server",
+  "description": "Livora OS - Backend API Server",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

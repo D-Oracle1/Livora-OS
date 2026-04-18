@@ -29,12 +29,12 @@ export class MailService {
   }
 
   private get appName(): string {
-    return this.configService.get<string>('appName', 'RMS Platform');
+    return this.configService.get<string>('appName', 'Livora OS');
   }
 
   private getFromAddress(companyName?: string): string {
     const displayName = companyName || this.appName;
-    const from = this.configService.get<string>('email.from', 'noreply@rms-platform.com');
+    const from = this.configService.get<string>('email.from', 'noreply@livora-os.com');
     return `"${displayName}" <${from}>`;
   }
 

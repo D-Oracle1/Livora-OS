@@ -1,4 +1,4 @@
-# RMS Platform — Realtors Management System
+# Livora OS
 
 <div align="center">
 
@@ -11,7 +11,7 @@
 
 ## Overview
 
-RMS is an enterprise-grade, multi-tenant PropTech SaaS platform for Nigerian real estate companies. Each company (tenant) gets a fully isolated instance — users, properties, sales, HR, and financials are all scoped per tenant. A global Super Admin panel manages all tenants from a single interface.
+Livora OS is an enterprise-grade, multi-tenant PropTech SaaS platform for Nigerian real estate companies. Each company (tenant) gets a fully isolated instance — users, properties, sales, HR, and financials are all scoped per tenant. A global Super Admin panel manages all tenants from a single interface.
 
 Currency: **Nigerian Naira (₦ / NGN)** throughout all interfaces and reports.
 

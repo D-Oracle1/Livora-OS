@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "RMS Platform",
-  "short_name": "RMS",
+  "name": "Livora OS",
+  "short_name": "Livora OS",
   "description": "Enterprise-grade PropTech platform for managing realtors, properties, and clients",
   "start_url": "/",
   "scope": "/",

@@ -30,20 +30,20 @@ async function main() {
   console.log(`  ID:       ${admin.id}`);
   console.log('');
 
-  // ── RMS Platform company (points to the main tenant DATABASE_URL) ────────
-  // This registers the primary RMS installation as the first tenant so it
+  // ── Livora OS company (points to the main tenant DATABASE_URL) ────────
+  // This registers the primary Livora OS installation as the first tenant so it
   // appears in the super-admin companies list.
   const tenantDbUrl = process.env.DATABASE_URL;
   if (tenantDbUrl) {
     const existing = await prisma.company.findFirst({
-      where: { slug: 'rms-platform' },
+      where: { slug: 'livora-os' },
     });
 
     if (!existing) {
       const company = await prisma.company.create({
         data: {
-          name: 'RMS Platform',
-          slug: 'rms-platform',
+          name: 'Livora OS',
+          slug: 'livora-os',
           domain: process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, '') || 'rms.vercel.app',
           databaseUrl: tenantDbUrl,
           primaryColor: '#3b82f6',
@@ -53,17 +53,17 @@ async function main() {
           maxUsers: 500,
         },
       });
-      console.log(`RMS Platform company created: ${company.id}`);
+      console.log(`Livora OS company created: ${company.id}`);
     } else {
       // Keep databaseUrl in sync if it changed
       await prisma.company.update({
         where: { id: existing.id },
         data: { databaseUrl: tenantDbUrl },
       });
-      console.log(`RMS Platform company already exists, URL refreshed.`);
+      console.log(`Livora OS company already exists, URL refreshed.`);
     }
   } else {
-    console.log('DATABASE_URL not set — skipping RMS Platform company seed.');
+    console.log('DATABASE_URL not set — skipping Livora OS company seed.');
   }
 
   console.log('Master database seeded successfully.');

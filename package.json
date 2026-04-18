@@ -1,7 +1,7 @@
 {
-  "name": "rms-platform",
+  "name": "livora-os",
   "version": "1.0.0",
-  "description": "Enterprise-grade Realtors Management System (RMS) - A full PropTech platform",
+  "description": "Enterprise-grade Livora OS - A full PropTech platform",
   "private": true,
   "workspaces": [
     "backend",

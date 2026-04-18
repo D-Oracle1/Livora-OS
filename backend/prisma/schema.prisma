@@ -1,5 +1,5 @@
 // ===========================================
-// RMS Platform - Prisma Database Schema
+// Livora OS - Prisma Database Schema
 // ===========================================
 
 generator client {

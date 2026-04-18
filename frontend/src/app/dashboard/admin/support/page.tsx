@@ -140,7 +140,7 @@ export default function AdminSupportPage() {
             <ShieldCheck className="w-5 h-5 text-amber-400" />
           </div>
           <div>
-            <p className="font-semibold text-sm">RMS Platform Support</p>
+            <p className="font-semibold text-sm">Livora OS Support</p>
             <p className="text-xs text-white/60">Technical support · Super Admin</p>
           </div>
           {thread && (
@@ -161,7 +161,7 @@ export default function AdminSupportPage() {
               <MessageCircle className="w-16 h-16 mb-4 opacity-20" />
               <p className="font-medium">No messages yet</p>
               <p className="text-sm mt-1 text-center max-w-xs">
-                Send a message to RMS Platform support. Our team will respond as soon as possible.
+                Send a message to Livora OS support. Our team will respond as soon as possible.
               </p>
             </div>
           )}

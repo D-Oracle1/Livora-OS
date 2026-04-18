@@ -78,5 +78,5 @@ export function usePlatformBranding(): PlatformBrandingData {
 }
 
 export function getPlatformName(branding: PlatformBrandingData): string {
-  return branding.platformName || 'RMS Platform';
+  return branding.platformName || 'Livora OS';
 }
