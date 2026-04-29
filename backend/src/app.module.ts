@@ -100,6 +100,11 @@ import { ExportModule } from './modules/export/export.module';
 // Event Management System
 import { EventModule } from './modules/event/event.module';
 
+// Ads → CRM Lead Capture System
+import { LeadsModule } from './modules/leads/leads.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
+
 // Master support (admin → super admin cross-tenant chat)
 import { MasterSupportModule } from './modules/master-support/master-support.module';
 
@@ -209,6 +214,11 @@ import { MasterPlatformModule } from './modules/master-platform/master-platform.
 
     // Health Check
     HealthModule,
+
+    // Ads → CRM Lead Capture System
+    LeadsModule,
+    IntegrationsModule,
+    WebhooksModule,
 
     // Contact Form (public SaaS enquiry)
     ContactModule,

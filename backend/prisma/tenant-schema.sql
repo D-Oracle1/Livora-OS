@@ -2226,10 +2226,10 @@ CREATE INDEX IF NOT EXISTS "general_ledger_entryDate_idx"   ON "general_ledger"(
 -- EVENT MANAGEMENT SYSTEM
 -- ===========================================
 
-CREATE TYPE IF NOT EXISTS "EventStatus" AS ENUM ('draft', 'published', 'closed');
-CREATE TYPE IF NOT EXISTS "EventLocationType" AS ENUM ('physical', 'online');
-CREATE TYPE IF NOT EXISTS "RegistrationStatus" AS ENUM ('pending', 'approved', 'rejected');
-CREATE TYPE IF NOT EXISTS "FormFieldType" AS ENUM ('text', 'email', 'phone', 'dropdown', 'checkbox', 'file');
+DO $$ BEGIN CREATE TYPE "EventStatus" AS ENUM ('draft', 'published', 'closed'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "EventLocationType" AS ENUM ('physical', 'online'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "RegistrationStatus" AS ENUM ('pending', 'approved', 'rejected'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "FormFieldType" AS ENUM ('text', 'email', 'phone', 'dropdown', 'checkbox', 'file'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS "events" (
   "id"                   TEXT NOT NULL,
@@ -2303,3 +2303,170 @@ CREATE TABLE IF NOT EXISTS "event_analytics" (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "event_analytics_eventId_key" ON "event_analytics"("eventId");
+
+-- ===========================================
+-- ADS → CRM LEAD CAPTURE SYSTEM
+-- ===========================================
+
+-- Enums
+DO $$ BEGIN CREATE TYPE "LeadStatus" AS ENUM ('NEW','CONTACTED','QUALIFIED','PROPOSAL_SENT','NEGOTIATION','WON','LOST','UNQUALIFIED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "LeadSource" AS ENUM ('FACEBOOK','INSTAGRAM','GOOGLE','WEBSITE','WHATSAPP','MESSENGER','REFERRAL','MANUAL'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "LeadScore" AS ENUM ('HOT','WARM','COLD'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "IntegrationProvider" AS ENUM ('META','GOOGLE','WEBSITE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "AssignmentMode" AS ENUM ('DIRECT','ROUND_ROBIN','LOAD_BALANCE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Leads
+CREATE TABLE IF NOT EXISTS "leads" (
+  "id"              TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "companyId"       TEXT,
+  "name"            TEXT NOT NULL,
+  "phone"           TEXT,
+  "email"           TEXT,
+  "city"            TEXT,
+  "country"         TEXT,
+  "source"          "LeadSource" NOT NULL DEFAULT 'MANUAL',
+  "platform"        TEXT,
+  "status"          "LeadStatus" NOT NULL DEFAULT 'NEW',
+  "score"           "LeadScore" NOT NULL DEFAULT 'COLD',
+  "scoreValue"      INTEGER NOT NULL DEFAULT 0,
+  "campaignName"    TEXT,
+  "adName"          TEXT,
+  "formId"          TEXT,
+  "pageId"          TEXT,
+  "adAccountId"     TEXT,
+  "keyword"         TEXT,
+  "adGroupName"     TEXT,
+  "costPerLead"     DECIMAL(10,2),
+  "adSpend"         DECIMAL(10,2),
+  "utmSource"       TEXT,
+  "utmMedium"       TEXT,
+  "utmCampaign"     TEXT,
+  "utmTerm"         TEXT,
+  "utmContent"      TEXT,
+  "externalId"      TEXT,
+  "assignedToId"    TEXT,
+  "notes"           TEXT,
+  "customFields"    JSONB,
+  "rawPayload"      JSONB,
+  "firstReplyAt"    TIMESTAMP(3),
+  "lastContactedAt" TIMESTAMP(3),
+  "convertedAt"     TIMESTAMP(3),
+  "isDeleted"       BOOLEAN NOT NULL DEFAULT false,
+  "deletedAt"       TIMESTAMP(3),
+  "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "leads_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "leads_companyId_idx"     ON "leads"("companyId");
+CREATE INDEX IF NOT EXISTS "leads_source_idx"        ON "leads"("source");
+CREATE INDEX IF NOT EXISTS "leads_status_idx"        ON "leads"("status");
+CREATE INDEX IF NOT EXISTS "leads_score_idx"         ON "leads"("score");
+CREATE INDEX IF NOT EXISTS "leads_assignedToId_idx"  ON "leads"("assignedToId");
+CREATE INDEX IF NOT EXISTS "leads_createdAt_idx"     ON "leads"("createdAt");
+CREATE INDEX IF NOT EXISTS "leads_phone_idx"         ON "leads"("phone");
+CREATE INDEX IF NOT EXISTS "leads_email_idx"         ON "leads"("email");
+CREATE INDEX IF NOT EXISTS "leads_externalId_idx"    ON "leads"("externalId");
+CREATE INDEX IF NOT EXISTS "leads_campaignName_idx"  ON "leads"("campaignName");
+CREATE INDEX IF NOT EXISTS "leads_isDeleted_idx"     ON "leads"("isDeleted");
+
+-- Lead Events (audit trail)
+CREATE TABLE IF NOT EXISTS "lead_events" (
+  "id"          TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "leadId"      TEXT NOT NULL,
+  "eventType"   TEXT NOT NULL,
+  "title"       TEXT,
+  "metadata"    JSONB,
+  "createdById" TEXT,
+  "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "lead_events_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "lead_events_leadId_fkey" FOREIGN KEY ("leadId") REFERENCES "leads"("id") ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "lead_events_leadId_idx"   ON "lead_events"("leadId");
+CREATE INDEX IF NOT EXISTS "lead_events_createdAt_idx" ON "lead_events"("createdAt");
+
+-- Lead Notes
+CREATE TABLE IF NOT EXISTS "lead_notes" (
+  "id"          TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "leadId"      TEXT NOT NULL,
+  "content"     TEXT NOT NULL,
+  "authorId"    TEXT,
+  "authorName"  TEXT,
+  "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "lead_notes_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "lead_notes_leadId_fkey" FOREIGN KEY ("leadId") REFERENCES "leads"("id") ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "lead_notes_leadId_idx" ON "lead_notes"("leadId");
+
+-- Platform Integrations
+CREATE TABLE IF NOT EXISTS "integrations" (
+  "id"                 TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "companyId"          TEXT NOT NULL,
+  "provider"           "IntegrationProvider" NOT NULL,
+  "name"               TEXT NOT NULL,
+  "providerAccountId"  TEXT,
+  "accessToken"        TEXT,
+  "refreshToken"       TEXT,
+  "tokenExpiresAt"     TIMESTAMP(3),
+  "webhookVerifyToken" TEXT,
+  "settings"           JSONB,
+  "isActive"           BOOLEAN NOT NULL DEFAULT true,
+  "lastSyncAt"         TIMESTAMP(3),
+  "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "integrations_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "integrations_companyId_idx"  ON "integrations"("companyId");
+CREATE INDEX IF NOT EXISTS "integrations_provider_idx"   ON "integrations"("provider");
+CREATE UNIQUE INDEX IF NOT EXISTS "integrations_company_provider_account_key"
+  ON "integrations"("companyId","provider","providerAccountId") WHERE "providerAccountId" IS NOT NULL;
+
+-- Lead Assignment Rules
+CREATE TABLE IF NOT EXISTS "lead_assignment_rules" (
+  "id"             TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "companyId"      TEXT NOT NULL,
+  "name"           TEXT NOT NULL,
+  "conditions"     JSONB NOT NULL DEFAULT '[]',
+  "assignToId"     TEXT,
+  "teamIds"        TEXT[] DEFAULT ARRAY[]::TEXT[],
+  "mode"           "AssignmentMode" NOT NULL DEFAULT 'DIRECT',
+  "priority"       INTEGER NOT NULL DEFAULT 0,
+  "isActive"       BOOLEAN NOT NULL DEFAULT true,
+  "triggerCount"   INTEGER NOT NULL DEFAULT 0,
+  "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "lead_assignment_rules_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "lead_assignment_rules_companyId_idx" ON "lead_assignment_rules"("companyId");
+CREATE INDEX IF NOT EXISTS "lead_assignment_rules_isActive_idx"  ON "lead_assignment_rules"("isActive");
+
+-- Embeddable Lead Forms
+CREATE TABLE IF NOT EXISTS "lead_forms" (
+  "id"        TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "companyId" TEXT NOT NULL,
+  "name"      TEXT NOT NULL,
+  "fields"    JSONB NOT NULL DEFAULT '[]',
+  "settings"  JSONB,
+  "isActive"  BOOLEAN NOT NULL DEFAULT true,
+  "leadCount" INTEGER NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "lead_forms_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "lead_forms_companyId_idx" ON "lead_forms"("companyId");
+
+-- Round-robin assignment state
+CREATE TABLE IF NOT EXISTS "assignment_round_robin" (
+  "id"           TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "companyId"    TEXT NOT NULL,
+  "ruleId"       TEXT NOT NULL,
+  "lastUserId"   TEXT,
+  "updatedAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "assignment_round_robin_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "assignment_round_robin_ruleId_key" UNIQUE ("ruleId")
+);

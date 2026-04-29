@@ -622,4 +622,34 @@ export class MailService {
   async sendRaffleCodeEmail(to: string, raffleName: string, html: string): Promise<void> {
     await this.send(to, `Your Raffle Code — ${raffleName}`, html);
   }
+
+  async sendLeadAssignmentEmail(to: string, data: {
+    recipientName: string;
+    leadName: string;
+    leadPhone?: string;
+    leadEmail?: string;
+    source?: string;
+    campaign?: string;
+    leadId: string;
+  }): Promise<void> {
+    const appUrl = this.configService.get<string>('appUrl', 'https://app.livora-os.com');
+    const html = this.baseTemplate(`
+      <h2 style="color:#1e293b;">New Lead Assigned to You 🎯</h2>
+      <p>Hi ${escapeHtml(data.recipientName)},</p>
+      <p>A new lead has been assigned to you on ${this.appName}:</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <tr><td style="padding:8px;background:#f8fafc;font-weight:600;width:140px;">Name</td><td style="padding:8px;">${escapeHtml(data.leadName)}</td></tr>
+        ${data.leadPhone ? `<tr><td style="padding:8px;background:#f1f5f9;font-weight:600;">Phone</td><td style="padding:8px;">${escapeHtml(data.leadPhone)}</td></tr>` : ''}
+        ${data.leadEmail ? `<tr><td style="padding:8px;background:#f8fafc;font-weight:600;">Email</td><td style="padding:8px;">${escapeHtml(data.leadEmail)}</td></tr>` : ''}
+        ${data.source ? `<tr><td style="padding:8px;background:#f1f5f9;font-weight:600;">Source</td><td style="padding:8px;">${escapeHtml(data.source)}</td></tr>` : ''}
+        ${data.campaign ? `<tr><td style="padding:8px;background:#f8fafc;font-weight:600;">Campaign</td><td style="padding:8px;">${escapeHtml(data.campaign)}</td></tr>` : ''}
+      </table>
+      <a href="${appUrl}/dashboard/admin/crm/leads/${data.leadId}"
+         style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">
+        View Lead →
+      </a>
+      <p style="margin-top:16px;color:#64748b;font-size:13px;">Respond within 5 minutes for best conversion rates.</p>
+    `);
+    await this.send(to, `New Lead: ${data.leadName} (via ${data.source || 'RMS'})`, html);
+  }
 }
