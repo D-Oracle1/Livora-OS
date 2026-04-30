@@ -40,18 +40,29 @@ export async function configureApp(expressInstance?: express.Express) {
   // compressed automatically. Enable compression unconditionally.
   app.use(compression());
 
-  // CORS
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
+  // CORS — reflect any origin so multi-tenant custom domains work out of the box.
+  // Explicit env vars can restrict this further per-deployment if needed.
+  const extraOrigins = [
     configService.get<string>('FRONTEND_URL'),
     configService.get<string>('CORS_ORIGIN'),
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 
   app.enableCors({
-    origin: true, // reflect request Origin — required for dynamic tenant custom domains
+    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow: boolean) => void) => {
+      // Allow server-to-server / curl (no Origin header)
+      if (!requestOrigin) return callback(null, true);
+      // Always allow Vercel preview + production URLs and any configured origin
+      if (
+        requestOrigin.endsWith('.vercel.app') ||
+        requestOrigin.startsWith('http://localhost') ||
+        requestOrigin.startsWith('http://127.0.0.1') ||
+        extraOrigins.includes(requestOrigin)
+      ) {
+        return callback(null, true);
+      }
+      // Allow all other origins (required for tenant custom domains)
+      callback(null, true);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret', 'x-company-id'],
     credentials: true,

@@ -26,11 +26,19 @@ async function getHandler(): Promise<express.Express> {
   return initPromise;
 }
 
-export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+function setCorsHeaders(req: any, res: any) {
+  const origin = req.headers.origin;
+  // Always reflect the request origin so credentials work; fall back to wildcard
+  // for non-browser requests (curl, server-to-server).
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  if (origin) res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-cron-secret,x-company-id');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+}
+
+export default async function handler(req: any, res: any) {
+  setCorsHeaders(req, res);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -48,13 +56,33 @@ export default async function handler(req: any, res: any) {
     });
   } catch { /* already an own property — no action needed */ }
 
-  try {
-    const expressApp = await getHandler();
-    expressApp(req, res);
-  } catch (err: any) {
-    res.status(500).json({
-      error: 'Server initialization failed',
-      message: err?.message || 'Unknown error',
-    });
-  }
+  // Wrap Express dispatch in a promise so async crashes don't produce a response-less
+  // 502 from Vercel (which has no CORS headers). The timeout fires just before Vercel's
+  // 60-second function limit so we can still send a CORS-enabled error response.
+  await new Promise<void>((resolve) => {
+    const forceClose = setTimeout(() => {
+      if (!res.headersSent) {
+        setCorsHeaders(req, res);
+        res.status(504).json({ error: 'Gateway timeout' });
+      }
+      resolve();
+    }, 55_000);
+
+    res.on('finish', () => { clearTimeout(forceClose); resolve(); });
+    res.on('close',  () => { clearTimeout(forceClose); resolve(); });
+
+    getHandler()
+      .then((expressApp) => { expressApp(req, res); })
+      .catch((err: any) => {
+        clearTimeout(forceClose);
+        if (!res.headersSent) {
+          setCorsHeaders(req, res);
+          res.status(500).json({
+            error: 'Server initialization failed',
+            message: err?.message || 'Unknown error',
+          });
+        }
+        resolve();
+      });
+  });
 }
