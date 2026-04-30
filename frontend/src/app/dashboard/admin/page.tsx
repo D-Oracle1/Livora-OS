@@ -395,7 +395,7 @@ export default function AdminDashboard() {
   // Get tier distribution from API
   const tierData = dashboardData?.tierDistribution || {};
   const tierDistributionData = useMemo(() => [
-    { name: 'Platinum', value: tierData.PLATINUM || 0, color: '#0b5c46' },
+    { name: 'Platinum', value: tierData.PLATINUM || 0, color: '#2b1464' },
     { name: 'Gold', value: tierData.GOLD || 0, color: '#fca639' },
     { name: 'Silver', value: tierData.SILVER || 0, color: '#94a3b8' },
     { name: 'Bronze', value: tierData.BRONZE || 0, color: '#c2956b' },
@@ -446,14 +446,14 @@ export default function AdminDashboard() {
       label: 'Total Revenue',
       value: formatCurrency(revenue),
       icon: NairaSign,
-      color: '#0b5c46',
+      color: '#2b1464',
       subtext: `${salesCount} completed sales`
     },
     {
       label: 'Total Realtors',
       value: String(totalRealtors),
       icon: Users,
-      color: '#0b5c46',
+      color: '#2b1464',
       subtext: `${activeRealtors} active`
     },
     {
@@ -467,7 +467,7 @@ export default function AdminDashboard() {
       label: 'Total Staff',
       value: String(totalStaff),
       icon: UserCog,
-      color: '#0b5c46',
+      color: '#2b1464',
       subtext: `${activeStaff} active`
     },
     {
@@ -481,8 +481,8 @@ export default function AdminDashboard() {
 
   const bottomStats = [
     { label: 'Commission Paid', value: formatCurrency(commissionPaid), icon: Wallet, color: '#fca639' },
-    { label: 'Completed Sales', value: String(salesCount), icon: TrendingUp, color: '#0b5c46' },
-    { label: 'Active Listings', value: String(activeListings), icon: Building2, color: '#0b5c46' },
+    { label: 'Completed Sales', value: String(salesCount), icon: TrendingUp, color: '#2b1464' },
+    { label: 'Active Listings', value: String(activeListings), icon: Building2, color: '#2b1464' },
     { label: 'Pending Sales', value: String(pendingSales), icon: Clock, color: '#fca639' },
   ];
 
@@ -499,7 +499,7 @@ export default function AdminDashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'COMPLETED':
-        return <Badge className="bg-[#0b5c46]/10 text-[#0b5c46] hover:bg-[#0b5c46]/20">Completed</Badge>;
+        return <Badge className="bg-[#2b1464]/10 text-[#2b1464] hover:bg-[#2b1464]/20">Completed</Badge>;
       case 'PENDING':
         return <Badge className="bg-[#fca639]/10 text-[#fca639] hover:bg-[#fca639]/20">Pending</Badge>;
       case 'CANCELLED':
@@ -637,7 +637,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Realtor of the Month */}
-              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#0b5c46] to-[#0e7a5e] p-5 text-white">
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#2b1464] to-[#3b2190] p-5 text-white">
                 <div className="absolute top-2 right-2 opacity-20"><Award className="w-16 h-16" /></div>
                 <div className="relative">
                   <div className="flex items-center gap-2 mb-3">
@@ -805,7 +805,7 @@ export default function AdminDashboard() {
                       <p className="text-xl font-bold text-[#fca639]">{formatCurrency(filteredCommission)}</p>
                       <p className="text-sm text-muted-foreground">Commission ({periodLabel})</p>
                     </div>
-                    <Button className="bg-[#0b5c46] hover:bg-[#094a38] text-white rounded-full px-6" asChild>
+                    <Button className="bg-[#2b1464] hover:bg-[#1e0e47] text-white rounded-full px-6" asChild>
                       <a href="/dashboard/admin/sales">View All Sales</a>
                     </Button>
                   </div>
@@ -815,8 +815,8 @@ export default function AdminDashboard() {
                         <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#0b5c46" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#0b5c46" stopOpacity={0} />
+                              <stop offset="5%" stopColor="#2b1464" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#2b1464" stopOpacity={0} />
                             </linearGradient>
                             <linearGradient id="colorSalesCount" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#fca639" stopOpacity={0.3} />
@@ -833,7 +833,7 @@ export default function AdminDashboard() {
                               name === 'revenue' ? 'Revenue' : 'Sales',
                             ]}
                           />
-                          <Area type="monotone" dataKey="revenue" stroke="#0b5c46" strokeWidth={2.5} fill="url(#colorRevenue)" dot={{ r: 4, fill: '#0b5c46', stroke: '#fff', strokeWidth: 2 }} />
+                          <Area type="monotone" dataKey="revenue" stroke="#2b1464" strokeWidth={2.5} fill="url(#colorRevenue)" dot={{ r: 4, fill: '#2b1464', stroke: '#fff', strokeWidth: 2 }} />
                           <Area type="monotone" dataKey="sales" stroke="#fca639" strokeWidth={2.5} fill="url(#colorSalesCount)" dot={{ r: 4, fill: '#fca639', stroke: '#fff', strokeWidth: 2 }} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -922,7 +922,7 @@ export default function AdminDashboard() {
                 <CardTitle className="text-lg">Recent Sales</CardTitle>
                 <p className="text-sm text-muted-foreground">{periodLabel} - {recentSales.length} transactions</p>
               </div>
-              <Button size="sm" className="bg-[#0b5c46] hover:bg-[#094a38] text-white gap-1" asChild>
+              <Button size="sm" className="bg-[#2b1464] hover:bg-[#1e0e47] text-white gap-1" asChild>
                 <a href="/dashboard/admin/sales">View All Sales</a>
               </Button>
             </div>
@@ -936,7 +936,7 @@ export default function AdminDashboard() {
               <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-[#0b5c46] hover:bg-[#0b5c46]">
+                  <TableRow className="bg-[#2b1464] hover:bg-[#2b1464]">
                     <TableHead className="text-white font-semibold">PROPERTY</TableHead>
                     <TableHead className="text-white font-semibold">CLIENT</TableHead>
                     <TableHead className="text-white font-semibold">REALTOR</TableHead>

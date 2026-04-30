@@ -349,7 +349,7 @@ export default function StaffSalesPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <p className="text-lg font-bold text-[#0b5c46]">{formatCurrency(Number(sale.salePrice))}</p>
+                      <p className="text-lg font-bold text-[#2b1464]">{formatCurrency(Number(sale.salePrice))}</p>
                       <Badge className={
                         sale.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
                         sale.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
@@ -467,7 +467,7 @@ export default function StaffSalesPage() {
                         <div className="flex gap-2">
                           {isAvailable && (
                             <Button
-                              className="bg-[#0b5c46] hover:bg-[#094a38]"
+                              className="bg-[#2b1464] hover:bg-[#1e0e47]"
                               onClick={() => openReportSale(property)}
                             >
                               <CheckCircle className="w-4 h-4 mr-2" />
@@ -495,7 +495,7 @@ export default function StaffSalesPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-[#0b5c46]" />
+              <CheckCircle className="w-5 h-5 text-[#2b1464]" />
               Report Sale
             </DialogTitle>
             <DialogDescription>
@@ -505,8 +505,8 @@ export default function StaffSalesPage() {
 
           <div className="grid gap-6 py-4">
             {/* Property Summary */}
-            <div className="p-4 bg-[#0b5c46]/5 border border-[#0b5c46]/20 rounded-lg">
-              <h4 className="font-semibold text-[#0b5c46] mb-2">Property Details</h4>
+            <div className="p-4 bg-[#2b1464]/5 border border-[#2b1464]/20 rounded-lg">
+              <h4 className="font-semibold text-[#2b1464] mb-2">Property Details</h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Type</p>
@@ -531,7 +531,7 @@ export default function StaffSalesPage() {
                   onClick={() => setSaleAttribution('REALTOR')}
                   className={`flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-all ${
                     saleAttribution === 'REALTOR'
-                      ? 'border-[#0b5c46] bg-[#0b5c46]/10 text-[#0b5c46]'
+                      ? 'border-[#2b1464] bg-[#2b1464]/10 text-[#2b1464]'
                       : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
                 >
@@ -656,7 +656,7 @@ export default function StaffSalesPage() {
                     onClick={() => updateSaleForm('paymentPlan', 'FULL')}
                     className={`flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-all ${
                       saleForm.paymentPlan === 'FULL'
-                        ? 'border-[#0b5c46] bg-[#0b5c46]/10 text-[#0b5c46]'
+                        ? 'border-[#2b1464] bg-[#2b1464]/10 text-[#2b1464]'
                         : 'border-gray-200 text-gray-500 hover:border-gray-300'
                     }`}
                   >
@@ -751,7 +751,7 @@ export default function StaffSalesPage() {
                 <div className="space-y-2">
                   <Label>Total Sale Amount (₦) *</Label>
                   {isLandProperty ? (
-                    <div className="px-3 py-2 bg-[#0b5c46]/10 border border-[#0b5c46]/20 rounded-md text-lg font-bold text-[#0b5c46]">
+                    <div className="px-3 py-2 bg-[#2b1464]/10 border border-[#2b1464]/20 rounded-md text-lg font-bold text-[#2b1464]">
                       {formatCurrency(parseFloat(saleForm.totalAmount) || 0)}
                     </div>
                   ) : (
@@ -807,7 +807,7 @@ export default function StaffSalesPage() {
                         : '—'}
                   </p>
                 </div>
-                <p className="text-2xl font-bold text-[#0b5c46]">
+                <p className="text-2xl font-bold text-[#2b1464]">
                   {formatCurrency(parseFloat(saleForm.totalAmount) || 0)}
                 </p>
               </div>
@@ -837,7 +837,7 @@ export default function StaffSalesPage() {
               Cancel
             </Button>
             <Button
-              className="bg-[#0b5c46] hover:bg-[#094a38]"
+              className="bg-[#2b1464] hover:bg-[#1e0e47]"
               onClick={handleSubmitSale}
               disabled={isSubmitting}
             >

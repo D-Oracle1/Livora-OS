@@ -90,7 +90,7 @@ export default function AdminReferralsPage() {
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Users2 className="w-5 h-5 text-[#0b5c46]" />
+              <Users2 className="w-5 h-5 text-[#2b1464]" />
               Referral Leads
             </CardTitle>
             <div className="relative w-full sm:w-64">
@@ -113,7 +113,7 @@ export default function AdminReferralsPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-[#0b5c46] hover:bg-[#0b5c46]">
+                  <TableRow className="bg-[#2b1464] hover:bg-[#2b1464]">
                     <TableHead className="text-white font-semibold">REFERRED USER</TableHead>
                     <TableHead className="text-white font-semibold hidden md:table-cell">EMAIL</TableHead>
                     <TableHead className="text-white font-semibold">ROLE</TableHead>

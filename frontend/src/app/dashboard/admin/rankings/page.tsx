@@ -112,7 +112,7 @@ const AWARD_LABELS: Record<string, string> = {
 
 const AWARD_COLORS: Record<string, string> = {
   STAFF_OF_MONTH: 'from-blue-500 to-blue-600',
-  REALTOR_OF_MONTH: 'from-[#0b5c46] to-[#0e7a5e]',
+  REALTOR_OF_MONTH: 'from-[#2b1464] to-[#3b2190]',
   CLIENT_OF_MONTH: 'from-[#fca639] to-[#e8953a]',
 };
 

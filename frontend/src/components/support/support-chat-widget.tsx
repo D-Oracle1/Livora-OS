@@ -156,8 +156,8 @@ export function SupportChatWidget() {
     if (!isLoggedIn) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-[#0b5c46]/10 flex items-center justify-center">
-            <MessageCircle className="w-8 h-8 text-[#0b5c46]" />
+          <div className="w-16 h-16 rounded-full bg-[#2b1464]/10 flex items-center justify-center">
+            <MessageCircle className="w-8 h-8 text-[#2b1464]" />
           </div>
           <div>
             <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Need Help?</h3>
@@ -166,7 +166,7 @@ export function SupportChatWidget() {
             </p>
           </div>
           <div className="flex flex-col gap-2 w-full max-w-[220px]">
-            <Button asChild className="bg-[#0b5c46] hover:bg-[#094a38] text-white w-full gap-2">
+            <Button asChild className="bg-[#2b1464] hover:bg-[#1e0e47] text-white w-full gap-2">
               <a href="/auth/login">
                 <LogIn className="w-4 h-4" />
                 Login
@@ -186,7 +186,7 @@ export function SupportChatWidget() {
     if (loading) {
       return (
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[#0b5c46]" />
+          <Loader2 className="w-6 h-6 animate-spin text-[#2b1464]" />
         </div>
       );
     }
@@ -216,12 +216,12 @@ export function SupportChatWidget() {
                 <div
                   className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
                     isOwn
-                      ? 'bg-[#0b5c46] text-white rounded-br-md'
+                      ? 'bg-[#2b1464] text-white rounded-br-md'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md'
                   }`}
                 >
                   {!isOwn && msg.sender && (
-                    <p className="text-xs font-medium text-[#0b5c46] dark:text-[#14956e] mb-0.5">
+                    <p className="text-xs font-medium text-[#2b1464] dark:text-[#14956e] mb-0.5">
                       {msg.sender.firstName}
                     </p>
                   )}
@@ -244,12 +244,12 @@ export function SupportChatWidget() {
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
-              className="flex-1 text-sm bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2.5 outline-none focus:ring-2 focus:ring-[#0b5c46]/30 border-0 text-gray-900 dark:text-gray-100 placeholder:text-gray-400"
+              className="flex-1 text-sm bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2.5 outline-none focus:ring-2 focus:ring-[#2b1464]/30 border-0 text-gray-900 dark:text-gray-100 placeholder:text-gray-400"
             />
             <button
               onClick={handleSend}
               disabled={!newMessage.trim() || sending}
-              className="w-9 h-9 rounded-full bg-[#0b5c46] text-white flex items-center justify-center hover:bg-[#094a38] disabled:opacity-40 transition-colors shrink-0"
+              className="w-9 h-9 rounded-full bg-[#2b1464] text-white flex items-center justify-center hover:bg-[#1e0e47] disabled:opacity-40 transition-colors shrink-0"
             >
               {sending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -276,7 +276,7 @@ export function SupportChatWidget() {
     if (loading) {
       return (
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-[#0b5c46]" />
+          <Loader2 className="w-6 h-6 animate-spin text-[#2b1464]" />
         </div>
       );
     }
@@ -310,12 +310,12 @@ export function SupportChatWidget() {
               <div
                 className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
                   isOwn
-                    ? 'bg-[#0b5c46] text-white rounded-br-md'
+                    ? 'bg-[#2b1464] text-white rounded-br-md'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md'
                 }`}
               >
                 {!isOwn && msg.sender && (
-                  <p className="text-xs font-medium text-[#0b5c46] dark:text-[#14956e] mb-0.5">
+                  <p className="text-xs font-medium text-[#2b1464] dark:text-[#14956e] mb-0.5">
                     {msg.sender.firstName}
                   </p>
                 )}
@@ -340,7 +340,7 @@ export function SupportChatWidget() {
       {isOpen && (
         <div className="fixed inset-0 md:inset-auto md:bottom-6 md:right-6 w-full h-full md:w-[360px] md:h-[480px] bg-white dark:bg-gray-900 md:rounded-2xl shadow-2xl md:border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 z-50">
           {/* Header */}
-          <div className="bg-[#0b5c46] text-white px-4 py-3 flex items-center justify-between shrink-0">
+          <div className="bg-[#2b1464] text-white px-4 py-3 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                 {activeTab === 'support' ? (
@@ -383,7 +383,7 @@ export function SupportChatWidget() {
                 className={cn(
                   'flex-1 flex flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors',
                   activeTab === 'support'
-                    ? 'text-[#0b5c46] bg-[#0b5c46]/5'
+                    ? 'text-[#2b1464] bg-[#2b1464]/5'
                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                 )}
               >
@@ -408,7 +408,7 @@ export function SupportChatWidget() {
                 className={cn(
                   'flex-1 flex flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors',
                   activeTab === 'messages'
-                    ? 'text-[#0b5c46] bg-[#0b5c46]/5'
+                    ? 'text-[#2b1464] bg-[#2b1464]/5'
                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                 )}
               >
@@ -427,7 +427,7 @@ export function SupportChatWidget() {
           'w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105',
           isOpen
             ? 'bg-gray-600 hover:bg-gray-700 text-white hidden md:flex'
-            : 'bg-[#0b5c46] hover:bg-[#094a38] text-white'
+            : 'bg-[#2b1464] hover:bg-[#1e0e47] text-white'
         )}
         title={isOpen ? 'Close support chat' : 'Chat with support'}
       >

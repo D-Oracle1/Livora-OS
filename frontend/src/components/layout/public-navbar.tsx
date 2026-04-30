@@ -1,20 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { Building2, Menu, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { Building2, Menu, X, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { getImageUrl } from '@/lib/api';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 
 const NAV_LINKS = [
   { href: '/', label: 'Home' },
-  { href: '/properties', label: 'Properties' },
+  { href: '/about', label: 'About Us' },
+  { href: '/properties', label: 'Property List' },
+  { href: '/contact', label: 'Contact Us' },
+];
+
+const PAGES_LINKS = [
   { href: '/features', label: 'Features' },
   { href: '/gallery', label: 'Gallery' },
-  { href: '/about', label: 'About Us' },
-  { href: '/contact', label: 'Contact' },
+  { href: '/platform', label: 'Platform' },
+  { href: '/auth/login', label: 'Login' },
+  { href: '/auth/register', label: 'Register' },
 ];
 
 interface PublicNavbarProps {
@@ -23,92 +28,133 @@ interface PublicNavbarProps {
 
 export function PublicNavbar({ currentPage }: PublicNavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pagesOpen, setPagesOpen] = useState(false);
+  const pagesRef = useRef<HTMLDivElement>(null);
   const branding = useBranding();
 
   const companyName = getCompanyName(branding);
   const logoUrl = branding.logo ? (branding.logo.startsWith('http') ? branding.logo : getImageUrl(branding.logo)) : '';
 
+  // Close pages dropdown when clicking outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (pagesRef.current && !pagesRef.current.contains(e.target as Node)) {
+        setPagesOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
   return (
-    <nav className="fixed top-0 w-full z-50 bg-primary/95 backdrop-blur-lg">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
+    <nav className="fixed top-0 w-full z-50 bg-white shadow-sm">
+      <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
           {logoUrl ? (
-            <img src={logoUrl} alt={companyName} className="w-10 h-10 rounded-lg object-contain" />
+            <img src={logoUrl} alt={companyName} className="h-9 w-auto object-contain" />
           ) : (
-            <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-white" />
+            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-white" />
             </div>
           )}
-          <span className="text-xl font-bold text-white">{companyName}</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-8">
+        {/* Desktop nav */}
+        <div className="hidden md:flex items-center gap-7">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               className={cn(
-                'text-sm font-medium transition-colors',
+                'text-sm transition-colors',
                 currentPage === link.href
-                  ? 'text-accent'
-                  : 'text-white/90 hover:text-accent',
+                  ? 'font-bold text-gray-900'
+                  : 'font-medium text-gray-500 hover:text-gray-900',
               )}
             >
               {link.label}
             </Link>
           ))}
+
+          {/* Pages dropdown */}
+          <div ref={pagesRef} className="relative">
+            <button
+              onClick={() => setPagesOpen(v => !v)}
+              className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              Pages
+              <ChevronDown className={cn('w-4 h-4 transition-transform', pagesOpen && 'rotate-180')} />
+            </button>
+            {pagesOpen && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 min-w-[160px] z-50">
+                {PAGES_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setPagesOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link href="/auth/login" className="hidden sm:block">
-            <Button variant="ghost" className="text-white hover:text-accent hover:bg-white/10">
-              Log in
-            </Button>
+        {/* CTA button */}
+        <div className="hidden md:flex items-center">
+          <Link href="/properties">
+            <button className="bg-primary hover:bg-primary-800 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+              Explore Properties
+            </button>
           </Link>
-          <Link href="/auth/register" className="hidden sm:block">
-            <Button className="bg-accent hover:bg-accent-600 text-white shadow-accent">
-              Get Started
-            </Button>
-          </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden text-white"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
         </div>
+
+        {/* Mobile toggle */}
+        <button
+          className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
       </div>
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden bg-primary/95 backdrop-blur-lg border-t border-white/10 px-4 py-4 space-y-2">
+        <div className="md:hidden bg-white border-t border-gray-100 px-6 py-4 space-y-1">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               className={cn(
-                'block py-2 text-sm font-medium transition-colors',
+                'block py-2.5 text-sm transition-colors',
                 currentPage === link.href
-                  ? 'text-accent'
-                  : 'text-white/90 hover:text-accent',
+                  ? 'font-bold text-gray-900'
+                  : 'font-medium text-gray-500 hover:text-gray-900',
               )}
               onClick={() => setMobileOpen(false)}
             >
               {link.label}
             </Link>
           ))}
-          <div className="flex gap-2 pt-2 border-t border-white/10">
-            <Link href="/auth/login" className="flex-1">
-              <Button variant="ghost" className="w-full text-white hover:text-accent hover:bg-white/10">
-                Log in
-              </Button>
+          {PAGES_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="block py-2.5 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+              onClick={() => setMobileOpen(false)}
+            >
+              {link.label}
             </Link>
-            <Link href="/auth/register" className="flex-1">
-              <Button className="w-full bg-accent hover:bg-accent-600 text-white">
-                Get Started
-              </Button>
+          ))}
+          <div className="pt-3">
+            <Link href="/properties" onClick={() => setMobileOpen(false)}>
+              <button className="w-full bg-primary hover:bg-primary-800 text-white text-sm font-semibold py-3 rounded-lg transition-colors">
+                Explore Properties
+              </button>
             </Link>
           </div>
         </div>

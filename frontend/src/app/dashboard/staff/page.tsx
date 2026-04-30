@@ -66,7 +66,7 @@ const miniChartData = [
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'IN_PROGRESS':
-      return <Badge className="bg-[#0b5c46]/10 text-[#0b5c46] hover:bg-[#0b5c46]/20">In Progress</Badge>;
+      return <Badge className="bg-[#2b1464]/10 text-[#2b1464] hover:bg-[#2b1464]/20">In Progress</Badge>;
     case 'TODO':
       return <Badge className="bg-[#fca639]/10 text-[#fca639] hover:bg-[#fca639]/20">To Do</Badge>;
     case 'IN_REVIEW':
@@ -223,7 +223,7 @@ export default function StaffDashboard() {
 
   // Task distribution for pie chart
   const taskDistribution = useMemo(() => [
-    { name: 'Completed', value: completedThisMonth || 1, color: '#0b5c46' },
+    { name: 'Completed', value: completedThisMonth || 1, color: '#2b1464' },
     { name: 'Pending', value: pendingTasks || 1, color: '#fca639' },
     { name: 'Blocked', value: 0, color: '#ef4444' },
   ].filter(t => t.value > 0), [completedThisMonth, pendingTasks]);
@@ -242,17 +242,17 @@ export default function StaffDashboard() {
 
   // Bottom stats
   const bottomStats = [
-    { label: 'Tasks Completed', value: String(completedThisMonth), icon: CheckCircle2, color: '#0b5c46' },
+    { label: 'Tasks Completed', value: String(completedThisMonth), icon: CheckCircle2, color: '#2b1464' },
     { label: 'Pending Tasks', value: String(pendingTasks), icon: CheckSquare, color: '#fca639' },
-    { label: 'Leave Balance', value: `${totalLeave} days`, icon: CalendarDays, color: '#0b5c46' },
+    { label: 'Leave Balance', value: `${totalLeave} days`, icon: CalendarDays, color: '#2b1464' },
     { label: 'Team Members', value: String(teamMembers), icon: Users, color: '#fca639' },
   ];
 
   // Gradient cards
   const gradientCards = [
-    { title: 'Pending Tasks', value: String(pendingTasks), subtitle: 'Assigned to you', gradient: 'from-[#0b5c46] to-[#0e7a5e]', icon: CheckSquare },
+    { title: 'Pending Tasks', value: String(pendingTasks), subtitle: 'Assigned to you', gradient: 'from-[#2b1464] to-[#3b2190]', icon: CheckSquare },
     { title: 'Annual Leave', value: String(annualLeave), subtitle: 'Days remaining', gradient: 'from-[#fca639] to-[#fdb95c]', icon: CalendarDays },
-    { title: 'Sick Leave', value: String(sickLeave), subtitle: 'Days remaining', gradient: 'from-[#0b5c46] to-[#14956e]', icon: CalendarDays },
+    { title: 'Sick Leave', value: String(sickLeave), subtitle: 'Days remaining', gradient: 'from-[#2b1464] to-[#14956e]', icon: CalendarDays },
     { title: 'Reviews', value: String(upcomingReviews.length), subtitle: 'Upcoming', gradient: 'from-[#fca639] to-[#e8953a]', icon: Target },
   ];
 
@@ -321,7 +321,7 @@ export default function StaffDashboard() {
                     onClick={handleClockToggle}
                     className={isClockedIn
                       ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-[#0b5c46] hover:bg-[#094a38] text-white'
+                      : 'bg-[#2b1464] hover:bg-[#1e0e47] text-white'
                     }
                   >
                     {isClockedIn ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
@@ -356,7 +356,7 @@ export default function StaffDashboard() {
                     <p className="text-3xl font-bold">{completedThisMonth}</p>
                     <p className="text-sm text-muted-foreground">Completed This Month</p>
                   </div>
-                  <Button className="bg-[#0b5c46] hover:bg-[#094a38] text-white rounded-full px-6" asChild>
+                  <Button className="bg-[#2b1464] hover:bg-[#1e0e47] text-white rounded-full px-6" asChild>
                     <a href="/dashboard/staff/tasks">View All Tasks</a>
                   </Button>
                 </div>
@@ -366,15 +366,15 @@ export default function StaffDashboard() {
                     <AreaChart data={attendanceChartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0b5c46" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#0b5c46" stopOpacity={0} />
+                          <stop offset="5%" stopColor="#2b1464" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#2b1464" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                       <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
                       <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                      <Area type="monotone" dataKey="hours" stroke="#0b5c46" strokeWidth={2.5} fill="url(#colorHours)" name="Hours Worked" dot={{ r: 4, fill: '#0b5c46', stroke: '#fff', strokeWidth: 2 }} />
+                      <Area type="monotone" dataKey="hours" stroke="#2b1464" strokeWidth={2.5} fill="url(#colorHours)" name="Hours Worked" dot={{ r: 4, fill: '#2b1464', stroke: '#fff', strokeWidth: 2 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -472,8 +472,8 @@ export default function StaffDashboard() {
             <CardContent className="p-5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#0b5c46]/10 flex items-center justify-center">
-                    <Link className="w-5 h-5 text-[#0b5c46]" />
+                  <div className="w-10 h-10 rounded-full bg-[#2b1464]/10 flex items-center justify-center">
+                    <Link className="w-5 h-5 text-[#2b1464]" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm">Your Referral Link</p>
@@ -487,7 +487,7 @@ export default function StaffDashboard() {
                     {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     {copied ? 'Copied' : 'Copy'}
                   </Button>
-                  <Button size="sm" className="bg-[#0b5c46] hover:bg-[#094a38] text-white gap-1.5" asChild>
+                  <Button size="sm" className="bg-[#2b1464] hover:bg-[#1e0e47] text-white gap-1.5" asChild>
                     <a href="/dashboard/staff/referrals">
                       <Users2 className="w-4 h-4" />
                       View Leads
@@ -510,7 +510,7 @@ export default function StaffDashboard() {
                 <p className="text-sm text-muted-foreground">Overview of assigned tasks</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" className="bg-[#0b5c46] hover:bg-[#094a38] text-white gap-1" asChild>
+                <Button size="sm" className="bg-[#2b1464] hover:bg-[#1e0e47] text-white gap-1" asChild>
                   <a href="/dashboard/staff/tasks">
                     <Plus className="w-4 h-4" />
                     View All
@@ -524,7 +524,7 @@ export default function StaffDashboard() {
               <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-[#0b5c46] hover:bg-[#0b5c46]">
+                  <TableRow className="bg-[#2b1464] hover:bg-[#2b1464]">
                     <TableHead className="text-white font-semibold">TITLE</TableHead>
                     <TableHead className="text-white font-semibold">PRIORITY</TableHead>
                     <TableHead className="text-white font-semibold">DUE DATE</TableHead>
@@ -549,12 +549,12 @@ export default function StaffDashboard() {
                       <TableCell>
                         <div className="flex gap-1">
                           {task.status === 'TODO' && (
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[#0b5c46] hover:bg-[#0b5c46]/10" onClick={() => handleStartTask(task.id)}>
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[#2b1464] hover:bg-[#2b1464]/10" onClick={() => handleStartTask(task.id)}>
                               <Play className="w-3 h-3" />
                             </Button>
                           )}
                           {task.status === 'IN_PROGRESS' && (
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[#0b5c46] hover:bg-[#0b5c46]/10" onClick={() => handleSubmitForReview(task.id)} title="Submit for Review">
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[#2b1464] hover:bg-[#2b1464]/10" onClick={() => handleSubmitForReview(task.id)} title="Submit for Review">
                               <Eye className="w-3 h-3" />
                             </Button>
                           )}
@@ -584,7 +584,7 @@ export default function StaffDashboard() {
             <div className="grid gap-4 md:grid-cols-4">
               <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
                 <a href="/dashboard/staff/leave">
-                  <CalendarDays className="w-6 h-6 text-[#0b5c46]" />
+                  <CalendarDays className="w-6 h-6 text-[#2b1464]" />
                   <span>Request Leave</span>
                 </a>
               </Button>
@@ -596,7 +596,7 @@ export default function StaffDashboard() {
               </Button>
               <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
                 <a href="/dashboard/staff/team">
-                  <Users className="w-6 h-6 text-[#0b5c46]" />
+                  <Users className="w-6 h-6 text-[#2b1464]" />
                   <span>Team Directory</span>
                 </a>
               </Button>

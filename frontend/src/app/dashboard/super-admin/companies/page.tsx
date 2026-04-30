@@ -66,7 +66,7 @@ const ASSIGNABLE_ROLES = ['ADMIN', 'GENERAL_OVERSEER', 'HR', 'REALTOR', 'CLIENT'
 const PRESET_THEMES = [
   { name: 'Blue', hex: '#3b82f6' },
   { name: 'Indigo', hex: '#6366f1' },
-  { name: 'Purple', hex: '#8b5cf6' },
+  { name: 'Purple', hex: '#4a32af' },
   { name: 'Pink', hex: '#ec4899' },
   { name: 'Red', hex: '#ef4444' },
   { name: 'Orange', hex: '#f97316' },

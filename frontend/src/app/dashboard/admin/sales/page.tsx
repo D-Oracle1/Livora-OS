@@ -625,7 +625,7 @@ export default function SalesPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <p className="text-lg font-bold text-[#0b5c46]">{formatCurrency(sale.amount)}</p>
+                      <p className="text-lg font-bold text-[#2b1464]">{formatCurrency(sale.amount)}</p>
                       <div className="flex flex-wrap gap-1">
                         <Button
                           size="sm"
@@ -638,7 +638,7 @@ export default function SalesPage() {
                         </Button>
                         <Button
                           size="sm"
-                          className="h-8 bg-[#0b5c46] hover:bg-[#094a38]"
+                          className="h-8 bg-[#2b1464] hover:bg-[#1e0e47]"
                           onClick={() => handleConfirmSale(sale.id)}
                           disabled={processingId === sale.id}
                         >
@@ -955,8 +955,8 @@ export default function SalesPage() {
                 </div>
 
                 {/* Sale Details */}
-                <div className="p-4 bg-[#0b5c46]/5 rounded-lg border border-[#0b5c46]/20">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2 text-[#0b5c46]">
+                <div className="p-4 bg-[#2b1464]/5 rounded-lg border border-[#2b1464]/20">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2 text-[#2b1464]">
                     <NairaSign className="w-4 h-4" />
                     Sale Breakdown
                   </h4>
@@ -979,7 +979,7 @@ export default function SalesPage() {
                     )}
                     <div>
                       <p className="text-xs text-muted-foreground">Total Amount</p>
-                      <p className="text-xl font-bold text-[#0b5c46]">{formatCurrency(selectedSale.amount)}</p>
+                      <p className="text-xl font-bold text-[#2b1464]">{formatCurrency(selectedSale.amount)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Commission</p>
@@ -1091,7 +1091,7 @@ export default function SalesPage() {
                       Reject
                     </Button>
                     <Button
-                      className="flex-1 bg-[#0b5c46] hover:bg-[#094a38]"
+                      className="flex-1 bg-[#2b1464] hover:bg-[#1e0e47]"
                       onClick={() => handleConfirmSale(selectedSale.id)}
                       disabled={processingId === selectedSale.id}
                     >
