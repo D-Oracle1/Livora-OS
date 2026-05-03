@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { AccountingService } from './accounting.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -133,5 +133,38 @@ export class AccountingController {
   @ApiOperation({ summary: 'Validate ledger consistency against source tables' })
   validateConsistency() {
     return this.service.validateConsistency();
+  }
+
+  // ─── Branch-Level Reports ──────────────────────────────────────────────────
+
+  @Get('branches/:branchId/profit-loss')
+  @Roles(UserRole.ADMIN, UserRole.GENERAL_OVERSEER, 'BRANCH_MANAGER' as any)
+  @ApiOperation({ summary: 'Profit & Loss for a specific branch' })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate',   required: false })
+  getBranchProfitAndLoss(
+    @Param('branchId') branchId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate')   endDate?: string,
+  ) {
+    const now   = new Date();
+    const start = startDate ?? new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const end   = endDate   ?? now.toISOString();
+    return this.service.getBranchProfitAndLoss(branchId, start, end);
+  }
+
+  @Get('branches/comparison')
+  @Roles(UserRole.ADMIN, UserRole.GENERAL_OVERSEER, UserRole.SUPER_ADMIN as any)
+  @ApiOperation({ summary: 'Revenue & profit comparison across all branches' })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate',   required: false })
+  getBranchComparison(
+    @Query('startDate') startDate?: string,
+    @Query('endDate')   endDate?: string,
+  ) {
+    const now   = new Date();
+    const start = startDate ?? new Date(now.getFullYear(), 0, 1).toISOString();
+    const end   = endDate   ?? now.toISOString();
+    return this.service.getBranchComparison(start, end);
   }
 }

@@ -100,9 +100,13 @@ interface QrScannerProps {
 
 function QrScannerModal({ open, onClose, onScanned }: QrScannerProps) {
   const scannerRef = useRef<any>(null);
+  const onScannedRef = useRef(onScanned);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [starting, setStarting] = useState(true);
   const divId = 'qr-attendance-scanner';
+
+  // Keep ref current without adding it to the effect deps
+  useEffect(() => { onScannedRef.current = onScanned; }, [onScanned]);
 
   useEffect(() => {
     if (!open) return;
@@ -118,6 +122,10 @@ function QrScannerModal({ open, onClose, onScanned }: QrScannerProps) {
         const { Html5Qrcode } = await import('html5-qrcode');
         if (stopped) return;
 
+        // Wait for the Dialog animation to finish so the container has real dimensions
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        if (stopped) return;
+
         scanner = new Html5Qrcode(divId);
         scannerRef.current = scanner;
 
@@ -127,7 +135,7 @@ function QrScannerModal({ open, onClose, onScanned }: QrScannerProps) {
           (text: string) => {
             // Success — stop scanner then notify parent
             scanner.stop().catch(() => {});
-            onScanned(text);
+            onScannedRef.current(text);
           },
           // Frame errors are expected — ignore them
           undefined,
@@ -136,8 +144,10 @@ function QrScannerModal({ open, onClose, onScanned }: QrScannerProps) {
       } catch (err: any) {
         if (!stopped) {
           setCameraError(
-            err?.message?.includes('permission')
+            err?.message?.includes('permission') || err?.message?.includes('Permission')
               ? 'Camera permission denied. Please allow camera access and try again.'
+              : err?.message?.includes('Requested device not found')
+              ? 'No camera found on this device.'
               : 'Could not start camera. Make sure no other app is using it.',
           );
           setStarting(false);
@@ -152,11 +162,13 @@ function QrScannerModal({ open, onClose, onScanned }: QrScannerProps) {
       scannerRef.current?.stop()?.catch(() => {});
       scannerRef.current = null;
     };
-  }, [open, onScanned]);
+  }, [open]); // onScanned intentionally excluded — handled via ref above
 
   const handleClose = () => {
     scannerRef.current?.stop()?.catch(() => {});
     scannerRef.current = null;
+    setCameraError(null);
+    setStarting(true);
     onClose();
   };
 
@@ -190,8 +202,8 @@ function QrScannerModal({ open, onClose, onScanned }: QrScannerProps) {
               {/* html5-qrcode mounts its video + canvas into this div */}
               <div
                 id={divId}
-                className="w-full overflow-hidden rounded-lg"
-                style={{ minHeight: '280px' }}
+                className="overflow-hidden rounded-lg"
+                style={{ width: '100%', minWidth: '280px', minHeight: '280px' }}
               />
             </div>
           )}

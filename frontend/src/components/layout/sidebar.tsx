@@ -61,7 +61,7 @@ import { usePlatformBranding, getPlatformName } from '@/hooks/use-platform-brand
 // ---------------------------------------------------------------------------
 
 export interface SidebarProps {
-  role: 'admin' | 'realtor' | 'client' | 'staff' | 'super-admin' | 'general-overseer' | 'hr';
+  role: 'admin' | 'realtor' | 'client' | 'staff' | 'super-admin' | 'general-overseer' | 'hr' | 'branch-manager';
   isOpen?: boolean;
   onClose?: () => void;
   collapsed?: boolean;
@@ -86,12 +86,23 @@ interface NavSection {
 // ---------------------------------------------------------------------------
 
 const navigationConfig: Record<string, NavItem[]> = {
+  'branch-manager': [
+    { name: 'Dashboard',   href: '/dashboard/branch-manager',             icon: LayoutDashboard },
+    { name: 'Properties',  href: '/dashboard/branch-manager/properties',  icon: Home },
+    { name: 'Leads',       href: '/dashboard/branch-manager/leads',       icon: Target },
+    { name: 'Staff',       href: '/dashboard/branch-manager/staff',       icon: Users },
+    { name: 'Reports',     href: '/dashboard/branch-manager/reports',     icon: BarChart3 },
+    { name: 'Transfers',   href: '/dashboard/branch-manager/transfers',   icon: Building },
+    { name: 'Chat',        href: '/dashboard/admin/chat',                 icon: MessageSquare },
+    { name: 'Notifications', href: '/dashboard/branch-manager/notifications', icon: Bell },
+  ],
   'super-admin': [
-    { name: 'Dashboard', href: '/dashboard/super-admin', icon: LayoutDashboard },
-    { name: 'Companies', href: '/dashboard/super-admin/companies', icon: Building },
-    { name: 'Analytics', href: '/dashboard/super-admin/analytics', icon: BarChart3 },
-    { name: 'Support Inbox', href: '/dashboard/super-admin/support', icon: Headphones },
-    { name: 'Notifications', href: '/dashboard/super-admin/notifications', icon: Bell },
+    { name: 'Dashboard',      href: '/dashboard/super-admin',                 icon: LayoutDashboard },
+    { name: 'Companies',      href: '/dashboard/super-admin/companies',       icon: Building },
+    { name: 'Subsidiaries',   href: '/dashboard/super-admin/subsidiaries',    icon: Building2 },
+    { name: 'Analytics',      href: '/dashboard/super-admin/analytics',       icon: BarChart3 },
+    { name: 'Support Inbox',  href: '/dashboard/super-admin/support',         icon: Headphones },
+    { name: 'Notifications',  href: '/dashboard/super-admin/notifications',   icon: Bell },
   ],
   realtor: [
     { name: 'Dashboard', href: '/dashboard/realtor', icon: LayoutDashboard },
@@ -167,6 +178,12 @@ const groupedNavigationConfig: Record<string, NavSection[]> = {
         { name: 'Clients', href: '/dashboard/admin/clients', icon: Briefcase, moduleKey: 'clients' },
         { name: 'Staff', href: '/dashboard/admin/staff', icon: UserCog, moduleKey: 'staff' },
         { name: 'Departments', href: '/dashboard/admin/departments', icon: Building, moduleKey: 'departments' },
+      ],
+    },
+    {
+      label: 'Operations',
+      items: [
+        { name: 'Branches', href: '/dashboard/admin/branches', icon: Building },
       ],
     },
     {

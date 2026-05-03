@@ -8,6 +8,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { MailService } from '../../common/services/mail.service';
 import { SmsService } from '../../common/services/sms.service';
+import { BranchService } from '../branch/branch.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 
@@ -28,6 +29,7 @@ export class LeadsService {
     private readonly notificationService: NotificationService,
     private readonly mailService: MailService,
     private readonly smsService: SmsService,
+    private readonly branchService: BranchService,
   ) {}
 
   // ─── Create / Ingest ────────────────────────────────────────────────────────
@@ -173,6 +175,26 @@ export class LeadsService {
 
   private async autoAssign(lead: any, companyId: string) {
     if (lead.assignedToId) return;
+
+    // Geo-based branch assignment: if lead has lat/lng, route to nearest branch
+    if (lead.latitude && lead.longitude) {
+      try {
+        const nearestBranchId = await this.branchService.findNearestBranch(
+          lead.latitude, lead.longitude,
+        );
+        if (nearestBranchId) {
+          await this.prisma.$queryRawUnsafe(
+            `UPDATE leads SET "branchId" = $1, "updatedAt" = NOW() WHERE id = $2`,
+            nearestBranchId, lead.id,
+          );
+          await this.logEvent(lead.id, 'BRANCH_ASSIGNED', 'Lead geo-routed to nearest branch', {
+            branchId: nearestBranchId,
+          });
+        }
+      } catch (e) {
+        this.logger.warn(`Geo-branch assignment failed for lead ${lead.id}: ${e?.message}`);
+      }
+    }
 
     const rules = await this.prisma.$queryRawUnsafe<any[]>(
       `SELECT * FROM lead_assignment_rules

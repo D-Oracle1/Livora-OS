@@ -66,6 +66,75 @@ async function main() {
     console.log('DATABASE_URL not set — skipping Livora OS company seed.');
   }
 
+  // ── Demo Parent + Subsidiary Companies ──────────────────────────────────
+  // Only seed demo hierarchy if DATABASE_URL is set and not in production
+  if (tenantDbUrl && process.env.SEED_DEMO_HIERARCHY === 'true') {
+    const parentExists = await prisma.company.findFirst({ where: { slug: 'livora-group' } });
+    if (!parentExists) {
+      const parent = await prisma.company.create({
+        data: {
+          name:          'Livora Group Holdings',
+          slug:          'livora-group',
+          domain:        'group.livora.com',
+          databaseUrl:   tenantDbUrl,
+          type:          'PARENT',
+          primaryColor:  '#2b1464',
+          inviteCode:    `INV-${uuidv4().substring(0, 8).toUpperCase()}`,
+          isActive:      true,
+          plan:          'enterprise',
+          maxUsers:      1000,
+          description:   'Parent holding company for all Livora subsidiaries',
+          city:          'Lagos',
+          country:       'Nigeria',
+          email:         'group@livora.com',
+          phone:         '+2341234500000',
+        },
+      });
+
+      // Subsidiary 1: Lagos
+      await prisma.company.create({
+        data: {
+          name:          'Livora Properties Lagos',
+          slug:          'livora-lagos',
+          domain:        'lagos.livora.com',
+          databaseUrl:   tenantDbUrl,
+          type:          'SUBSIDIARY',
+          parentId:      parent.id,
+          primaryColor:  '#6366f1',
+          inviteCode:    `INV-${uuidv4().substring(0, 8).toUpperCase()}`,
+          isActive:      true,
+          plan:          'professional',
+          maxUsers:      200,
+          description:   'Lagos region operations',
+          city:          'Lagos',
+          country:       'Nigeria',
+        },
+      });
+
+      // Subsidiary 2: Abuja
+      await prisma.company.create({
+        data: {
+          name:          'Livora Properties Abuja',
+          slug:          'livora-abuja',
+          domain:        'abuja.livora.com',
+          databaseUrl:   tenantDbUrl,
+          type:          'SUBSIDIARY',
+          parentId:      parent.id,
+          primaryColor:  '#22c55e',
+          inviteCode:    `INV-${uuidv4().substring(0, 8).toUpperCase()}`,
+          isActive:      true,
+          plan:          'professional',
+          maxUsers:      150,
+          description:   'FCT and North-Central operations',
+          city:          'Abuja',
+          country:       'Nigeria',
+        },
+      });
+
+      console.log('Demo parent/subsidiary hierarchy seeded (set SEED_DEMO_HIERARCHY=true to re-run)');
+    }
+  }
+
   console.log('Master database seeded successfully.');
 }
 

@@ -21,6 +21,7 @@ enum UserRole {
   SUPER_ADMIN
   GENERAL_OVERSEER
   ADMIN
+  BRANCH_MANAGER
   HR
   REALTOR
   CLIENT
@@ -350,6 +351,13 @@ model User {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
+  // Branch assignment
+  branchId      String?
+  branch        Branch?    @relation(fields: [branchId], references: [id])
+
+  // Branch manager back-relation
+  managedBranch Branch?    @relation("BranchManager")
+
   // Referral system
   referralCode  String?    @unique
   referredBy    String?
@@ -414,6 +422,7 @@ model User {
   @@index([role])
   @@index([status])
   @@index([referralCode])
+  @@index([branchId])
   @@map("users")
 }
 
@@ -521,6 +530,71 @@ model ClientProfile {
   @@map("client_profiles")
 }
 
+// ===========================================
+// BRANCH SYSTEM
+// ===========================================
+
+model Branch {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique   // Short code e.g. "LGS-01"
+  description String?
+
+  // Location
+  address     String
+  city        String
+  state       String
+  country     String   @default("Nigeria")
+  latitude    Float?
+  longitude   Float?
+
+  // Contact
+  phone       String?
+  email       String?
+
+  // Manager
+  managerId   String?  @unique
+  manager     User?    @relation("BranchManager", fields: [managerId], references: [id])
+
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users                User[]
+  properties           Property[]
+  sales                Sale[]
+  expenses             Expense[]
+  transfersFrom        PropertyTransfer[] @relation("TransferFrom")
+  transfersTo          PropertyTransfer[] @relation("TransferTo")
+
+  @@index([city])
+  @@index([isActive])
+  @@map("branches")
+}
+
+model PropertyTransfer {
+  id              String   @id @default(uuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  fromBranchId    String
+  fromBranch      Branch   @relation("TransferFrom", fields: [fromBranchId], references: [id])
+  toBranchId      String
+  toBranch        Branch   @relation("TransferTo", fields: [toBranchId], references: [id])
+  initiatedById   String
+  approvedById    String?
+  reason          String?
+  status          String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId])
+  @@index([fromBranchId])
+  @@index([toBranchId])
+  @@index([status])
+  @@map("property_transfers")
+}
+
 model Property {
   id                     String         @id @default(uuid())
   title                  String
@@ -569,6 +643,12 @@ model Property {
   realtorId              String?
   realtor                RealtorProfile? @relation(fields: [realtorId], references: [id])
 
+  // Branch assignment
+  branchId               String?
+  branch                 Branch?        @relation(fields: [branchId], references: [id])
+
+  deletedAt              DateTime?
+
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 
@@ -578,12 +658,14 @@ model Property {
   offers                 Offer[]
   priceHistory           PriceHistory[]
   purchaseEnquiries      PurchaseEnquiry[]
+  transfers              PropertyTransfer[]
 
   @@index([status])
   @@index([type])
   @@index([city])
   @@index([price])
   @@index([isListed])
+  @@index([branchId])
   @@map("properties")
 }
 
@@ -596,6 +678,10 @@ model Sale {
   realtorId       String?
   realtor         RealtorProfile? @relation(fields: [realtorId], references: [id])
   clientId        String
+
+  // Branch
+  branchId        String?
+  branch          Branch?       @relation(fields: [branchId], references: [id])
   client          ClientProfile @relation("ClientPurchases", fields: [clientId], references: [id])
 
   // Sale details
@@ -641,6 +727,7 @@ model Sale {
   @@index([clientId])
   @@index([status])
   @@index([saleDate])
+  @@index([branchId])
   @@map("sales")
 }
 
@@ -2208,11 +2295,16 @@ model Expense {
   updatedAt       DateTime              @updatedAt
   auditLogs       ExpenseAuditLog[]
 
+  // Branch assignment
+  branchId        String?
+  branch          Branch?               @relation(fields: [branchId], references: [id])
+
   @@index([categoryId])
   @@index([createdById])
   @@index([expenseDate])
   @@index([approvalStatus])
   @@index([deletedAt])
+  @@index([branchId])
   @@map("expenses")
 }
 
