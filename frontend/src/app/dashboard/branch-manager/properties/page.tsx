@@ -55,7 +55,8 @@ export default function BranchPropertiesPage() {
         api.get('/branches?isActive=true'),
       ]);
       setProperties(propsRes?.data ?? propsRes ?? []);
-      setBranches((branchesRes ?? []).filter((b: any) => b.id !== branchId));
+      const bList = branchesRes?.data ?? branchesRes ?? [];
+      setBranches((Array.isArray(bList) ? bList : []).filter((b: any) => b.id !== branchId));
     } finally {
       setLoading(false);
     }

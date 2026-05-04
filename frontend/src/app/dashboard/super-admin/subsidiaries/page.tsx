@@ -72,8 +72,9 @@ export default function SubsidiariesPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await masterGet('/companies?hierarchy=true');
-      setCompanies(data ?? []);
+      const raw = await masterGet('/companies?hierarchy=true');
+      const list = raw?.data ?? raw;
+      setCompanies(Array.isArray(list) ? list : []);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load companies');
     } finally {

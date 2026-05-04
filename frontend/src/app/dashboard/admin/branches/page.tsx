@@ -62,9 +62,11 @@ export default function AdminBranchesPage() {
         api.get(`/accounting/branches/comparison?startDate=${start}&endDate=${end}`),
         api.get('/branches/transfers/list?status=PENDING'),
       ]);
-      setBranches(branchRes ?? []);
-      setComparison(compRes);
-      setTransfers(transferRes ?? []);
+      const b = branchRes?.data ?? branchRes;
+      setBranches(Array.isArray(b) ? b : []);
+      setComparison(compRes?.data ?? compRes);
+      const t = transferRes?.data ?? transferRes;
+      setTransfers(Array.isArray(t) ? t : []);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load branch data');
     } finally {

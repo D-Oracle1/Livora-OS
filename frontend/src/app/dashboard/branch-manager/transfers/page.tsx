@@ -30,7 +30,8 @@ export default function BranchTransfersPage() {
     try {
       const branchId = user?.branchId;
       const res = await api.get(`/branches/transfers/list?branchId=${branchId}`);
-      setTransfers(res ?? []);
+      const list = res?.data ?? res ?? [];
+      setTransfers(Array.isArray(list) ? list : []);
     } finally {
       setLoading(false);
     }
