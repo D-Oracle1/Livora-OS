@@ -211,14 +211,6 @@ export default function HomePage() {
     ? (events.featured.length > 0 ? events.featured : events.upcoming.slice(0, 3))
     : [];
 
-  if (cmsLoading) {
-    return (
-      <div className="min-h-dvh bg-white flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   const selectedTypeLabel = PROPERTY_TYPES.find(t => t.value === searchType)?.label || 'All Types';
   const selectedPriceLabel = PRICE_RANGES.find(r => r.value === searchPrice)?.label || 'Any Price';
 

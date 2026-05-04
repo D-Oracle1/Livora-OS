@@ -42,6 +42,8 @@ export default function LoginPage() {
         router.replace('/dashboard/general-overseer');
       } else if (role === 'admin') {
         router.replace('/dashboard/admin');
+      } else if (role === 'branch_manager') {
+        router.replace('/dashboard/branch-manager');
       } else if (role === 'realtor') {
         router.replace('/dashboard/realtor');
       } else if (role === 'hr') {
@@ -122,6 +124,8 @@ export default function LoginPage() {
         router.push('/dashboard/general-overseer');
       } else if (role === 'admin') {
         router.push('/dashboard/admin');
+      } else if (role === 'branch_manager') {
+        router.push('/dashboard/branch-manager');
       } else if (role === 'realtor') {
         router.push('/dashboard/realtor');
       } else if (role === 'hr') {
