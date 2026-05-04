@@ -20,10 +20,15 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth-storage';
 
-const MASTER_API = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
+const _MASTER_API = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
+
+function masterBase(): string {
+  if (typeof window !== 'undefined' && !_MASTER_API.includes('localhost')) return '/api/v1';
+  return `${_MASTER_API}/api/v1`;
+}
 
 async function masterGet(path: string) {
-  const res = await fetch(`${MASTER_API}/api/v1${path}`, {
+  const res = await fetch(`${masterBase()}${path}`, {
     headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
   });
   if (!res.ok) throw new Error((await res.json())?.message || 'Request failed');
@@ -31,7 +36,7 @@ async function masterGet(path: string) {
 }
 
 async function masterPost(path: string, body: any) {
-  const res = await fetch(`${MASTER_API}/api/v1${path}`, {
+  const res = await fetch(`${masterBase()}${path}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

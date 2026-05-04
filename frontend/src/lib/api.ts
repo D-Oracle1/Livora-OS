@@ -24,8 +24,27 @@ export function getImageUrl(path: string): string {
   return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
+// In the browser, route all API calls through the Next.js rewrite proxy
+// (/api/:path* → backend) to avoid CORS preflight entirely.
+// In SSR/SSG contexts and local dev, use the absolute backend URL directly.
+function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined' && !API_BASE_URL.includes('localhost')) {
+    return '/api/v1';
+  }
+  return `${API_BASE_URL}/api/v1`;
+}
+
+/**
+ * Build a full API URL that goes through the Next.js proxy in the browser
+ * (avoids CORS) and directly to the backend in SSR/dev.
+ * path should start with '/', e.g. '/auth/register'
+ */
+export function apiUrl(path: string): string {
+  return `${getApiBaseUrl()}${path}`;
+}
+
 export const api = {
-  baseUrl: `${API_BASE_URL}/api/v1`,
+  get baseUrl() { return getApiBaseUrl(); },
 
   getHeaders(): HeadersInit {
     const token = getToken();

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { setAuth, clearAuth, getToken, getUser } from '@/lib/auth-storage';
-import { getImageUrl, setTenantId } from '@/lib/api';
+import { getImageUrl, setTenantId, apiUrl } from '@/lib/api';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 
 export default function LoginPage() {
@@ -89,7 +89,7 @@ export default function LoginPage() {
       const tid = (await import('@/lib/api')).getTenantId();
       if (tid) loginHeaders['X-Company-ID'] = tid;
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/auth/login`, {
+      const response = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
         headers: loginHeaders,
         body: JSON.stringify({
