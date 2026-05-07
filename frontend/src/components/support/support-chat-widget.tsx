@@ -335,7 +335,7 @@ export function SupportChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 flex flex-col items-end gap-3">
       {/* Widget Panel */}
       {isOpen && (
         <div className="fixed inset-0 md:inset-auto md:bottom-6 md:right-6 w-full h-full md:w-[360px] md:h-[480px] bg-white dark:bg-gray-900 md:rounded-2xl shadow-2xl md:border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 z-50">
