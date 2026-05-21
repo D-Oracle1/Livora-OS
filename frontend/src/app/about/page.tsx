@@ -322,7 +322,7 @@ export default function AboutPage() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {teamMembers.length > 0
                 ? teamMembers.slice(0, 3).map((member: any, i: number) => {
-                    const photo = resolveImg(member.photo || member.avatar || '');
+                    const photo = resolveImg(member.photo || member.image || member.avatar || '');
                     const name  = member.name  || `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'Team Member';
                     const role  = (typeof member.role === 'string' ? member.role : member.role?.name) || member.title || 'Property Consultant';
                     return (

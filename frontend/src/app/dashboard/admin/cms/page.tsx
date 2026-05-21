@@ -695,11 +695,11 @@ export default function CmsPage() {
               />
             </div>
             {renderDynamicList('Team Members (first 3 shown on About page)', 'agents', [
+              { key: 'photo', label: 'Photo', type: 'image' },
               { key: 'name', label: 'Full Name' },
               { key: 'role', label: 'Role / Title' },
               { key: 'deals', label: 'Deals count' },
               { key: 'rating', label: 'Rating (1-5)' },
-              { key: 'image', label: 'Photo URL' },
             ])}
           </div>
         );
