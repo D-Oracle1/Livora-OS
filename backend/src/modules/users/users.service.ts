@@ -172,18 +172,38 @@ export class UsersService {
   }
 
   async delete(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-    });
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
 
-    if (!user) {
-      throw new NotFoundException('User not found');
+    // ── 1. Clean up non-cascading user-level relations ────────────────────────
+    await this.prisma.message.deleteMany({ where: { senderId: id } });
+    await this.prisma.auditLog.deleteMany({ where: { userId: id } });
+    await this.prisma.monthlyAward.deleteMany({ where: { userId: id } });
+    await this.prisma.purchaseEnquiry.deleteMany({ where: { userId: id } });
+    await this.prisma.sharedFile.deleteMany({ where: { uploadedById: id } });
+    await this.prisma.cmsPage.deleteMany({ where: { authorId: id } });
+    await this.prisma.engagementPost.deleteMany({ where: { authorId: id } });
+    await this.prisma.expenseAuditLog.deleteMany({ where: { userId: id } });
+    await this.prisma.expense.updateMany({ where: { approvedById: id }, data: { approvedById: null } });
+    await this.prisma.expense.deleteMany({ where: { createdById: id } });
+
+    // ── 2. Clean up non-cascading StaffProfile relations ──────────────────────
+    const staffProfile = await this.prisma.staffProfile.findUnique({ where: { userId: id } });
+    if (staffProfile) {
+      const spId = staffProfile.id;
+      await this.prisma.department.updateMany({ where: { headId: spId }, data: { headId: null } });
+      await this.prisma.staffProfile.updateMany({ where: { managerId: spId }, data: { managerId: null } });
+      await this.prisma.penaltyRecord.deleteMany({ where: { staffProfileId: spId } });
+      await this.prisma.payrollRecord.deleteMany({ where: { staffProfileId: spId } });
+      await this.prisma.staffRanking.deleteMany({ where: { staffProfileId: spId } });
+      await this.prisma.performanceReview.deleteMany({
+        where: { OR: [{ revieweeId: spId }, { reviewerId: spId }] },
+      });
+      await this.prisma.staffTask.updateMany({ where: { creatorId: spId }, data: { creatorId: null } });
+      await this.prisma.staffTask.deleteMany({ where: { assigneeId: spId } });
     }
 
-    await this.prisma.user.delete({
-      where: { id },
-    });
-
+    await this.prisma.user.delete({ where: { id } });
     return { message: 'User deleted successfully' };
   }
 
