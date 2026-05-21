@@ -5,6 +5,8 @@ const withPWA = isProd
       dest: "public",
       register: true,
       skipWaiting: true,
+      // Don't cache JS chunks — always fetch fresh so sidebar/nav updates propagate immediately
+      buildExcludes: [/chunks\/.*\.js$/],
     })
   : (config) => config;
 

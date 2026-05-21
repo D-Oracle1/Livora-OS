@@ -61,6 +61,12 @@ export class CreateSaleDto {
   @Min(0)
   areaSold?: number;
 
+  @ApiPropertyOptional({ example: 2, description: 'Number of plots or units sold' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  unitsSold?: number;
+
   @ApiPropertyOptional({ example: 'realtor-profile-uuid', description: 'Required when submitted by sales-dept staff; ignored for realtors' })
   @IsOptional()
   @IsString()

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { api, getImageUrl } from '@/lib/api';
 import { useTenantResolution } from '@/hooks/use-tenant-resolution';
 
@@ -86,6 +87,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-dvh bg-white">
       <PublicNavbar currentPage="/about" />
+      <MobileBottomNav />
 
       {/* ── 1. HERO BANNER ─────────────────────────────────────────── */}
       <section className="relative pt-16 h-[300px] md:h-[360px] flex flex-col items-center justify-center overflow-hidden">
@@ -360,27 +362,52 @@ export default function AboutPage() {
       </section>
 
       {/* ── 8. CTA ─────────────────────────────────────────────────── */}
-      <section className="py-20 px-4 bg-gradient-to-r from-primary via-primary to-primary/90">
-        <div className="container mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Find Your Perfect Property?</h2>
-          <p className="text-white/70 text-lg max-w-xl mx-auto mb-8">
-            Join hundreds of satisfied clients who trust {companyName} for their real estate journey.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/properties">
-              <Button size="lg" className="bg-accent hover:bg-accent-600 text-white px-8 py-6 text-base">
-                Browse Properties <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
-            <Link href="/contact">
-              <Button size="lg" variant="outline" className="text-white border-white/40 hover:bg-white/10 px-8 py-6 text-base">
-                Contact Us
-              </Button>
-            </Link>
+      <section className="py-16 md:py-20 px-4 bg-gray-50">
+        <div className="container mx-auto">
+          <div className="relative rounded-3xl overflow-hidden flex flex-col md:flex-row bg-gray-950 min-h-[340px]">
+            {/* Decorative right panel */}
+            <div className="relative order-first md:order-last w-full h-44 md:h-auto md:w-[38%] flex-shrink-0 overflow-hidden bg-green-900">
+              <div className="absolute inset-0 opacity-[0.12]"
+                style={{ backgroundImage: 'radial-gradient(circle, #4ade80 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+              <div className="absolute inset-0 bg-gradient-to-br from-green-800/50 via-green-900 to-gray-950" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Users className="w-36 h-36 text-green-400/10" strokeWidth={0.5} />
+              </div>
+              <div className="absolute bottom-5 right-5 bg-white/10 backdrop-blur-sm border border-white/10 rounded-2xl px-4 py-3">
+                <div className="text-xl font-bold text-white">1,200+</div>
+                <div className="text-xs text-green-300/70">Happy Clients</div>
+              </div>
+            </div>
+            {/* Content */}
+            <div className="flex flex-col justify-center p-8 md:p-12 lg:p-14 flex-1">
+              <div className="flex items-center gap-2.5 mb-5">
+                <div className="w-6 h-px bg-green-500" />
+                <span className="text-green-400 text-xs font-semibold uppercase tracking-widest">Your Journey Starts Here</span>
+              </div>
+              <h2 className="text-2xl md:text-4xl font-bold text-white leading-tight mb-4 max-w-md">
+                Ready to Find Your Perfect Property?
+              </h2>
+              <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-sm">
+                Join hundreds of satisfied clients who trust {companyName} for their real estate journey. Expert guidance at every step.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/properties">
+                  <div className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+                    Browse Properties <ArrowRight className="w-4 h-4" />
+                  </div>
+                </Link>
+                <Link href="/contact">
+                  <div className="inline-flex items-center gap-2 border border-white/10 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+                    Contact Us
+                  </div>
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
+      <div className="md:hidden h-24" />
       <PublicFooter cmsData={cms?.footer} />
     </div>
   );

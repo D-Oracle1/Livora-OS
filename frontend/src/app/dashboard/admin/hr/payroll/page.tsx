@@ -15,6 +15,8 @@ import {
   RefreshCw,
   CreditCard,
   Settings,
+  MinusCircle,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -158,6 +160,45 @@ export default function AdminPayrollPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [periodStart, setPeriodStart] = useState(getDefaultPeriod().start);
   const [periodEnd, setPeriodEnd] = useState(getDefaultPeriod().end);
+
+  // Manual deductions dialog
+  const [deductionRecord, setDeductionRecord] = useState<PayrollRecord | null>(null);
+  const [deductionRows, setDeductionRows] = useState<{ label: string; amount: string }[]>([]);
+  const [savingDeductions, setSavingDeductions] = useState(false);
+
+  const openDeductionsDialog = (record: PayrollRecord) => {
+    const existing = record.otherDeductions
+      ? Object.entries(record.otherDeductions).map(([label, amount]) => ({
+          label,
+          amount: String(amount),
+        }))
+      : [];
+    setDeductionRows(existing.length > 0 ? existing : [{ label: '', amount: '' }]);
+    setDeductionRecord(record);
+  };
+
+  const handleSaveDeductions = async () => {
+    if (!deductionRecord) return;
+    const otherDeductions: Record<string, number> = {};
+    for (const row of deductionRows) {
+      const trimmed = row.label.trim();
+      const amt = parseFloat(row.amount);
+      if (trimmed && !isNaN(amt) && amt > 0) {
+        otherDeductions[trimmed] = amt;
+      }
+    }
+    setSavingDeductions(true);
+    try {
+      await api.put(`/hr/payroll/${deductionRecord.id}`, { otherDeductions });
+      toast.success('Deductions saved successfully');
+      setDeductionRecord(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save deductions');
+    } finally {
+      setSavingDeductions(false);
+    }
+  };
 
   // Payroll settings (pension / tax toggles)
   const [payrollSettings, setPayrollSettings] = useState({
@@ -681,6 +722,17 @@ export default function AdminPayrollPage() {
                                 size="sm"
                                 variant="outline"
                                 className="gap-1"
+                                onClick={() => openDeductionsDialog(record)}
+                                disabled={actionLoading === record.id}
+                                title="Add manual deductions (lateness, queries, etc.)"
+                              >
+                                <MinusCircle className="w-4 h-4" />
+                                Deductions
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
                                 onClick={() => handleRecalculate(record)}
                                 disabled={actionLoading === record.id}
                                 title="Recalculate using current settings, allowances & penalties"
@@ -810,6 +862,82 @@ export default function AdminPayrollPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Manual Deductions Dialog */}
+      <Dialog open={!!deductionRecord} onOpenChange={(open) => { if (!open) setDeductionRecord(null); }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MinusCircle className="w-5 h-5 text-red-500" />
+              Manual Deductions
+            </DialogTitle>
+            <DialogDescription>
+              {deductionRecord && (
+                <>
+                  {deductionRecord.staffProfile?.user?.firstName} {deductionRecord.staffProfile?.user?.lastName} —{' '}
+                  {formatPeriod(deductionRecord.periodStart, deductionRecord.periodEnd)}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2 max-h-[360px] overflow-y-auto pr-1">
+            {deductionRows.map((row, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <Input
+                  placeholder="Reason (e.g. Lateness, Query)"
+                  value={row.label}
+                  onChange={(e) =>
+                    setDeductionRows((prev) =>
+                      prev.map((r, i) => (i === idx ? { ...r, label: e.target.value } : r))
+                    )
+                  }
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Amount"
+                  value={row.amount}
+                  onChange={(e) =>
+                    setDeductionRows((prev) =>
+                      prev.map((r, i) => (i === idx ? { ...r, amount: e.target.value } : r))
+                    )
+                  }
+                  className="w-32"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:text-red-600 px-2"
+                  onClick={() => setDeductionRows((prev) => prev.filter((_, i) => i !== idx))}
+                  disabled={deductionRows.length === 1}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1 w-full"
+              onClick={() => setDeductionRows((prev) => [...prev, { label: '', amount: '' }])}
+            >
+              <Plus className="w-4 h-4" />
+              Add Deduction
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Existing deductions are replaced when you save. Leave a row empty to ignore it.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeductionRecord(null)}>Cancel</Button>
+            <Button onClick={handleSaveDeductions} disabled={savingDeductions} className="gap-2">
+              {savingDeductions && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Deductions
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Generate Payroll Dialog */}
       <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>

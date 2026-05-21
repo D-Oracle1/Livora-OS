@@ -5,6 +5,7 @@ import { Camera, Film, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { GalleryLightbox } from '@/components/gallery-lightbox';
 import { getImageUrl } from '@/lib/api';
 
@@ -71,6 +72,7 @@ export default function GalleryPage() {
   return (
     <div className="min-h-dvh bg-white dark:bg-primary-950">
       <PublicNavbar currentPage="/gallery" />
+      <MobileBottomNav />
 
       {/* Hero */}
       <section className="bg-gradient-to-r from-primary via-primary-600 to-primary pt-28 pb-12 px-4">
@@ -168,6 +170,7 @@ export default function GalleryPage() {
         />
       )}
 
+      <div className="md:hidden h-24" />
       <PublicFooter cmsData={footerData} />
     </div>
   );

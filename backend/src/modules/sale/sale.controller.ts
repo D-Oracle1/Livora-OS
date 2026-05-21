@@ -168,9 +168,12 @@ export class SaleController {
 
   @Delete(':id')
   @Roles('SUPER_ADMIN', 'ADMIN')
-  @ApiOperation({ summary: 'Permanently delete a cancelled sale' })
+  @ApiOperation({ summary: 'Permanently delete a sale (SUPER_ADMIN can delete any; ADMIN can only delete cancelled)' })
   @ApiResponse({ status: 200, description: 'Sale deleted' })
-  async deleteCancelledSale(@Param('id') id: string) {
-    return this.saleService.deleteCancelledSale(id);
+  async deleteCancelledSale(
+    @Param('id') id: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.saleService.deleteCancelledSale(id, role);
   }
 }

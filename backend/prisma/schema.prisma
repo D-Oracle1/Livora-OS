@@ -3,8 +3,7 @@
 // ===========================================
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -623,6 +622,9 @@ model Sale {
 
   // Area sold (sqm deducted from property on sale)
   areaSold             Float?
+
+  // Number of plots/units sold in this transaction
+  unitsSold            Int      @default(1)
 
   // Loyalty points awarded
   loyaltyPointsAwarded Int      @default(0)

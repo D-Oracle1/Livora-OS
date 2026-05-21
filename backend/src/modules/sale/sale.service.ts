@@ -132,6 +132,7 @@ export class SaleService {
         remainingBalance: totalSalePrice - firstPaymentAmount,
         notes: createSaleDto.notes,
         areaSold: createSaleDto.areaSold || null,
+        unitsSold: createSaleDto.unitsSold || 1,
         nextPaymentDue: isInstallment && (totalSalePrice - firstPaymentAmount) > 0
           ? new Date(new Date(createSaleDto.saleDate).getTime() + 30 * 24 * 60 * 60 * 1000)
           : null,
@@ -224,6 +225,37 @@ export class SaleService {
       data: { status: 'COMPLETED' },
     });
 
+    // Fetch the first payment record — used for installment ledger posting
+    const firstPayment = await this.prisma.payment.findFirst({
+      where: { saleId: sale.id },
+      orderBy: { paymentNumber: 'asc' },
+    });
+
+    // ── Revenue posting (cash-basis: always reflects actual money received) ──
+    // FULL plan: entire price received at once → post the full salePrice.
+    // INSTALLMENT: only the initial deposit is collected at approval; each
+    // subsequent payment is posted in recordPayment. Post the first payment here
+    // so the ledger is never missing cash that has already been received.
+    if (isInstallment && firstPayment) {
+      await this.ledgerService.postSalePayment({
+        referenceId:   firstPayment.id,
+        referenceType: 'PAYMENT',
+        amount:        Number(firstPayment.amount),
+        entryDate:     firstPayment.paymentDate,
+        saleId:        sale.id,
+        description:   `Installment #1 – ${sale.property?.title ?? sale.id}`,
+      });
+    } else if (!isInstallment) {
+      await this.ledgerService.postSalePayment({
+        referenceId:   sale.id,
+        referenceType: 'SALE',
+        amount:        Number(sale.salePrice),
+        entryDate:     sale.saleDate,
+        saleId:        sale.id,
+        description:   `Full payment – ${sale.property?.title ?? sale.id}`,
+      });
+    }
+
     let points = 0;
 
     if (sale.realtorId) {
@@ -259,41 +291,39 @@ export class SaleService {
         quarter: Math.floor(now.getMonth() / 3) + 1,
       });
 
-      // ── Post to General Ledger (FULL plan only — installments posted per payment) ──
-      if (!isInstallment) {
-        await Promise.all([
-          // Cash received for the full sale
-          this.ledgerService.postSalePayment({
-            referenceId:   sale.id,
-            referenceType: 'SALE',
-            amount:        Number(sale.salePrice),
-            entryDate:     sale.saleDate,
-            saleId:        sale.id,
-            description:   `Full payment – ${sale.property?.title ?? sale.id}`,
-          }),
-          // Commission liability created
-          commissionRecord && commissionAmount > 0
-            ? this.ledgerService.postCommission({
-                referenceId:   (commissionRecord as any).id,
-                referenceType: 'COMMISSION',
-                amount:        commissionAmount,
-                entryDate:     sale.saleDate,
-                saleId:        sale.id,
-                realtorId:     sale.realtorId,
-              })
-            : Promise.resolve(),
-          // Tax liability created
-          taxRecord && taxAmount > 0
-            ? this.ledgerService.postTax({
-                referenceId:   (taxRecord as any).id,
-                referenceType: 'TAX',
-                amount:        taxAmount,
-                entryDate:     sale.saleDate,
-                saleId:        sale.id,
-              })
-            : Promise.resolve(),
-        ]);
-      }
+      // ── Post commission & tax to ledger ──
+      // For FULL plan: commission on the full amount, referenced by commission/tax record IDs.
+      // For INSTALLMENT: only the commission/tax earned on the first payment — subsequent
+      // payments are posted in recordPayment using the individual payment amounts.
+      const ledgerDate             = isInstallment && firstPayment ? firstPayment.paymentDate : sale.saleDate;
+      const ledgerCommissionAmount = isInstallment && firstPayment ? Number(firstPayment.commissionAmount) : commissionAmount;
+      const ledgerTaxAmount        = isInstallment && firstPayment ? Number(firstPayment.taxAmount)        : taxAmount;
+      const commissionRef          = isInstallment && firstPayment ? firstPayment.id : (commissionRecord as any)?.id;
+      const commissionRefType      = (isInstallment && firstPayment ? 'PAYMENT' : 'COMMISSION') as 'PAYMENT' | 'COMMISSION';
+      const taxRef                 = isInstallment && firstPayment ? firstPayment.id : (taxRecord as any)?.id;
+      const taxRefType             = (isInstallment && firstPayment ? 'PAYMENT' : 'TAX') as 'PAYMENT' | 'TAX';
+
+      await Promise.all([
+        commissionRecord && ledgerCommissionAmount > 0
+          ? this.ledgerService.postCommission({
+              referenceId:   commissionRef,
+              referenceType: commissionRefType,
+              amount:        ledgerCommissionAmount,
+              entryDate:     ledgerDate,
+              saleId:        sale.id,
+              realtorId:     sale.realtorId,
+            })
+          : Promise.resolve(),
+        taxRecord && ledgerTaxAmount > 0
+          ? this.ledgerService.postTax({
+              referenceId:   taxRef,
+              referenceType: taxRefType,
+              amount:        ledgerTaxAmount,
+              entryDate:     ledgerDate,
+              saleId:        sale.id,
+            })
+          : Promise.resolve(),
+      ]);
 
       // Award loyalty points
       points = await this.loyaltyService.awardPoints({
@@ -980,11 +1010,14 @@ export class SaleService {
     return updatedSale;
   }
 
-  async deleteCancelledSale(id: string) {
+  async deleteCancelledSale(id: string, callerRole?: string) {
     const sale = await this.prisma.sale.findUnique({ where: { id } });
     if (!sale) throw new NotFoundException('Sale not found');
-    if (sale.status !== SaleStatus.CANCELLED) {
-      throw new BadRequestException('Only cancelled sales can be deleted');
+    const isPrivileged = callerRole === 'SUPER_ADMIN' || callerRole === 'GENERAL_OVERSEER' || callerRole === 'ADMIN';
+    if (sale.status !== SaleStatus.CANCELLED && !isPrivileged) {
+      throw new BadRequestException(
+        `Only cancelled sales can be deleted (your role: ${callerRole || 'unknown'})`,
+      );
     }
 
     // Remove all child records before deleting the sale
@@ -993,7 +1026,7 @@ export class SaleService {
     await this.prisma.tax.deleteMany({ where: { saleId: id } });
     await this.prisma.sale.delete({ where: { id } });
 
-    return { success: true, message: 'Cancelled sale deleted' };
+    return { success: true, message: 'Sale deleted' };
   }
 
   async getStats(period?: 'week' | 'month' | 'quarter' | 'year') {

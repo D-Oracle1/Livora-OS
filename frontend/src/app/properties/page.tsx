@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import { api, getImageUrl } from '@/lib/api';
 import { useTenantResolution } from '@/hooks/use-tenant-resolution';
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 
 const PROPERTY_TYPES = [
   { value: '', label: 'All Types' },
@@ -55,8 +57,9 @@ function getTypeIcon(type: string) {
 
 export default function PropertiesPage() {
   const { tenantReady } = useTenantResolution();
-  const [searchLocation, setSearchLocation] = useState('');
-  const [propertyType, setPropertyType] = useState('');
+  const searchParams = useSearchParams();
+  const [searchLocation, setSearchLocation] = useState(() => searchParams.get('search') || '');
+  const [propertyType, setPropertyType] = useState(() => searchParams.get('type') || '');
   const [priceRange, setPriceRange] = useState('');
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,6 +124,7 @@ export default function PropertiesPage() {
   return (
     <div className="min-h-dvh bg-white dark:bg-primary-950">
       <PublicNavbar currentPage="/properties" />
+      <MobileBottomNav />
 
       {/* Hero */}
       <section className="bg-gradient-to-r from-primary via-primary-600 to-primary pt-28 pb-12 px-4">
@@ -357,6 +361,7 @@ export default function PropertiesPage() {
         </div>
       </section>
 
+      <div className="md:hidden h-24" />
       <PublicFooter />
     </div>
   );

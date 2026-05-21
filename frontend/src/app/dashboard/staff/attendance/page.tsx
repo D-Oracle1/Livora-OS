@@ -13,19 +13,10 @@ import {
   MapPin,
   Loader2,
   RefreshCw,
-  QrCode,
-  CameraOff,
-  X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -90,122 +81,6 @@ const formatDuration = (totalMinutes: number) => {
   return `${hours}h ${minutes}m`;
 };
 
-// ── QR Scanner Modal ──────────────────────────────────────────────────────────
-
-interface QrScannerProps {
-  open: boolean;
-  onClose: () => void;
-  onScanned: (token: string) => void;
-}
-
-function QrScannerModal({ open, onClose, onScanned }: QrScannerProps) {
-  const scannerRef = useRef<any>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [starting, setStarting] = useState(true);
-  const divId = 'qr-attendance-scanner';
-
-  useEffect(() => {
-    if (!open) return;
-
-    setCameraError(null);
-    setStarting(true);
-
-    let scanner: any;
-    let stopped = false;
-
-    const start = async () => {
-      try {
-        const { Html5Qrcode } = await import('html5-qrcode');
-        if (stopped) return;
-
-        scanner = new Html5Qrcode(divId);
-        scannerRef.current = scanner;
-
-        await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 240, height: 240 } },
-          (text: string) => {
-            // Success — stop scanner then notify parent
-            scanner.stop().catch(() => {});
-            onScanned(text);
-          },
-          // Frame errors are expected — ignore them
-          undefined,
-        );
-        setStarting(false);
-      } catch (err: any) {
-        if (!stopped) {
-          setCameraError(
-            err?.message?.includes('permission')
-              ? 'Camera permission denied. Please allow camera access and try again.'
-              : 'Could not start camera. Make sure no other app is using it.',
-          );
-          setStarting(false);
-        }
-      }
-    };
-
-    start();
-
-    return () => {
-      stopped = true;
-      scannerRef.current?.stop()?.catch(() => {});
-      scannerRef.current = null;
-    };
-  }, [open, onScanned]);
-
-  const handleClose = () => {
-    scannerRef.current?.stop()?.catch(() => {});
-    scannerRef.current = null;
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <QrCode className="w-5 h-5" />
-            Scan Attendance QR Code
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-col items-center gap-4 p-2">
-          <p className="text-sm text-center text-muted-foreground">
-            Point your camera at the QR code displayed by your admin to clock in.
-          </p>
-
-          {cameraError ? (
-            <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <CameraOff className="w-12 h-12 text-muted-foreground" />
-              <p className="text-sm text-destructive">{cameraError}</p>
-            </div>
-          ) : (
-            <div className="relative w-full">
-              {starting && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 rounded-lg">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
-              )}
-              {/* html5-qrcode mounts its video + canvas into this div */}
-              <div
-                id={divId}
-                className="w-full overflow-hidden rounded-lg"
-                style={{ minHeight: '280px' }}
-              />
-            </div>
-          )}
-
-          <Button variant="outline" className="w-full gap-2" onClick={handleClose}>
-            <X className="w-4 h-4" />
-            Cancel
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AttendancePage() {
@@ -215,7 +90,6 @@ export default function AttendancePage() {
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
 
   const isClockedIn = todayRecord?.clockIn && !todayRecord?.clockOut;
 
@@ -309,13 +183,24 @@ export default function AttendancePage() {
     };
   }, [isClockedIn, todayRecord?.clockIn]);
 
-  // Called after a successful QR scan
-  const handleQrScanned = useCallback(async (qrToken: string) => {
-    setShowScanner(false);
+  // Capture GPS location — resolves with coords string or null
+  const captureLocation = (): Promise<string | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(`${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`),
+        () => resolve(null),
+        { timeout: 6000, maximumAge: 60000 },
+      );
+    });
+  };
+
+  const handleClockIn = async () => {
     setActionLoading(true);
     try {
-      await api.post('/hr/attendance/clock-in', { qrToken });
-      toast.success('Clocked in successfully!');
+      const location = await captureLocation();
+      await api.post('/hr/attendance/clock-in', { ...(location ? { location } : {}) });
+      toast.success(location ? 'Clocked in successfully! Location recorded.' : 'Clocked in successfully!');
       fetchAttendance();
     } catch (err: any) {
       const msg = err.message || 'Failed to clock in';
@@ -328,7 +213,7 @@ export default function AttendancePage() {
     } finally {
       setActionLoading(false);
     }
-  }, [fetchAttendance]);
+  };
 
   const handleClockOut = async () => {
     setActionLoading(true);
@@ -356,13 +241,6 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6">
-      {/* QR Scanner Modal */}
-      <QrScannerModal
-        open={showScanner}
-        onClose={() => setShowScanner(false)}
-        onScanned={handleQrScanned}
-      />
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -446,14 +324,14 @@ export default function AttendancePage() {
                   <Button
                     size="lg"
                     className="gap-2 min-w-[150px]"
-                    onClick={() => setShowScanner(true)}
+                    onClick={handleClockIn}
                     disabled={actionLoading}
                   >
                     {actionLoading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
                       <>
-                        <QrCode className="w-5 h-5" />
+                        <LogIn className="w-5 h-5" />
                         Clock In
                       </>
                     )}
@@ -466,10 +344,10 @@ export default function AttendancePage() {
                   </p>
                 )}
                 {todayRecord?.location && (
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <MapPin className="w-4 h-4" />
-                    {todayRecord.location}
-                  </Button>
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <MapPin className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                    Location recorded
+                  </p>
                 )}
               </div>
             </div>
@@ -521,7 +399,7 @@ export default function AttendancePage() {
               <div className="text-center py-8 text-muted-foreground">
                 <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No attendance records yet</p>
-                <p className="text-sm">Scan the attendance QR code to start tracking</p>
+                <p className="text-sm">Click Clock In to start tracking your attendance</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -534,6 +412,7 @@ export default function AttendancePage() {
                       <TableHead>Clock Out</TableHead>
                       <TableHead>Hours</TableHead>
                       <TableHead>Overtime</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -549,6 +428,13 @@ export default function AttendancePage() {
                           {record.overtime && record.overtime > 0 ? (
                             <span className="text-green-600">+{record.overtime.toFixed(1)}h</span>
                           ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {record.location ? (
+                            <span className="flex items-center gap-1 text-xs text-green-600">
+                              <MapPin className="w-3 h-3" /> Recorded
+                            </span>
+                          ) : <span className="text-muted-foreground">-</span>}
                         </TableCell>
                         <TableCell>{getStatusBadge(record.status)}</TableCell>
                       </TableRow>

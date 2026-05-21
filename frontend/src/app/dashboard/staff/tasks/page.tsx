@@ -460,13 +460,22 @@ export default function TasksPage() {
                                 </DropdownMenuItem>
                               )}
                               {task.status === 'IN_REVIEW' && (
-                                <DropdownMenuItem
-                                  className="gap-2"
-                                  onClick={() => handleStatusChange(task.id, 'IN_PROGRESS')}
-                                >
-                                  <Play className="w-4 h-4" />
-                                  Back to Progress
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => handleStatusChange(task.id, 'IN_PROGRESS')}
+                                  >
+                                    <Play className="w-4 h-4" />
+                                    Back to Progress
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="gap-2 text-green-600"
+                                    onClick={() => handleStatusChange(task.id, 'COMPLETED')}
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    Mark as Complete
+                                  </DropdownMenuItem>
+                                </>
                               )}
                               {task.status === 'BLOCKED' && (
                                 <DropdownMenuItem

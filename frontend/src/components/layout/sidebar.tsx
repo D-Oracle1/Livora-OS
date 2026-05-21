@@ -89,6 +89,7 @@ const navigationConfig: Record<string, NavItem[]> = {
   'super-admin': [
     { name: 'Dashboard', href: '/dashboard/super-admin', icon: LayoutDashboard },
     { name: 'Companies', href: '/dashboard/super-admin/companies', icon: Building },
+    { name: 'Sales', href: '/dashboard/super-admin/sales', icon: TrendingUp },
     { name: 'Analytics', href: '/dashboard/super-admin/analytics', icon: BarChart3 },
     { name: 'Support Inbox', href: '/dashboard/super-admin/support', icon: Headphones },
     { name: 'Notifications', href: '/dashboard/super-admin/notifications', icon: Bell },

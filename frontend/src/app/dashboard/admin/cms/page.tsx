@@ -297,31 +297,87 @@ export default function CmsPage() {
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
-              {fields.map((f) => (
-                <div key={f.key}>
-                  <label className="text-xs text-muted-foreground">{f.label}</label>
-                  {f.type === 'textarea' ? (
-                    <Textarea
-                      value={item[f.key] || ''}
-                      onChange={(e) => {
-                        const updated = [...items];
-                        updated[idx] = { ...updated[idx], [f.key]: e.target.value };
-                        updateField(field, updated);
-                      }}
-                      rows={2}
-                    />
-                  ) : (
-                    <Input
-                      value={item[f.key] || ''}
-                      onChange={(e) => {
-                        const updated = [...items];
-                        updated[idx] = { ...updated[idx], [f.key]: e.target.value };
-                        updateField(field, updated);
-                      }}
-                    />
-                  )}
-                </div>
-              ))}
+              {fields.map((f) => {
+                const imgVal: string = item[f.key] || '';
+                if (f.type === 'image') {
+                  const handleItemImageUpload = () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = async (e: any) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
+                        if (urls && urls.length > 0) {
+                          const updated = [...items];
+                          updated[idx] = { ...updated[idx], [f.key]: urls[0] };
+                          updateField(field, updated);
+                          toast.success('Image uploaded');
+                        }
+                      } catch {
+                        toast.error('Failed to upload image');
+                      }
+                    };
+                    input.click();
+                  };
+                  return (
+                    <div key={f.key}>
+                      <label className="text-xs text-muted-foreground">{f.label}</label>
+                      <div className="flex items-start gap-3 mt-1">
+                        {imgVal && (
+                          <img
+                            src={imgVal.startsWith('http') ? imgVal : getImageUrl(imgVal)}
+                            alt={f.label}
+                            className="w-16 h-16 object-cover rounded-lg border flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 space-y-1.5">
+                          <Button variant="outline" size="sm" onClick={handleItemImageUpload} className="w-full">
+                            <Upload className="w-3.5 h-3.5 mr-1.5" />
+                            {imgVal ? 'Change Image' : 'Upload Image'}
+                          </Button>
+                          <Input
+                            placeholder="Or paste image URL"
+                            value={imgVal}
+                            onChange={(e) => {
+                              const updated = [...items];
+                              updated[idx] = { ...updated[idx], [f.key]: e.target.value };
+                              updateField(field, updated);
+                            }}
+                            className="text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={f.key}>
+                    <label className="text-xs text-muted-foreground">{f.label}</label>
+                    {f.type === 'textarea' ? (
+                      <Textarea
+                        value={item[f.key] || ''}
+                        onChange={(e) => {
+                          const updated = [...items];
+                          updated[idx] = { ...updated[idx], [f.key]: e.target.value };
+                          updateField(field, updated);
+                        }}
+                        rows={2}
+                      />
+                    ) : (
+                      <Input
+                        value={item[f.key] || ''}
+                        onChange={(e) => {
+                          const updated = [...items];
+                          updated[idx] = { ...updated[idx], [f.key]: e.target.value };
+                          updateField(field, updated);
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -609,7 +665,7 @@ export default function CmsPage() {
         return renderDynamicList('Main Features', 'features', [
           { key: 'title', label: 'Title' },
           { key: 'description', label: 'Description', type: 'textarea' },
-          { key: 'image', label: 'Image URL' },
+          { key: 'image', label: 'Image', type: 'image' },
         ]);
 
       case 'platform_features':
@@ -700,6 +756,19 @@ export default function CmsPage() {
             <div>
               <label className="text-sm font-medium mb-1 block">Working Hours</label>
               <Input value={sectionData.hours || ''} onChange={(e) => updateField('hours', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Map Coordinates</label>
+              <Input
+                value={sectionData.mapCoordinates || ''}
+                onChange={(e) => updateField('mapCoordinates', e.target.value)}
+                placeholder="e.g. 6.4540, 3.3947  (latitude, longitude)"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Pinpoints the exact location on the map without changing the display address. Find coordinates at{' '}
+                <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" className="underline">maps.google.com</a>
+                {' '}→ right-click your location → copy the numbers shown.
+              </p>
             </div>
           </div>
         );

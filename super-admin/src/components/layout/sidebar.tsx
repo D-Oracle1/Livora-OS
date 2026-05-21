@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Building, BarChart3, Headphones, Bell,
-  Settings, LogOut, ChevronLeft, Crown, X,
+  Settings, LogOut, ChevronLeft, Crown, X, TrendingUp,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getImageUrl } from '@/lib/api';
@@ -16,6 +16,7 @@ import { usePlatformBranding, getPlatformName } from '@/hooks/use-platform-brand
 const NAV_ITEMS = [
   { name: 'Dashboard',     href: '/dashboard',               icon: LayoutDashboard },
   { name: 'Companies',     href: '/dashboard/companies',     icon: Building },
+  { name: 'Sales',         href: '/dashboard/sales',         icon: TrendingUp },
   { name: 'Analytics',     href: '/dashboard/analytics',     icon: BarChart3 },
   { name: 'Support Inbox', href: '/dashboard/support',       icon: Headphones },
   { name: 'Notifications', href: '/dashboard/notifications', icon: Bell },

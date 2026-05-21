@@ -615,10 +615,21 @@ export class CompanyService {
       } else if (oldRole === 'ADMIN' || oldRole === 'GENERAL_OVERSEER') {
         await client.adminProfile.deleteMany({ where: { userId } });
       } else if (oldRole === 'STAFF' || oldRole === 'HR') {
-        // StaffProfile has relations; cascade handles children via schema, but we must null managerId references first
         const sp = await client.staffProfile.findUnique({ where: { userId }, select: { id: true } });
         if (sp) {
-          await client.staffProfile.updateMany({ where: { managerId: sp.id }, data: { managerId: null } });
+          const spId = sp.id;
+          // Null out non-cascading reverse references
+          await client.department.updateMany({ where: { headId: spId }, data: { headId: null } });
+          await client.staffProfile.updateMany({ where: { managerId: spId }, data: { managerId: null } });
+          // Delete non-cascading child records
+          await client.penaltyRecord.deleteMany({ where: { staffProfileId: spId } });
+          await client.payrollRecord.deleteMany({ where: { staffProfileId: spId } });
+          await client.staffRanking.deleteMany({ where: { staffProfileId: spId } });
+          await client.performanceReview.deleteMany({
+            where: { OR: [{ revieweeId: spId }, { reviewerId: spId }] },
+          });
+          await client.staffTask.updateMany({ where: { creatorId: spId }, data: { creatorId: null } });
+          await client.staffTask.deleteMany({ where: { assigneeId: spId } });
           await client.staffProfile.deleteMany({ where: { userId } });
         }
       }

@@ -23,6 +23,7 @@ import {
 
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
 import { getToken } from '@/lib/auth-storage';
 import { api, getImageUrl } from '@/lib/api';
@@ -96,6 +97,7 @@ export default function PropertyDetailPage() {
   return (
     <div className="min-h-dvh bg-gray-50">
       <PublicNavbar />
+      <MobileBottomNav />
 
       {/* Breadcrumb */}
       <div className="bg-white border-b pt-16">
@@ -332,6 +334,7 @@ export default function PropertyDetailPage() {
         </div>
       </div>
 
+      <div className="md:hidden h-24" />
       <PublicFooter />
     </div>
   );

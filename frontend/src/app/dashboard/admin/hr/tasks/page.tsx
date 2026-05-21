@@ -162,7 +162,7 @@ export default function AdminTasksPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      params.append('limit', '100');
+      params.append('limit', '500');
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (priorityFilter !== 'all') params.append('priority', priorityFilter);
       if (searchQuery) params.append('search', searchQuery);

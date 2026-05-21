@@ -118,7 +118,9 @@ export default function NewsletterPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [sending, setSending] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // ── Data fetching ────────────────────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
@@ -234,6 +236,22 @@ export default function NewsletterPage() {
       toast.error('Failed to upload logo');
     } finally {
       setUploadingLogo(false);
+    }
+  };
+
+  // ── Image file upload ────────────────────────────────────────────────────────
+  const handleImageUpload = async (file: File) => {
+    setUploadingImage(true);
+    try {
+      const result = await api.uploadFiles('/upload/file', [file], 'file');
+      const url: string = Array.isArray(result) ? result[0] : (result as any)?.url || result;
+      setImages((prev) => [...prev, url]);
+      toast.success('Image uploaded');
+    } catch {
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
     }
   };
 
@@ -632,17 +650,44 @@ export default function NewsletterPage() {
 
             {/* Images */}
             <div>
+              {/* Hidden file input for image upload */}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file);
+                }}
+              />
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium">Images</label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowImageInput((v) => !v)}
-                >
-                  <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
-                  Add Image URL
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    Upload Image
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowImageInput((v) => !v)}
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
+                    Add URL
+                  </Button>
+                </div>
               </div>
               {showImageInput && (
                 <div className="flex gap-2 mb-2">

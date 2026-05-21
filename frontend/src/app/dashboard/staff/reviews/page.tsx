@@ -38,9 +38,11 @@ interface PerformanceReview {
   periodEnd: string;
   status: string;
   overallRating: number | null;
+  ratings: Record<string, number> | null;
   strengths: string | null;
-  improvements: string | null;
-  goals: string | null;
+  areasForImprovement: string | null;
+  goals: any[] | null;
+  reviewerComments: string | null;
   revieweeComments: string | null;
   acknowledgedAt: string | null;
   createdAt: string;
@@ -48,6 +50,17 @@ interface PerformanceReview {
     user: { firstName: string; lastName: string };
   };
 }
+
+const CATEGORY_LABELS: Record<string, string> = {
+  attendance:      'Attendance & Punctuality',
+  taskCompletion:  'Task Completion',
+  qualityOfWork:   'Quality of Work',
+  communication:   'Communication',
+  teamwork:        'Teamwork & Collaboration',
+  initiative:      'Initiative & Problem Solving',
+  timeManagement:  'Time Management',
+  professionalism: 'Professionalism',
+};
 
 const formatPeriod = (start: string, end: string, cycle: string) => {
   const startDate = new Date(start);
@@ -267,25 +280,43 @@ export default function ReviewsPage() {
                       </div>
                     </div>
 
-                    {/* Show feedback if available */}
-                    {(review.strengths || review.improvements || review.goals) && review.status === 'COMPLETED' && (
-                      <div className="mt-4 pt-4 border-t space-y-3">
+                    {/* Category scores + feedback */}
+                    {review.status === 'COMPLETED' && (
+                      <div className="mt-4 pt-4 border-t space-y-4">
+                        {/* Category breakdown */}
+                        {review.ratings && Object.keys(review.ratings).length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Category Scores</p>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                              {Object.entries(review.ratings).map(([key, score]) => (
+                                <div key={key} className="flex items-center justify-between">
+                                  <span className="text-xs text-muted-foreground">{CATEGORY_LABELS[key] || key}</span>
+                                  <span className="text-xs font-semibold ml-2">{score}/10</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {review.strengths && (
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-1">Strengths</p>
                             <p className="text-sm">{review.strengths}</p>
                           </div>
                         )}
-                        {review.improvements && (
+                        {review.areasForImprovement && (
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-1">Areas for Improvement</p>
-                            <p className="text-sm">{review.improvements}</p>
+                            <p className="text-sm">{review.areasForImprovement}</p>
                           </div>
                         )}
-                        {review.goals && (
+                        {review.goals && Array.isArray(review.goals) && review.goals.length > 0 && (
                           <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">Goals</p>
-                            <p className="text-sm">{review.goals}</p>
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Goals for Next Period</p>
+                            <ul className="list-disc list-inside space-y-0.5">
+                              {review.goals.map((g: any, i: number) => (
+                                <li key={i} className="text-sm">{typeof g === 'string' ? g : JSON.stringify(g)}</li>
+                              ))}
+                            </ul>
                           </div>
                         )}
                       </div>

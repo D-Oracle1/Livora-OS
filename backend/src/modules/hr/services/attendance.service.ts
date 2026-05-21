@@ -71,12 +71,6 @@ export class AttendanceService {
   }
 
   async clockIn(userId: string, dto: ClockInDto, ipAddress?: string) {
-    // QR token is required — validates physical presence
-    if (!dto.qrToken) {
-      throw new BadRequestException('QR code is required to clock in');
-    }
-    this.validateQrToken(dto.qrToken);
-
     const staffProfile = await this.prisma.staffProfile.findUnique({
       where: { userId },
     });

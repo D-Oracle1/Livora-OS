@@ -77,7 +77,9 @@ interface Sale {
   paymentPlan: 'FULL' | 'INSTALLMENT';
   numberOfInstallments: number;
   totalPaid: number;
+  contractValue: number;
   remainingBalance: number;
+  paymentsMade: number;
   payments: Array<{ number: number; amount: number; date: string; commission: number; tax: number; method: string; reference: string }>;
   nextPaymentDue: string | null;
 }
@@ -115,6 +117,7 @@ export default function SalesPage() {
   const [reportForm, setReportForm] = useState({
     buyerFirstName: '', buyerLastName: '', buyerEmail: '', buyerPhone: '',
     sqmSold: '', pricePerSqm: '', totalAmount: '', notes: '',
+    numberOfPlots: '1',
     paymentMethod: 'BANK_TRANSFER', paymentPlan: 'FULL' as 'FULL' | 'INSTALLMENT',
     numberOfInstallments: '2', firstPaymentAmount: '',
     saleDate: new Date().toISOString().split('T')[0],
@@ -138,12 +141,13 @@ export default function SalesPage() {
         realtor: s.realtorId ? (`${s.realtor?.user?.firstName || ''} ${s.realtor?.user?.lastName || ''}`.trim() || 'Unknown') : 'Company',
         realtorEmail: s.realtor?.user?.email || '',
         realtorTier: s.realtorId ? (s.realtor?.loyaltyTier || 'BRONZE') : '',
-        // For installment sales report on how much has been paid, not the full contract value
+        // Contract value is the full sale price regardless of how much has been paid
+        contractValue: Number(s.salePrice) || (Number(s.totalPaid) + Number(s.remainingBalance)) || 0,
         amount: s.paymentPlan === 'INSTALLMENT'
           ? (Number(s.totalPaid) || 0)
           : (Number(s.salePrice) || 0),
         commission: Number(s.commissionAmount) || 0,
-        plotsSold: 1,
+        plotsSold: Number(s.unitsSold) || 1,
         sqmSold: Number(s.areaSold) || 0,
         pricePerSqm: 0,
         paymentMethod: s.paymentPlan || 'FULL',
@@ -164,15 +168,29 @@ export default function SalesPage() {
           reference: p.reference || '',
         })),
         nextPaymentDue: s.nextPaymentDue || null,
+        paymentsMade: (() => {
+          const fromArray = (s.payments || []).length;
+          if (fromArray > 0) return fromArray;
+          const cv = Number(s.salePrice) || (Number(s.totalPaid) + Number(s.remainingBalance)) || 0;
+          const ni = s.numberOfInstallments || 1;
+          const installmentAmt = cv / ni;
+          return installmentAmt > 0 ? Math.round(Number(s.totalPaid) / installmentAmt) : 0;
+        })(),
       }));
       setSalesData(mapped);
-    } catch {
-      // API unavailable, keep mock data
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to load sales data');
     }
   }, []);
 
+  const [collectedRevenue, setCollectedRevenue] = useState<number | null>(null);
+
   useEffect(() => {
     fetchSales();
+    api.get('/admin/dashboard').then((res: any) => {
+      const data = res?.data || res;
+      setCollectedRevenue(Number(data?.revenue?.allTime ?? 0));
+    }).catch(() => {});
   }, [fetchSales]);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -219,21 +237,23 @@ export default function SalesPage() {
 
   // Calculate stats
   const stats = useMemo(() => {
-    // Include both COMPLETED and IN_PROGRESS (active installment sales) for total sales value
+    // Active = COMPLETED + IN_PROGRESS (excludes pending/cancelled)
     const activeSales = filteredByTime.filter(s => s.status === 'COMPLETED' || s.status === 'IN_PROGRESS');
-    const totalSales = activeSales.reduce((acc, s) => acc + s.amount, 0);
+    // Contract value = full agreed price for every active sale regardless of how much is paid
+    const totalContractValue = activeSales.reduce((acc, s) => acc + s.contractValue, 0);
     const completedCount = filteredByTime.filter(s => s.status === 'COMPLETED').length;
     const inProgressCount = filteredByTime.filter(s => s.status === 'IN_PROGRESS').length;
     const pendingCount = filteredByTime.filter(s => s.status === 'PENDING').length;
-    const avgSalePrice = activeSales.length > 0 ? totalSales / activeSales.length : 0;
+    const avgSalePrice = activeSales.length > 0 ? totalContractValue / activeSales.length : 0;
 
     return [
-      { title: 'Total Sales', value: formatCurrency(totalSales), change: `${activeSales.length} active`, trend: 'up', icon: NairaSign, color: 'text-primary', bgColor: 'bg-primary/10' },
+      { title: 'Contract Value', value: formatCurrency(totalContractValue), change: `${activeSales.length} active`, trend: 'up', icon: NairaSign, color: 'text-primary', bgColor: 'bg-primary/10' },
+      { title: 'Collected Revenue', value: collectedRevenue === null ? '...' : formatCurrency(collectedRevenue), change: 'cash received · matches dashboard', trend: 'up', icon: Banknote, color: 'text-green-700', bgColor: 'bg-green-100' },
       { title: 'Completed', value: completedCount.toString(), change: '', trend: 'up', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' },
       { title: 'In Progress', value: inProgressCount.toString(), change: `${pendingCount} pending`, trend: 'up', icon: Clock, color: 'text-orange-600', bgColor: 'bg-orange-100' },
-      { title: 'Avg. Sale Price', value: formatCurrency(avgSalePrice), change: '', trend: 'down', icon: Building2, color: 'text-purple-600', bgColor: 'bg-purple-100' },
+      { title: 'Avg. Contract', value: formatCurrency(avgSalePrice), change: '', trend: 'down', icon: Building2, color: 'text-purple-600', bgColor: 'bg-purple-100' },
     ];
-  }, [filteredByTime]);
+  }, [filteredByTime, collectedRevenue]);
 
   const handleConfirmSale = async (saleId: number | string) => {
     setProcessingId(saleId);
@@ -266,7 +286,7 @@ export default function SalesPage() {
   };
 
   const handleDeleteSale = async (saleId: number | string) => {
-    if (!confirm('Permanently delete this cancelled sale? This cannot be undone.')) return;
+    if (!confirm('Permanently delete this sale record? This cannot be undone.')) return;
     setProcessingId(saleId);
     try {
       await api.delete(`/sales/${saleId}`);
@@ -411,6 +431,7 @@ export default function SalesPage() {
       pricePerSqm: String(ppsqm),
       totalAmount: isLand && ppsqm > 0 ? String(ppsqm * (property.area || 0)) : String(Number(property.price) || 0),
       notes: '', paymentMethod: 'BANK_TRANSFER', paymentPlan: 'FULL',
+      numberOfPlots: '1',
       numberOfInstallments: '2', firstPaymentAmount: '',
       saleDate: new Date().toISOString().split('T')[0],
     });
@@ -465,6 +486,7 @@ export default function SalesPage() {
         paymentPlan: reportForm.paymentPlan,
         paymentMethod: reportForm.paymentMethod || undefined,
         areaSold: toSqm(parseFloat(reportForm.sqmSold) || 0, reportAreaUnit) || undefined,
+        unitsSold: parseInt(reportForm.numberOfPlots) || 1,
         ...(reportAttribution === 'REALTOR' && reportSelectedRealtorId ? { realtorId: reportSelectedRealtorId } : {}),
       };
       if (reportForm.paymentPlan === 'INSTALLMENT') {
@@ -520,8 +542,9 @@ export default function SalesPage() {
   };
 
   const getPaymentCounterText = (sale: Sale) => {
-    if (sale.remainingBalance <= 0) return `${sale.payments.length}/${sale.payments.length} paid`;
-    return `${sale.payments.length}/${sale.numberOfInstallments} paid`;
+    if (sale.remainingBalance <= 0) return 'Fully Paid';
+    const total = Math.max(sale.numberOfInstallments, sale.paymentsMade);
+    return `${sale.paymentsMade}/${total} paid`;
   };
 
   return (
@@ -552,7 +575,7 @@ export default function SalesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat, index) => (
           <motion.div
             key={stat.title}
@@ -773,7 +796,7 @@ export default function SalesPage() {
                             <div className="w-16 h-1.5 bg-gray-200 rounded-full">
                               <div
                                 className={`h-full ${getProgressBarColor(sale)} rounded-full transition-all`}
-                                style={{ width: `${Math.min((sale.totalPaid / sale.amount) * 100, 100)}%` }}
+                                style={{ width: `${sale.contractValue > 0 ? Math.min((sale.totalPaid / sale.contractValue) * 100, 100) : 0}%` }}
                               />
                             </div>
                             {sale.nextPaymentDue && new Date(sale.nextPaymentDue) < new Date() && sale.remainingBalance > 0 && (
@@ -1106,20 +1129,18 @@ export default function SalesPage() {
                 )}
                 {selectedSale.status !== 'PENDING' && (
                   <div className="flex gap-2">
-                    {selectedSale.status === 'CANCELLED' && (
-                      <Button
-                        variant="destructive"
-                        onClick={() => handleDeleteSale(selectedSale.id)}
-                        disabled={processingId === selectedSale.id}
-                      >
-                        {processingId === selectedSale.id ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <XCircle className="w-4 h-4 mr-2" />
-                        )}
-                        Delete Permanently
-                      </Button>
-                    )}
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleDeleteSale(selectedSale.id)}
+                      disabled={processingId === selectedSale.id}
+                    >
+                      {processingId === selectedSale.id ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <XCircle className="w-4 h-4 mr-2" />
+                      )}
+                      Delete Permanently
+                    </Button>
                     {selectedSale.paymentPlan === 'INSTALLMENT' && selectedSale.remainingBalance > 0 && (
                       <Button
                         className="bg-[#fca639] hover:bg-[#e8953a] text-white"
@@ -1418,6 +1439,11 @@ export default function SalesPage() {
                     </div>
                   </div>
                 )}
+
+                <div className="space-y-1">
+                  <Label>Number of Plots / Units Sold *</Label>
+                  <Input type="number" min="1" placeholder="1" value={reportForm.numberOfPlots} onChange={(e) => updateReportForm('numberOfPlots', e.target.value)} />
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
