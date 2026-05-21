@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AwardBanner } from '@/components/award-banner';
 import {
@@ -25,9 +25,8 @@ import {
   Check,
   Users2,
   Link,
-  QrCode,
+  LogIn,
 } from 'lucide-react';
-import { QrScannerModal } from '@/components/attendance/qr-scanner-modal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -101,7 +100,6 @@ export default function StaffDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [isClockedIn, setIsClockedIn] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
   const [userName, setUserName] = useState('');
   const [staffOfMonth, setStaffOfMonth] = useState<any>(null);
   const [referralCode, setReferralCode] = useState('');
@@ -186,8 +184,7 @@ export default function StaffDashboard() {
     }
   };
 
-  const handleQrScanned = useCallback(async (qrToken: string) => {
-    setShowScanner(false);
+  const handleClockIn = async () => {
     try {
       let location: string | null = null;
       if (navigator.geolocation) {
@@ -199,13 +196,13 @@ export default function StaffDashboard() {
           );
         });
       }
-      await api.post('/hr/attendance/clock-in', { qrToken, ...(location ? { location } : {}) });
+      await api.post('/hr/attendance/clock-in', { ...(location ? { location } : {}) });
       toast.success('Clocked in successfully!');
       setIsClockedIn(true);
     } catch (err: any) {
       toast.error(err.message || 'Failed to clock in');
     }
-  }, []);
+  };
 
   const handleStartTask = async (taskId: string) => {
     try {
@@ -285,11 +282,6 @@ export default function StaffDashboard() {
 
   return (
     <div className="space-y-6">
-      <QrScannerModal
-        open={showScanner}
-        onClose={() => setShowScanner(false)}
-        onScanned={handleQrScanned}
-      />
       <AwardBanner />
 
       {/* Staff of the Month Spotlight */}
@@ -342,13 +334,13 @@ export default function StaffDashboard() {
                 </div>
                 <div className="flex items-center gap-3">
                   <Button
-                    onClick={isClockedIn ? handleClockOut : () => setShowScanner(true)}
+                    onClick={isClockedIn ? handleClockOut : handleClockIn}
                     className={isClockedIn
                       ? 'bg-red-500 hover:bg-red-600 text-white'
                       : 'bg-[#0b5c46] hover:bg-[#094a38] text-white'
                     }
                   >
-                    {isClockedIn ? <Pause className="w-4 h-4 mr-2" /> : <QrCode className="w-4 h-4 mr-2" />}
+                    {isClockedIn ? <Pause className="w-4 h-4 mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
                     {isClockedIn ? 'Clock Out' : 'Clock In'}
                   </Button>
                   <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
