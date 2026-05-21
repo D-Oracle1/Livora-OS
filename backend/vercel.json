@@ -32,6 +32,16 @@
       "includeFiles": "{dist/**,prisma/**,node_modules/.prisma/**,node_modules/@prisma/engines/**,node_modules/pg*/**,node_modules/{exceljs,archiver,@vercel/blob,undici,openai,@sentry,passport-google-oauth20,passport-facebook}/**}"
     }
   },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,PATCH,DELETE,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type,Authorization,x-cron-secret,x-company-id" }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

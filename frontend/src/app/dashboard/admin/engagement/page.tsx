@@ -412,6 +412,10 @@ export default function EngagementPage() {
     input.onchange = async (e: any) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      if (file.size > 4 * 1024 * 1024) {
+        toast.error('File must be under 4 MB');
+        return;
+      }
       setUploading(true);
       try {
         const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');

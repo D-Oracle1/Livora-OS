@@ -91,6 +91,8 @@ export default function CmsPage() {
     setSectionData((prev: any) => ({ ...prev, [field]: value }));
   };
 
+  const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB — Vercel serverless body limit
+
   const handleImageUpload = async (field: string) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -98,6 +100,10 @@ export default function CmsPage() {
     input.onchange = async (e: any) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      if (file.size > MAX_UPLOAD_BYTES) {
+        toast.error('Image must be under 4 MB');
+        return;
+      }
       try {
         const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
         if (urls && urls.length > 0) {
@@ -143,6 +149,10 @@ export default function CmsPage() {
     input.onchange = async (e: any) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      if (file.size > MAX_UPLOAD_BYTES) {
+        toast.error('Image must be under 4 MB');
+        return;
+      }
       try {
         const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
         if (urls && urls.length > 0) {
@@ -207,6 +217,10 @@ export default function CmsPage() {
     input.onchange = async (e: any) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      if (file.size > MAX_UPLOAD_BYTES) {
+        toast.error('Image must be under 4 MB');
+        return;
+      }
       try {
         const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
         if (urls && urls.length > 0) {
@@ -307,6 +321,10 @@ export default function CmsPage() {
                     input.onchange = async (e: any) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
+                      if (file.size > MAX_UPLOAD_BYTES) {
+                        toast.error('Image must be under 4 MB');
+                        return;
+                      }
                       try {
                         const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
                         if (urls && urls.length > 0) {

@@ -27,11 +27,8 @@ async function getHandler(): Promise<express.Express> {
 }
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-cron-secret,x-company-id');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
+  // CORS is handled at the platform level via vercel.json headers.
+  // Handle OPTIONS preflight early so the function returns 200 before NestJS initializes.
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }

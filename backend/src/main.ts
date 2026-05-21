@@ -40,22 +40,16 @@ export async function configureApp(expressInstance?: express.Express) {
   // compressed automatically. Enable compression unconditionally.
   app.use(compression());
 
-  // CORS
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
-    configService.get<string>('FRONTEND_URL'),
-    configService.get<string>('CORS_ORIGIN'),
-  ].filter(Boolean);
-
-  app.enableCors({
-    origin: true, // reflect request Origin — required for dynamic tenant custom domains
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret', 'x-company-id'],
-    credentials: true,
-  });
+  // CORS — handled by vercel.json platform headers in production.
+  // Only enable NestJS CORS for local development to avoid duplicate headers.
+  if (!process.env.VERCEL) {
+    app.enableCors({
+      origin: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret', 'x-company-id'],
+      credentials: true,
+    });
+  }
 
   // API Versioning
   app.enableVersioning({
