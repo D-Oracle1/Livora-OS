@@ -9,6 +9,7 @@ const SUPABASE_ANON_KEY = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim
 
 const log = (...args: any[]) => console.log('[Realtime]', ...args);
 const warn = (...args: any[]) => console.warn('[Realtime]', ...args);
+const MAX_CHANNEL_FAILURES = 3;
 
 type EventHandler = (data: any) => void;
 
@@ -39,6 +40,7 @@ export function PusherProvider({ children }: { children: React.ReactNode }) {
   const channelsRef = useRef<Map<string, RealtimeChannel>>(new Map());
   const userEventHandlersRef = useRef<Map<string, Set<EventHandler>>>(new Map());
   const mountedRef = useRef(true);
+  const channelFailuresRef = useRef<Map<string, number>>(new Map());
 
   const initRealtime = useCallback(() => {
     const token = getToken();
@@ -77,10 +79,20 @@ export function PusherProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .subscribe((status) => {
-        log(`User channel "${userChannelName}" status: ${status}`);
-        if (mountedRef.current) {
-          setIsConnected(status === 'SUBSCRIBED');
+        if (!mountedRef.current) return;
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          const failures = (channelFailuresRef.current.get(userChannelName) || 0) + 1;
+          channelFailuresRef.current.set(userChannelName, failures);
+          if (failures >= MAX_CHANNEL_FAILURES) {
+            warn(`Realtime unavailable after ${failures} attempts — stopping retries`);
+            supabase.realtime.disconnect(1000, 'max retries');
+          }
+          setIsConnected(false);
+          return;
         }
+        if (status === 'SUBSCRIBED') channelFailuresRef.current.set(userChannelName, 0);
+        log(`User channel "${userChannelName}" status: ${status}`);
+        setIsConnected(status === 'SUBSCRIBED');
       });
     channelsRef.current.set(userChannelName, userChannel);
 
@@ -99,7 +111,10 @@ export function PusherProvider({ children }: { children: React.ReactNode }) {
           }
         })
         .subscribe((status) => {
-          log(`Role channel "${roleChannelName}" status: ${status}`);
+          if (!mountedRef.current) return;
+          if (status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT') {
+            log(`Role channel "${roleChannelName}" status: ${status}`);
+          }
         });
       channelsRef.current.set(roleChannelName, roleChannel);
     }
@@ -120,6 +135,8 @@ export function PusherProvider({ children }: { children: React.ReactNode }) {
         setOnlineUsers(ids);
       })
       .subscribe(async (status) => {
+        if (!mountedRef.current) return;
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') return;
         log(`Presence channel status: ${status}`);
         if (status === 'SUBSCRIBED') {
           await presenceChannel.track({
@@ -140,6 +157,7 @@ export function PusherProvider({ children }: { children: React.ReactNode }) {
       channelsRef.current.clear();
       supabaseRef.current = null;
     }
+    channelFailuresRef.current.clear();
     setIsConnected(false);
   }, []);
 
