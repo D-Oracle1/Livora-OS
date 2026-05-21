@@ -281,10 +281,10 @@ export default function NewsletterPage() {
 
   // ── Send email ───────────────────────────────────────────────────────────────
   const buildFinalContent = () => {
-    let finalContent = content;
+    let finalContent = '';
     if (images.length > 0) {
       finalContent +=
-        '<div style="margin-top:16px;">' +
+        '<div style="margin-bottom:16px;">' +
         images
           .map(
             (url) =>
@@ -293,6 +293,7 @@ export default function NewsletterPage() {
           .join('') +
         '</div>';
     }
+    finalContent += content;
     return finalContent;
   };
 
@@ -903,16 +904,8 @@ export default function NewsletterPage() {
                 </div>
                 {/* Email Body */}
                 <div className="bg-white p-5">
-                  {content ? (
-                    <div
-                      className="prose prose-sm max-w-none text-gray-800"
-                      dangerouslySetInnerHTML={{ __html: content }}
-                    />
-                  ) : (
-                    <p className="text-gray-400 text-sm italic">Your content will appear here...</p>
-                  )}
                   {images.length > 0 && (
-                    <div className="mt-3 space-y-2">
+                    <div className="mb-3 space-y-2">
                       {images.map((url, i) => (
                         <img
                           key={i}
@@ -925,6 +918,14 @@ export default function NewsletterPage() {
                         />
                       ))}
                     </div>
+                  )}
+                  {content ? (
+                    <div
+                      className="prose prose-sm max-w-none text-gray-800"
+                      dangerouslySetInnerHTML={{ __html: content }}
+                    />
+                  ) : (
+                    <p className="text-gray-400 text-sm italic">Your content will appear here...</p>
                   )}
                 </div>
                 {/* Attachments */}
