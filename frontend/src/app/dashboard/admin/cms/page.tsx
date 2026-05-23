@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Home,
   Info,
@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import { api, getImageUrl } from '@/lib/api';
 import { resetBrandingCache } from '@/hooks/use-branding';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { ImageCropModal } from '@/components/ui/image-crop-modal';
 import { cn } from '@/lib/utils';
 
 
@@ -56,6 +57,8 @@ export default function CmsPage() {
   const [sectionData, setSectionData] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const pendingUploadRef = useRef<((f: File) => Promise<void>) | null>(null);
 
   const fetchSection = useCallback(async (key: string) => {
     setLoading(true);
@@ -93,28 +96,41 @@ export default function CmsPage() {
 
   const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB — Vercel serverless body limit
 
-  const handleImageUpload = async (field: string) => {
+  /** Open file picker → size check → crop modal → upload */
+  const openCropFlow = (onUpload: (f: File) => Promise<void>) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
+    input.onchange = (e: any) => {
+      const file: File | undefined = e.target.files?.[0];
       if (!file) return;
       if (file.size > MAX_UPLOAD_BYTES) {
         toast.error('Image must be under 4 MB');
         return;
       }
-      try {
-        const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
-        if (urls && urls.length > 0) {
-          updateField(field, urls[0]);
-          toast.success('Image uploaded');
-        }
-      } catch {
-        toast.error('Failed to upload image');
-      }
+      pendingUploadRef.current = onUpload;
+      setCropFile(file);
     };
     input.click();
+  };
+
+  const handleCropDone = async (croppedFile: File) => {
+    setCropFile(null);
+    const upload = pendingUploadRef.current;
+    pendingUploadRef.current = null;
+    if (!upload) return;
+    try {
+      await upload(croppedFile);
+    } catch {
+      toast.error('Failed to upload image');
+    }
+  };
+
+  const handleImageUpload = (field: string) => {
+    openCropFlow(async (file) => {
+      const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
+      if (urls?.length) { updateField(field, urls[0]); toast.success('Image uploaded'); }
+    });
   };
 
   const renderImageField = (label: string, field: string) => (
@@ -142,29 +158,15 @@ export default function CmsPage() {
     </div>
   );
 
-  const handleSideCarouselImageAdd = async () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (file.size > MAX_UPLOAD_BYTES) {
-        toast.error('Image must be under 4 MB');
-        return;
+  const handleSideCarouselImageAdd = () => {
+    openCropFlow(async (file) => {
+      const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
+      if (urls?.length) {
+        const existing: string[] = Array.isArray(sectionData.heroImages) ? sectionData.heroImages : [];
+        updateField('heroImages', [...existing, urls[0]]);
+        toast.success('Image added to side carousel');
       }
-      try {
-        const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
-        if (urls && urls.length > 0) {
-          const existing: string[] = Array.isArray(sectionData.heroImages) ? sectionData.heroImages : [];
-          updateField('heroImages', [...existing, urls[0]]);
-          toast.success('Image added to side carousel');
-        }
-      } catch {
-        toast.error('Failed to upload image');
-      }
-    };
-    input.click();
+    });
   };
 
   const renderSideCarouselImages = () => {
@@ -210,29 +212,15 @@ export default function CmsPage() {
     );
   };
 
-  const handleCarouselImageAdd = async () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (file.size > MAX_UPLOAD_BYTES) {
-        toast.error('Image must be under 4 MB');
-        return;
+  const handleCarouselImageAdd = () => {
+    openCropFlow(async (file) => {
+      const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
+      if (urls?.length) {
+        const existing: string[] = Array.isArray(sectionData.backgroundImages) ? sectionData.backgroundImages : [];
+        updateField('backgroundImages', [...existing, urls[0]]);
+        toast.success('Image added to carousel');
       }
-      try {
-        const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
-        if (urls && urls.length > 0) {
-          const existing: string[] = Array.isArray(sectionData.backgroundImages) ? sectionData.backgroundImages : [];
-          updateField('backgroundImages', [...existing, urls[0]]);
-          toast.success('Image added to carousel');
-        }
-      } catch {
-        toast.error('Failed to upload image');
-      }
-    };
-    input.click();
+    });
   };
 
   const renderCarouselImages = () => {
@@ -315,29 +303,15 @@ export default function CmsPage() {
                 const imgVal: string = item[f.key] || '';
                 if (f.type === 'image') {
                   const handleItemImageUpload = () => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.onchange = async (e: any) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > MAX_UPLOAD_BYTES) {
-                        toast.error('Image must be under 4 MB');
-                        return;
+                    openCropFlow(async (file) => {
+                      const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
+                      if (urls?.length) {
+                        const updated = [...items];
+                        updated[idx] = { ...updated[idx], [f.key]: urls[0] };
+                        updateField(field, updated);
+                        toast.success('Image uploaded');
                       }
-                      try {
-                        const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
-                        if (urls && urls.length > 0) {
-                          const updated = [...items];
-                          updated[idx] = { ...updated[idx], [f.key]: urls[0] };
-                          updateField(field, updated);
-                          toast.success('Image uploaded');
-                        }
-                      } catch {
-                        toast.error('Failed to upload image');
-                      }
-                    };
-                    input.click();
+                    });
                   };
                   return (
                     <div key={f.key}>
@@ -864,6 +838,12 @@ export default function CmsPage() {
   };
 
   return (
+    <>
+    <ImageCropModal
+      file={cropFile}
+      onCrop={handleCropDone}
+      onClose={() => { setCropFile(null); pendingUploadRef.current = null; }}
+    />
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -920,5 +900,6 @@ export default function CmsPage() {
         </Card>
       </div>
     </div>
+    </>
   );
 }

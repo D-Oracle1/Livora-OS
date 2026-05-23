@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus,
   Loader2,
@@ -43,6 +43,7 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { ImageCropModal } from '@/components/ui/image-crop-modal';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -232,6 +233,8 @@ export default function EngagementPage() {
   const [form, setForm] = useState<PostFormData>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const pendingUploadRef = useRef<((f: File) => Promise<void>) | null>(null);
 
   // Analytics state
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -405,31 +408,35 @@ export default function EngagementPage() {
     }
   };
 
-  const handleMediaUpload = async () => {
+  const handleMediaUpload = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*,video/*';
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
+    input.accept = 'image/*';
+    input.onchange = (e: any) => {
+      const file: File | undefined = e.target.files?.[0];
       if (!file) return;
-      if (file.size > 4 * 1024 * 1024) {
-        toast.error('File must be under 4 MB');
-        return;
-      }
-      setUploading(true);
-      try {
-        const urls = await api.uploadFiles('/upload/cms-images', [file], 'images');
-        if (urls && urls.length > 0) {
-          updateForm('mediaUrl', urls[0]);
-          toast.success('Media uploaded');
+      if (file.size > 4 * 1024 * 1024) { toast.error('Image must be under 4 MB'); return; }
+      pendingUploadRef.current = async (cropped) => {
+        setUploading(true);
+        try {
+          const urls = await api.uploadFiles('/upload/cms-images', [cropped], 'images');
+          if (urls?.length) { updateForm('mediaUrl', urls[0]); toast.success('Image uploaded'); }
+        } catch {
+          toast.error('Failed to upload image');
+        } finally {
+          setUploading(false);
         }
-      } catch {
-        toast.error('Failed to upload media');
-      } finally {
-        setUploading(false);
-      }
+      };
+      setCropFile(file);
     };
     input.click();
+  };
+
+  const handleCropDone = async (croppedFile: File) => {
+    setCropFile(null);
+    const upload = pendingUploadRef.current;
+    pendingUploadRef.current = null;
+    if (upload) await upload(croppedFile);
   };
 
   // ---------------------------------------------------------------------------
@@ -875,6 +882,12 @@ export default function EngagementPage() {
   // ---------------------------------------------------------------------------
 
   return (
+    <>
+    <ImageCropModal
+      file={cropFile}
+      onCrop={handleCropDone}
+      onClose={() => { setCropFile(null); pendingUploadRef.current = null; }}
+    />
     <div className="space-y-6">
       {/* Page header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-emerald-600 to-teal-500 p-5 sm:p-6 text-white shadow-lg">
@@ -923,5 +936,6 @@ export default function EngagementPage() {
 
       {renderDialog()}
     </div>
+    </>
   );
 }
