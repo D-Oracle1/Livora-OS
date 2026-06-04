@@ -128,6 +128,28 @@ export class CompanyService {
     };
   }
 
+  /** Returns flat list with parent/subsidiary relationships for hierarchy UI */
+  async findAllWithHierarchy() {
+    const all = await this.masterPrisma.company.findMany({
+      select: {
+        id: true, name: true, slug: true, domain: true, logo: true,
+        primaryColor: true, isActive: true, plan: true,
+        type: true, parentId: true,
+        city: true, country: true,
+        subsidiaries: {
+          select: {
+            id: true, name: true, slug: true, domain: true, logo: true,
+            primaryColor: true, isActive: true, plan: true,
+            type: true, parentId: true, city: true, country: true,
+          },
+        },
+      },
+      where: { parentId: null },   // top-level only; subsidiaries nested
+      orderBy: { createdAt: 'desc' },
+    });
+    return all;
+  }
+
   async findById(id: string) {
     let company: any;
     try {
@@ -737,7 +759,7 @@ export class CompanyService {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'RMS Platform';
+    workbook.creator = 'Livora OS';
     workbook.created = new Date();
 
     const addSheet = (name: string, headers: string[], rows: any[][]) => {

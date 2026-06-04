@@ -66,7 +66,7 @@ const ASSIGNABLE_ROLES = ['ADMIN', 'GENERAL_OVERSEER', 'HR', 'REALTOR', 'CLIENT'
 const PRESET_THEMES = [
   { name: 'Blue', hex: '#3b82f6' },
   { name: 'Indigo', hex: '#6366f1' },
-  { name: 'Purple', hex: '#8b5cf6' },
+  { name: 'Purple', hex: '#4a32af' },
   { name: 'Pink', hex: '#ec4899' },
   { name: 'Red', hex: '#ef4444' },
   { name: 'Orange', hex: '#f97316' },
@@ -1038,7 +1038,7 @@ export default function CompaniesPage() {
                 <form onSubmit={handleRegisterExisting} className="space-y-4">
                   <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
                     <p className="text-xs text-amber-700 dark:text-amber-400">
-                      Use this to register an existing PostgreSQL database (e.g. your current RMS installation) as a tenant — no schema provisioning is performed.
+                      Use this to register an existing PostgreSQL database (e.g. your current Livora OS installation) as a tenant — no schema provisioning is performed.
                     </p>
                   </div>
                   <div>
@@ -1049,7 +1049,7 @@ export default function CompaniesPage() {
                         const name = e.target.value;
                         setExistingDbData({ ...existingDbData, name, slug: autoSlug(name) });
                       }}
-                      placeholder="RMS Platform"
+                      placeholder="Livora OS"
                       required
                     />
                   </div>
@@ -1058,7 +1058,7 @@ export default function CompaniesPage() {
                     <Input
                       value={existingDbData.slug}
                       onChange={(e) => setExistingDbData({ ...existingDbData, slug: e.target.value })}
-                      placeholder="rms-platform"
+                      placeholder="livora-os"
                       required
                     />
                   </div>

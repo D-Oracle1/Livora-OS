@@ -1,5 +1,5 @@
 // ===========================================
-// RMS Platform - Master Database Schema
+// Livora OS - Master Database Schema
 // Stores company/tenant records and super admin accounts
 // ===========================================
 
@@ -11,6 +11,12 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("MASTER_DATABASE_URL")
+}
+
+enum CompanyType {
+  PARENT
+  SUBSIDIARY
+  STANDALONE
 }
 
 model Company {
@@ -26,12 +32,33 @@ model Company {
   plan          String         @default("standard")
   maxUsers      Int            @default(50)
   pwaSettings   Json?
+
+  // Multi-company hierarchy
+  type          CompanyType    @default(STANDALONE)
+  parentId      String?
+  parent        Company?       @relation("CompanyHierarchy", fields: [parentId], references: [id])
+  subsidiaries  Company[]      @relation("CompanyHierarchy")
+
+  // Company details
+  description   String?
+  address       String?
+  city          String?
+  state         String?
+  country       String?
+  phone         String?
+  email         String?
+  website       String?
+  registrationNo String?
+  taxId         String?
+
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   supportThread SupportThread?
 
   @@index([domain])
   @@index([inviteCode])
+  @@index([parentId])
+  @@index([type])
   @@map("companies")
 }
 

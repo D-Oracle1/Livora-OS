@@ -32,6 +32,12 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
+    // BRANCH_MANAGER inherits ADMIN-level access within their branch
+    // (actual branch scoping enforced separately in services via branchId)
+    if (user.role === 'BRANCH_MANAGER' && requiredRoles.includes('ADMIN')) {
+      return true;
+    }
+
     const hasRole = requiredRoles.some((role) => user.role === role);
 
     if (!hasRole) {

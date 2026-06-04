@@ -62,7 +62,7 @@ export class AiMessagingService {
 
   async generateNewsletterContent(data: NewsletterData): Promise<AIGeneratedContent> {
     const toneGuide = this.getToneGuide(data.tone);
-    const companyName = data.companyName || 'RMS Platform';
+    const companyName = data.companyName || 'Livora OS';
     const brandColor = data.brandColor || '#1F5625';
 
     const prompt = `You are an expert real estate email copywriter for ${companyName}.
@@ -93,7 +93,7 @@ ${data.ctaText ? `- CTA text: ${data.ctaText}` : ''}`;
 
   async generateBirthdayMessage(data: BirthdayData): Promise<AIGeneratedContent> {
     const toneGuide = this.getToneGuide(data.tone);
-    const companyName = data.companyName || 'RMS Platform';
+    const companyName = data.companyName || 'Livora OS';
     const brandColor = data.brandColor || '#1F5625';
 
     const prompt = `You are writing a birthday email for ${companyName}, a real estate company.
@@ -118,7 +118,7 @@ ${data.ctaUrl ? `- Include CTA to: ${data.ctaUrl}` : ''}`;
 
   async generatePropertyAlert(data: PropertyAlertData): Promise<AIGeneratedContent> {
     const toneGuide = this.getToneGuide(data.tone);
-    const companyName = data.companyName || 'RMS Platform';
+    const companyName = data.companyName || 'Livora OS';
     const brandColor = data.brandColor || '#1F5625';
 
     const propertyList = data.properties
@@ -149,7 +149,7 @@ ${data.ctaUrl ? `- Main CTA: ${data.ctaUrl}` : ''}`;
 
   async generateCustomCampaign(data: CustomCampaignData): Promise<AIGeneratedContent> {
     const toneGuide = this.getToneGuide(data.tone);
-    const companyName = data.companyName || 'RMS Platform';
+    const companyName = data.companyName || 'Livora OS';
     const brandColor = data.brandColor || '#1F5625';
 
     const prompt = `You are writing a marketing email for ${companyName}, a real estate company.
@@ -247,7 +247,7 @@ ${data.ctaText ? `- CTA text: ${data.ctaText}` : ''}`;
   }
 
   private parseResponse(rawContent: string, prompt: string): AIGeneratedContent {
-    let subject = 'Update from RMS Platform';
+    let subject = 'Update from Livora OS';
     let htmlContent = rawContent;
 
     // Extract subject line
@@ -265,7 +265,7 @@ ${data.ctaText ? `- CTA text: ${data.ctaText}` : ''}`;
 
   private fallbackContent(prompt: string): AIGeneratedContent {
     return {
-      subject: 'Update from RMS Platform',
+      subject: 'Update from Livora OS',
       htmlContent: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #1F5625;">Latest Updates</h2>

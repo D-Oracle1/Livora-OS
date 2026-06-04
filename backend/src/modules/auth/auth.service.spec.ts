@@ -52,7 +52,7 @@ describe('AuthService', () => {
         'jwt.refreshSecret': 'test-refresh-secret',
         'jwt.refreshExpiresIn': '30d',
         appUrl: 'http://localhost:3000',
-        appName: 'RMS Test',
+        appName: 'Livora OS Test',
       };
       return config[key] ?? defaultVal;
     }),

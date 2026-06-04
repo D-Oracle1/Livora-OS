@@ -11,7 +11,7 @@ export class HealthController {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'RMS Backend API',
+      service: 'Livora OS Backend API',
       version: '1.0.0',
     };
   }

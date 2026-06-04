@@ -6,6 +6,14 @@ import { getTenantId } from '@/lib/api';
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim();
 const STORAGE_KEY = 'cms_branding';
 
+// Use proxy path in browser to avoid CORS; absolute URL in SSR/dev
+function brandingUrl(): string {
+  if (typeof window !== 'undefined' && !API_BASE_URL.includes('localhost')) {
+    return '/api/v1/cms/public/branding';
+  }
+  return `${API_BASE_URL}/api/v1/cms/public/branding`;
+}
+
 export interface BrandingData {
   companyName?: string;
   shortName?: string;
@@ -58,7 +66,7 @@ function fetchBranding(): Promise<void> {
     const headers: HeadersInit = {};
     const tid = getTenantId();
     if (tid) (headers as Record<string, string>)['X-Company-ID'] = tid;
-    cache.promise = fetch(`${API_BASE_URL}/api/v1/cms/public/branding`, { headers })
+    cache.promise = fetch(brandingUrl(), { headers })
       .then((r) => (r.ok ? r.json() : null))
       .then((raw) => {
         const data = raw?.data || raw;
@@ -136,11 +144,11 @@ export function useBranding(): BrandingData {
 
 /** Helper — company name with fallback */
 export function getCompanyName(branding: BrandingData): string {
-  return branding.companyName || 'RMS Platform';
+  return branding.companyName || 'Livora OS';
 }
 
 /** Helper — short name with fallback.
- *  Priority: explicit shortName → first-word of companyName → 'RMS'
+ *  Priority: explicit shortName → first-word of companyName → 'Livora OS'
  */
 export function getShortName(branding: BrandingData): string {
   if (branding.shortName) return branding.shortName;
@@ -151,5 +159,5 @@ export function getShortName(branding: BrandingData): string {
       ? words.map((w) => w[0]).join('').toUpperCase().slice(0, 4)
       : branding.companyName.slice(0, 6);
   }
-  return 'RMS';
+  return 'Livora OS';
 }

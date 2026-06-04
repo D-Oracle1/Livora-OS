@@ -1,5 +1,5 @@
 // ===========================================
-// RMS Platform - Shared Constants
+// Livora OS - Shared Constants
 // ===========================================
 
 // API Versions

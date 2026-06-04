@@ -77,7 +77,7 @@ export default function CreateDirectorPage() {
             width: '56px',
             height: '56px',
             borderRadius: '50%',
-            background: '#0b5c46',
+            background: '#2b1464',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -248,7 +248,7 @@ export default function CreateDirectorPage() {
               style={{
                 width: '100%',
                 padding: '0.75rem',
-                background: loading ? '#9ca3af' : '#0b5c46',
+                background: loading ? '#9ca3af' : '#2b1464',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '8px',

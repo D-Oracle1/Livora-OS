@@ -105,7 +105,7 @@ export function SaleApprovalModal({ open, onClose, saleData }: SaleApprovalModal
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <NairaSign className="w-3 h-3" /> Amount
               </p>
-              <p className="font-semibold text-sm text-[#0b5c46]">
+              <p className="font-semibold text-sm text-[#2b1464]">
                 {saleData.salePrice ? formatCurrency(saleData.salePrice) : 'N/A'}
               </p>
             </div>
@@ -171,7 +171,7 @@ export function SaleApprovalModal({ open, onClose, saleData }: SaleApprovalModal
                 Reject
               </Button>
               <Button
-                className="bg-[#0b5c46] hover:bg-[#094a38] text-white"
+                className="bg-[#2b1464] hover:bg-[#1e0e47] text-white"
                 onClick={handleApprove}
                 disabled={!!loading}
               >

@@ -1,5 +1,5 @@
 // ===========================================
-// RMS Platform - Shared Types
+// Livora OS - Shared Types
 // ===========================================
 
 // User Roles

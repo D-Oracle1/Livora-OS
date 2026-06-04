@@ -17,6 +17,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
+    // Always guarantee CORS headers on error responses — guards and other
+    // NestJS pipeline stages can throw before the cors middleware flushes its
+    // headers, and Vercel's serverless environment may not preserve pre-set
+    // headers across pipeline boundaries.
+    const origin = (request.headers as any).origin as string | undefined;
+    response.setHeader('Access-Control-Allow-Origin', origin || '*');
+    if (origin) response.setHeader('Vary', 'Origin');
+    response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    response.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-cron-secret,x-company-id');
+    response.setHeader('Access-Control-Allow-Credentials', 'true');
+
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
     let error = 'Internal Server Error';

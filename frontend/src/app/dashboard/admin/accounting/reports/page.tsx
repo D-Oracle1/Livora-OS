@@ -17,7 +17,7 @@ import {
 type ReportTab = 'trend' | 'breakdown' | 'revenue';
 type TrendMonths = 6 | 12 | 24;
 
-const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
+const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#4a32af', '#06b6d4', '#f97316'];
 
 function getThisYearRange() {
   const y = new Date().getFullYear();

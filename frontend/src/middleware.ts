@@ -2,24 +2,29 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Two deployment modes:
+ * Three deployment contexts:
  *
- * ADMIN mode  (NEXT_PUBLIC_ADMIN_ONLY=true  — rms-admin-dashboard project)
- *   • / → /platform  (Vicson Estate Suite landing page)
- *   • /dashboard/super-admin, /auth/*, /platform → allowed
- *   • everything else → /platform
+ * ADMIN mode  (NEXT_PUBLIC_ADMIN_ONLY=true — dedicated admin project)
+ *   • / → /platform
+ *   • only /dashboard/*, /auth/*, /platform/* allowed
  *
- * TENANT mode (default — frontend project, tenant custom domains)
+ * PLATFORM mode (default — livoraos.vercel.app, localhost, *.vercel.app)
+ *   • no route restrictions — all dashboards accessible
+ *
+ * TENANT mode (custom domain, e.g. tenant.com)
  *   • /dashboard/super-admin → blocked (redirect to /)
  *   • /platform → blocked (redirect to /)
  *   • everything else → allowed
  */
 
-function isMasterDomain(hostname: string): boolean {
-  if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+function isTenantCustomDomain(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return false;
+  if (hostname.endsWith('.vercel.app')) return false;
+  if (hostname.endsWith('.railway.app')) return false;
+  if (hostname.endsWith('.render.com')) return false;
   const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN;
-  if (platformDomain && hostname === platformDomain) return true;
-  return false;
+  if (platformDomain && hostname === platformDomain) return false;
+  return true;
 }
 
 export function middleware(request: NextRequest) {
@@ -36,26 +41,21 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Admin mode: explicit env flag (rms-admin-dashboard project) OR master hostname
-  const isAdminMode =
-    process.env.NEXT_PUBLIC_ADMIN_ONLY === 'true' || isMasterDomain(hostname);
+  const isAdminMode = process.env.NEXT_PUBLIC_ADMIN_ONLY === 'true';
 
   if (isAdminMode) {
-    // Root → platform landing page (Vicson Estate Suite)
     if (pathname === '/') {
       return NextResponse.redirect(new URL('/platform', request.url));
     }
-    // Allow admin dashboard, auth pages, and the platform landing
     const allowed =
-      pathname.startsWith('/dashboard/super-admin') ||
-      pathname.startsWith('/dashboard/admin') ||
+      pathname.startsWith('/dashboard') ||
       pathname.startsWith('/auth') ||
       pathname.startsWith('/platform');
     if (!allowed) {
       return NextResponse.redirect(new URL('/platform', request.url));
     }
-  } else {
-    // Tenant mode: block super-admin and platform routes
+  } else if (isTenantCustomDomain(hostname)) {
+    // Custom tenant domain: block super-admin and platform routes
     if (
       pathname.startsWith('/dashboard/super-admin') ||
       pathname.startsWith('/platform')

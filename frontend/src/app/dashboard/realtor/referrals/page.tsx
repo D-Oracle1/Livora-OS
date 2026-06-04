@@ -78,8 +78,8 @@ export default function RealtorReferralsPage() {
           <CardContent className="p-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#0b5c46]/10 flex items-center justify-center">
-                  <Link className="w-5 h-5 text-[#0b5c46]" />
+                <div className="w-10 h-10 rounded-full bg-[#2b1464]/10 flex items-center justify-center">
+                  <Link className="w-5 h-5 text-[#2b1464]" />
                 </div>
                 <div>
                   <p className="font-semibold text-sm">Your Referral Link</p>
@@ -100,7 +100,7 @@ export default function RealtorReferralsPage() {
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Users2 className="w-5 h-5 text-[#0b5c46]" />
+            <Users2 className="w-5 h-5 text-[#2b1464]" />
             Referral Leads ({referrals.length})
           </CardTitle>
         </CardHeader>
@@ -113,7 +113,7 @@ export default function RealtorReferralsPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-[#0b5c46] hover:bg-[#0b5c46]">
+                  <TableRow className="bg-[#2b1464] hover:bg-[#2b1464]">
                     <TableHead className="text-white font-semibold">NAME</TableHead>
                     <TableHead className="text-white font-semibold hidden md:table-cell">EMAIL</TableHead>
                     <TableHead className="text-white font-semibold">ROLE</TableHead>

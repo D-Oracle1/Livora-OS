@@ -2,7 +2,7 @@ export default () => ({
   // Application
   port: parseInt(process.env.BACKEND_PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  appName: process.env.APP_NAME || 'RMS Platform',
+  appName: process.env.APP_NAME || 'Livora OS',
   appUrl: process.env.APP_URL || 'http://localhost:3000',
   apiUrl: process.env.API_URL || 'http://localhost:4000',
 
@@ -11,9 +11,9 @@ export default () => ({
     url: process.env.DATABASE_URL,
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),
-    name: process.env.DB_NAME || 'rms_db',
-    user: process.env.DB_USER || 'rms_user',
-    password: process.env.DB_PASSWORD || 'rms_password',
+    name: process.env.DB_NAME || 'livora_db',
+    user: process.env.DB_USER || 'livora_user',
+    password: process.env.DB_PASSWORD || 'livora_password',
   },
 
   // Redis
@@ -26,7 +26,7 @@ export default () => ({
 
   // MongoDB
   mongodb: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/rms_chat',
+    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/livora_chat',
   },
 
   // JWT
@@ -48,7 +48,7 @@ export default () => ({
     port: parseInt(process.env.SMTP_PORT || '587', 10),
     user: process.env.SMTP_USER,
     password: process.env.SMTP_PASSWORD,
-    from: process.env.SMTP_FROM || 'noreply@rms-platform.com',
+    from: process.env.SMTP_FROM || 'noreply@livora-os.com',
   },
 
   // SMS (Twilio)
@@ -60,7 +60,7 @@ export default () => ({
 
   // Push Notifications (Web Push)
   webPush: {
-    subject: process.env.VAPID_SUBJECT || 'mailto:admin@rms-platform.com',
+    subject: process.env.VAPID_SUBJECT || 'mailto:admin@livora-os.com',
     publicKey: process.env.VAPID_PUBLIC_KEY,
     privateKey: process.env.VAPID_PRIVATE_KEY,
   },
@@ -70,7 +70,7 @@ export default () => ({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     region: process.env.AWS_REGION || 'us-east-1',
-    s3Bucket: process.env.AWS_S3_BUCKET || 'rms-platform-files',
+    s3Bucket: process.env.AWS_S3_BUCKET || 'livora-os-files',
   },
 
   // CDN (optional — set to a CloudFront or custom CDN URL to rewrite blob URLs)

@@ -799,4 +799,124 @@ export class AccountingService {
   async validateConsistency() {
     return this.ledger.validateConsistency();
   }
+
+  // ─── Branch-Level Financial Reports ────────────────────────────────────────
+
+  /** P&L scoped to a single branch */
+  async getBranchProfitAndLoss(branchId: string, startDate: string, endDate: string) {
+    const start = new Date(startDate);
+    const end   = new Date(endDate);
+
+    const [salesAgg, expensesAgg, expensesByCategory, commissions] = await Promise.all([
+      this.prisma.sale.aggregate({
+        where: { branchId, status: 'COMPLETED', saleDate: { gte: start, lte: end } },
+        _sum: { salePrice: true, commissionAmount: true, taxAmount: true, netAmount: true },
+        _count: true,
+      }),
+      this.safeExpenseQuery(
+        () => this.prisma.expense.aggregate({
+          where: { branchId, approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: start, lte: end } },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        { _sum: { amount: null }, _count: 0 },
+      ),
+      this.safeExpenseQuery(
+        () => this.prisma.expense.groupBy({
+          by: ['categoryId'],
+          where: { branchId, approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: start, lte: end } },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        [],
+      ),
+      this.prisma.commission.aggregate({
+        where: { sale: { branchId, createdAt: { gte: start, lte: end } } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const revenue    = this.toNum(salesAgg._sum.salePrice);
+    const expenses   = this.toNum(expensesAgg._sum.amount);
+    const commission = this.toNum(salesAgg._sum.commissionAmount);
+    const tax        = this.toNum(salesAgg._sum.taxAmount);
+    const netProfit  = revenue - expenses - commission - tax;
+
+    const categoryIds = expensesByCategory.map((e: any) => e.categoryId);
+    const categories = categoryIds.length
+      ? await this.prisma.expenseCategory.findMany({ where: { id: { in: categoryIds } }, select: { id: true, name: true } })
+      : [];
+    const catMap = new Map(categories.map((c) => [c.id, c]));
+
+    return {
+      branchId,
+      period: { startDate: start.toISOString(), endDate: end.toISOString() },
+      income: {
+        grossRevenue: revenue,
+        totalSales:   salesAgg._count,
+      },
+      costs: {
+        commission,
+        tax,
+        operationalExpenses: expenses,
+        totalCosts: commission + tax + expenses,
+      },
+      expenseBreakdown: expensesByCategory.map((e: any) => ({
+        category: catMap.get(e.categoryId)?.name ?? 'Unknown',
+        amount:   this.toNum(e._sum?.amount),
+        count:    e._count,
+      })),
+      netProfit,
+      margin: revenue > 0 ? ((netProfit / revenue) * 100).toFixed(2) + '%' : '0%',
+    };
+  }
+
+  /** Consolidated revenue comparison across all branches */
+  async getBranchComparison(startDate: string, endDate: string) {
+    const start = new Date(startDate);
+    const end   = new Date(endDate);
+
+    const branches = await this.prisma.branch.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true, city: true } });
+
+    const data = await Promise.all(
+      branches.map(async (b) => {
+        const [sales, expenses] = await Promise.all([
+          this.prisma.sale.aggregate({
+            where: { branchId: b.id, status: 'COMPLETED', saleDate: { gte: start, lte: end } },
+            _sum: { salePrice: true, netAmount: true },
+            _count: true,
+          }),
+          this.safeExpenseQuery(
+            () => this.prisma.expense.aggregate({
+              where: { branchId: b.id, approvalStatus: 'APPROVED', deletedAt: null, expenseDate: { gte: start, lte: end } },
+              _sum: { amount: true },
+            }),
+            { _sum: { amount: null } },
+          ),
+        ]);
+        const revenue  = this.toNum(sales._sum.salePrice);
+        const expenses_ = this.toNum(expenses._sum.amount);
+        return {
+          branchId:   b.id,
+          branchName: b.name,
+          branchCode: b.code,
+          city:       b.city,
+          totalSales: sales._count,
+          revenue,
+          expenses:   expenses_,
+          netProfit:  revenue - expenses_,
+        };
+      }),
+    );
+
+    const totalRevenue  = data.reduce((s, b) => s + b.revenue,   0);
+    const totalExpenses = data.reduce((s, b) => s + b.expenses,  0);
+    const totalProfit   = data.reduce((s, b) => s + b.netProfit, 0);
+
+    return {
+      period: { startDate: start.toISOString(), endDate: end.toISOString() },
+      consolidated: { totalRevenue, totalExpenses, totalProfit, branchCount: branches.length },
+      branches: data.sort((a, b_) => b_.revenue - a.revenue),
+    };
+  }
 }

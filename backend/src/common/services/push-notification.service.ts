@@ -16,7 +16,7 @@ export class PushNotificationService {
 
     if (publicKey && privateKey) {
       try {
-        webPush.setVapidDetails(subject || 'mailto:admin@rms-platform.com', publicKey, privateKey);
+        webPush.setVapidDetails(subject || 'mailto:admin@livora-os.com', publicKey, privateKey);
         this.initialized = true;
         this.logger.log('Web Push notification service initialized');
       } catch (error: any) {

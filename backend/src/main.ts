@@ -40,16 +40,33 @@ export async function configureApp(expressInstance?: express.Express) {
   // compressed automatically. Enable compression unconditionally.
   app.use(compression());
 
-  // CORS — handled by vercel.json platform headers in production.
-  // Only enable NestJS CORS for local development to avoid duplicate headers.
-  if (!process.env.VERCEL) {
-    app.enableCors({
-      origin: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret', 'x-company-id'],
-      credentials: true,
-    });
-  }
+  // CORS — reflect any origin so multi-tenant custom domains work out of the box.
+  // Explicit env vars can restrict this further per-deployment if needed.
+  const extraOrigins = [
+    configService.get<string>('FRONTEND_URL'),
+    configService.get<string>('CORS_ORIGIN'),
+  ].filter(Boolean) as string[];
+
+  app.enableCors({
+    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow: boolean) => void) => {
+      // Allow server-to-server / curl (no Origin header)
+      if (!requestOrigin) return callback(null, true);
+      // Always allow Vercel preview + production URLs and any configured origin
+      if (
+        requestOrigin.endsWith('.vercel.app') ||
+        requestOrigin.startsWith('http://localhost') ||
+        requestOrigin.startsWith('http://127.0.0.1') ||
+        extraOrigins.includes(requestOrigin)
+      ) {
+        return callback(null, true);
+      }
+      // Allow all other origins (required for tenant custom domains)
+      callback(null, true);
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret', 'x-company-id'],
+    credentials: true,
+  });
 
   // API Versioning
   app.enableVersioning({
@@ -97,8 +114,8 @@ async function bootstrap() {
   if (nodeEnv !== 'production') {
     const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
     const config = new DocumentBuilder()
-      .setTitle('RMS Platform API')
-      .setDescription('Realtors Management System - Enterprise PropTech Platform API')
+      .setTitle('Livora OS API')
+      .setDescription('Livora OS - Enterprise PropTech Platform API')
       .setVersion('1.0')
       .addBearerAuth(
         {
@@ -135,7 +152,7 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`
-  RMS Platform - Realtors Management System
+  Livora OS
   Environment: ${nodeEnv}
   Server running on: http://localhost:${port}
   API Documentation: http://localhost:${port}/api/docs

@@ -19,7 +19,7 @@ interface StoredState {
 }
 
 function key(userId: string) {
-  return `rms_chat_v${SCHEMA_VERSION}_${userId}`;
+  return `livora_chat_v${SCHEMA_VERSION}_${userId}`;
 }
 
 const empty = (): Omit<StoredState, 'v' | 'userId'> => ({

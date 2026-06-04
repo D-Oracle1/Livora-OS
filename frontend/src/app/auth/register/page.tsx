@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { useBranding, getCompanyName } from '@/hooks/use-branding';
+import { apiUrl } from '@/lib/api';
 
 const nigerianStates = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
@@ -112,7 +113,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').trim()}/api/v1/auth/register`, {
+      const response = await fetch(apiUrl('/auth/register'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

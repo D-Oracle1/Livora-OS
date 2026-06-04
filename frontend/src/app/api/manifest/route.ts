@@ -14,10 +14,10 @@ const DEFAULT_ICONS = [
 ];
 
 export async function GET(req: NextRequest) {
-  let companyName = 'RMS Platform';
-  let shortName = 'RMS';
+  let companyName = 'Livora OS';
+  let shortName = 'Livora OS';
   let description = 'Enterprise-grade PropTech platform for managing realtors, properties, and clients';
-  let themeColor = '#0b5c46';
+  let themeColor = '#2b1464';
   let bgColor = '#ffffff';
   let icons = DEFAULT_ICONS;
   let splashAnimation = 'none';

@@ -577,7 +577,7 @@ export default function SuperAdminSettings() {
           {/* About */}
           <div>
             <p className={sectionTitle}>About / Description</p>
-            <Textarea rows={4} value={cms.aboutText} onChange={e => setCms(c => ({ ...c, aboutText: e.target.value }))} className="neuo-inset rounded-xl text-sm text-gray-800 placeholder:text-gray-400 resize-none border-0 outline-none px-3 py-2.5 w-full" placeholder="Brief description of the RMS platform..." />
+            <Textarea rows={4} value={cms.aboutText} onChange={e => setCms(c => ({ ...c, aboutText: e.target.value }))} className="neuo-inset rounded-xl text-sm text-gray-800 placeholder:text-gray-400 resize-none border-0 outline-none px-3 py-2.5 w-full" placeholder="Brief description of the Livora OS platform..." />
           </div>
 
           {/* Contact */}

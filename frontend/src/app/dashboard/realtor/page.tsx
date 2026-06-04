@@ -177,26 +177,26 @@ export default function RealtorDashboard() {
   const progressToNext = ((points - currentTierInfo.min) / (currentTierInfo.max - currentTierInfo.min)) * 100;
 
   const earningsBreakdown = useMemo(() => [
-    { name: 'Net Earnings', value: Number(filteredNetEarnings), color: '#0b5c46' },
+    { name: 'Net Earnings', value: Number(filteredNetEarnings), color: '#2b1464' },
     { name: 'Tax Deducted', value: Number(filteredTax), color: '#fca639' },
   ].filter((e) => e.value > 0), [filteredNetEarnings, filteredTax]);
 
   const bottomStats = [
-    { label: 'Active Listings', value: String(properties), icon: Home, color: '#0b5c46' },
+    { label: 'Active Listings', value: String(properties), icon: Home, color: '#2b1464' },
     { label: 'Total Clients', value: String(clients), icon: Users, color: '#fca639' },
-    { label: 'Loyalty Points', value: points.toLocaleString(), icon: Award, color: '#0b5c46' },
+    { label: 'Loyalty Points', value: points.toLocaleString(), icon: Award, color: '#2b1464' },
   ];
 
   const gradientCards = [
-    { title: 'Total Sales', value: String(totalSales), subtitle: `${formatCurrency(stats?.totalSalesValue || 0)} value`, gradient: 'from-[#0b5c46] to-[#0e7a5e]', icon: Target },
+    { title: 'Total Sales', value: String(totalSales), subtitle: `${formatCurrency(stats?.totalSalesValue || 0)} value`, gradient: 'from-[#2b1464] to-[#3b2190]', icon: Target },
     { title: `${periodLabel} Sales`, value: String(filteredSales), subtitle: periodLabel, gradient: 'from-[#fca639] to-[#fdb95c]', icon: TrendingUp },
-    { title: 'Commission', value: formatCurrency(filteredCommission), subtitle: periodLabel, gradient: 'from-[#0b5c46] to-[#14956e]', icon: NairaSign },
+    { title: 'Commission', value: formatCurrency(filteredCommission), subtitle: periodLabel, gradient: 'from-[#2b1464] to-[#14956e]', icon: NairaSign },
     { title: 'Net Earnings', value: formatCurrency(filteredNetEarnings), subtitle: `After tax`, gradient: 'from-[#fca639] to-[#e8953a]', icon: Zap },
   ];
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'COMPLETED': return <Badge className="bg-[#0b5c46]/10 text-[#0b5c46] hover:bg-[#0b5c46]/20">Completed</Badge>;
+      case 'COMPLETED': return <Badge className="bg-[#2b1464]/10 text-[#2b1464] hover:bg-[#2b1464]/20">Completed</Badge>;
       case 'IN_PROGRESS': return <Badge className="bg-blue-100 text-blue-600 hover:bg-blue-200">In Progress</Badge>;
       case 'PENDING': return <Badge className="bg-[#fca639]/10 text-[#fca639] hover:bg-[#fca639]/20">Pending</Badge>;
       case 'CANCELLED': return <Badge className="bg-red-100 text-red-600 hover:bg-red-200">Cancelled</Badge>;
@@ -340,7 +340,7 @@ export default function RealtorDashboard() {
                       <p className="text-3xl font-bold">{filteredSales}</p>
                       <p className="text-sm text-muted-foreground">{periodLabel} Sales</p>
                     </div>
-                    <Button className="bg-[#0b5c46] hover:bg-[#094a38] text-white rounded-full px-6" asChild>
+                    <Button className="bg-[#2b1464] hover:bg-[#1e0e47] text-white rounded-full px-6" asChild>
                       <a href="/dashboard/realtor/sales">View All Sales</a>
                     </Button>
                   </div>
@@ -350,8 +350,8 @@ export default function RealtorDashboard() {
                         <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="colorComm" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#0b5c46" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#0b5c46" stopOpacity={0} />
+                              <stop offset="5%" stopColor="#2b1464" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#2b1464" stopOpacity={0} />
                             </linearGradient>
                             <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#fca639" stopOpacity={0.3} />
@@ -367,7 +367,7 @@ export default function RealtorDashboard() {
                               name === 'revenue' ? 'Revenue' : 'Sales',
                             ]}
                           />
-                          <Area type="monotone" dataKey="revenue" stroke="#0b5c46" strokeWidth={2.5} fill="url(#colorComm)" name="Revenue" dot={{ r: 4, fill: '#0b5c46', stroke: '#fff', strokeWidth: 2 }} />
+                          <Area type="monotone" dataKey="revenue" stroke="#2b1464" strokeWidth={2.5} fill="url(#colorComm)" name="Revenue" dot={{ r: 4, fill: '#2b1464', stroke: '#fff', strokeWidth: 2 }} />
                           <Area type="monotone" dataKey="sales" stroke="#fca639" strokeWidth={2.5} fill="url(#colorSales)" name="Sales" dot={{ r: 4, fill: '#fca639', stroke: '#fff', strokeWidth: 2 }} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -479,8 +479,8 @@ export default function RealtorDashboard() {
             <CardContent className="p-5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#0b5c46]/10 flex items-center justify-center">
-                    <Link className="w-5 h-5 text-[#0b5c46]" />
+                  <div className="w-10 h-10 rounded-full bg-[#2b1464]/10 flex items-center justify-center">
+                    <Link className="w-5 h-5 text-[#2b1464]" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm">Your Referral Link</p>
@@ -494,7 +494,7 @@ export default function RealtorDashboard() {
                     {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     {copied ? 'Copied' : 'Copy'}
                   </Button>
-                  <Button size="sm" className="bg-[#0b5c46] hover:bg-[#094a38] text-white gap-1.5" asChild>
+                  <Button size="sm" className="bg-[#2b1464] hover:bg-[#1e0e47] text-white gap-1.5" asChild>
                     <a href="/dashboard/realtor/referrals">
                       <Users2 className="w-4 h-4" />
                       View Leads
@@ -530,7 +530,7 @@ export default function RealtorDashboard() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-[#0b5c46] hover:bg-[#0b5c46]">
+                    <TableRow className="bg-[#2b1464] hover:bg-[#2b1464]">
                       <TableHead className="text-white font-semibold text-xs">PROPERTY</TableHead>
                       <TableHead className="text-white font-semibold text-xs">CLIENT</TableHead>
                       <TableHead className="text-white font-semibold text-xs">AMOUNT</TableHead>
@@ -546,7 +546,7 @@ export default function RealtorDashboard() {
                         <TableCell className="text-sm">
                           {sale.client?.user ? `${sale.client.user.firstName} ${sale.client.user.lastName}` : 'Unknown'}
                         </TableCell>
-                        <TableCell className="font-semibold text-[#0b5c46] text-sm">{formatCurrency(Number(sale.salePrice || sale.commissionAmount || 0))}</TableCell>
+                        <TableCell className="font-semibold text-[#2b1464] text-sm">{formatCurrency(Number(sale.salePrice || sale.commissionAmount || 0))}</TableCell>
                         <TableCell>{getStatusBadge(sale.status)}</TableCell>
                       </TableRow>
                     ))}

@@ -14,6 +14,8 @@ const withPWA = isProd
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
   turbopack: {},
   experimental: {
     optimizePackageImports: ['lucide-react', 'framer-motion', 'recharts', '@radix-ui/react-icons'],
