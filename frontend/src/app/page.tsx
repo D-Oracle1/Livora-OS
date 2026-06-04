@@ -743,7 +743,7 @@ export default function HomePage() {
                 <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-green-100 dark:border-gray-700 hover:shadow-md transition-all">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="relative flex-shrink-0">
-                      <Image src={agent.image?.startsWith('http') ? agent.image : getImageUrl(agent.image || '')} alt={agent.name} width={52} height={52} className="rounded-full object-cover" />
+                      {(() => { const photo = agent.photo || agent.image || agent.avatar || ''; return <Image src={photo.startsWith('http') ? photo : getImageUrl(photo)} alt={agent.name} width={52} height={52} className="rounded-full object-cover" />; })()}
                       <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-700 rounded-full border-2 border-white" />
                     </div>
                     <div>
