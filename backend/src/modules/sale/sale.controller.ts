@@ -81,6 +81,12 @@ export class SaleController {
       const realtor = await this.prisma.realtorProfile.findUnique({ where: { userId } });
       realtorId = realtor?.id;
     }
+    // CLIENT may only ever see their own purchases — force the clientId filter to
+    // their own profile (a missing profile yields a sentinel that matches nothing).
+    if (role === 'CLIENT') {
+      const client = await this.prisma.clientProfile.findUnique({ where: { userId } });
+      clientId = client?.id ?? '__no_client_profile__';
+    }
     const parsedPage = page !== undefined && !isNaN(Number(page)) ? Number(page) : undefined;
     const parsedLimit = limit !== undefined && !isNaN(Number(limit)) ? Number(limit) : undefined;
     return this.saleService.findAll({

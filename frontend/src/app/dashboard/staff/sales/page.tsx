@@ -258,6 +258,12 @@ export default function StaffSalesPage() {
         paymentPlan: saleForm.paymentPlan,
         paymentMethod: saleForm.paymentMethod || undefined,
         areaSold: toSqm(parseFloat(saleForm.sqmSold) || 0, saleAreaUnit) || undefined,
+        // Persist the discrete number of plots/units sold so receipts don't
+        // read every multi-plot sale as a single plot. When the size is entered
+        // in plots this is the value itself; for area units it's the plot-equivalent.
+        unitsSold: selectedProperty?.type === 'LAND'
+          ? Math.max(1, Math.round(toSqm(parseFloat(saleForm.sqmSold) || 0, saleAreaUnit) / AREA_UNITS.plot.factor))
+          : 1,
         ...(saleAttribution === 'REALTOR' && selectedRealtorId ? { realtorId: selectedRealtorId } : {}),
       };
 

@@ -117,7 +117,15 @@ export default function RealtorSalesPage() {
         buyerPhone: s.client?.user?.phone || '',
         amount: Number(s.salePrice) || 0,
         commission: Number(s.commissionAmount) || 0,
-        plotsSold: 1,
+        // Prefer the stored unit count; for land, fall back to plots derived
+        // from areaSold (plot = 465 sqm) so sales saved before unitsSold was
+        // captured don't read a multi-plot purchase as a single plot.
+        plotsSold: (() => {
+          const units = Number(s.unitsSold) || 1;
+          const isLand = String(s.property?.type || 'LAND').toUpperCase() === 'LAND';
+          const derived = isLand && Number(s.areaSold) > 0 ? Math.max(1, Math.round(Number(s.areaSold) / 465)) : 1;
+          return units > 1 ? units : Math.max(units, derived);
+        })(),
         sqmSold: Number(s.areaSold) || 0,
         date: s.saleDate ? new Date(s.saleDate).toISOString().split('T')[0] : '',
         status: s.status || 'PENDING',

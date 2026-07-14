@@ -20,13 +20,19 @@ import { ReceiptModal, ReceiptData } from '@/components/receipt';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { NairaSign } from '@/components/icons/naira-sign';
+import { useBranding, getCompanyName } from '@/hooks/use-branding';
 
 type PropertyFilter = 'all' | 'owned' | 'listed';
 
 export default function ClientPropertiesPage() {
+  const branding = useBranding();
+  const companyName = getCompanyName(branding);
   const [searchTerm, setSearchTerm] = useState('');
   const [propertyFilter, setPropertyFilter] = useState<PropertyFilter>('all');
   const [properties, setProperties] = useState<any[]>([]);
+  // Map of propertyId → the client's own sale record, used to build purchase
+  // receipts from real sale data (buyer, total plots, full price, payments).
+  const [salesByProperty, setSalesByProperty] = useState<Record<string, any>>({});
 
   const fetchProperties = useCallback(async () => {
     try {
@@ -57,9 +63,27 @@ export default function ClientPropertiesPage() {
     }
   }, []);
 
+  // Fetch the client's own sales (backend scopes /sales to the logged-in client)
+  // so each owned property's receipt can be built from the real purchase record.
+  const fetchSales = useCallback(async () => {
+    try {
+      const response: any = await api.get('/sales?limit=500');
+      const payload = response.data || response;
+      const records = Array.isArray(payload) ? payload : payload?.data || [];
+      const map: Record<string, any> = {};
+      for (const s of records) {
+        if (s.propertyId) map[String(s.propertyId)] = s;
+      }
+      setSalesByProperty(map);
+    } catch {
+      // Sales unavailable — receipts fall back to property-only data
+    }
+  }, []);
+
   useEffect(() => {
     fetchProperties();
-  }, [fetchProperties]);
+    fetchSales();
+  }, [fetchProperties, fetchSales]);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptData | null>(null);
 
@@ -86,18 +110,86 @@ export default function ClientPropertiesPage() {
   }, [filteredProperties]);
 
   const handleViewReceipt = (property: typeof properties[0]) => {
+    const sale = salesByProperty[String(property.id)];
+
+    // Preferred path: build the receipt from the real sale record. The receipt
+    // always shows the FULL purchase — total plots and full contract value — and
+    // the payment breakdown below reveals whether it is a part or full payment.
+    if (sale) {
+      const plots = (() => {
+        const units = Number(sale.unitsSold) || 1;
+        const isLand = String(sale.property?.type || property.type || 'LAND').toUpperCase() === 'LAND';
+        const derived = isLand && Number(sale.areaSold) > 0
+          ? Math.max(1, Math.round(Number(sale.areaSold) / 465))
+          : 1;
+        return units > 1 ? units : Math.max(units, derived);
+      })();
+      const contractValue = Number(sale.salePrice)
+        || (Number(sale.totalPaid) + Number(sale.remainingBalance))
+        || property.purchasePrice || 0;
+      const propType = sale.property?.type || property.type || 'Land';
+      const isLand = String(propType).toUpperCase() === 'LAND';
+      const unitWord = isLand ? (plots === 1 ? 'plot' : 'plots') : (plots === 1 ? 'unit' : 'units');
+      const buyerName = sale.client?.user
+        ? `${sale.client.user.firstName || ''} ${sale.client.user.lastName || ''}`.trim()
+        : '';
+      const isInstallment = sale.paymentPlan === 'INSTALLMENT';
+
+      const receiptData: ReceiptData = {
+        type: 'sale',
+        receiptNumber: `ELNG-${new Date(sale.saleDate || Date.now()).getFullYear().toString().slice(-2)}-${String(sale.id).replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+        date: sale.saleDate ? new Date(sale.saleDate).toISOString().split('T')[0] : property.purchaseDate,
+        seller: { name: companyName, address: branding.address || '' },
+        buyer: {
+          name: buyerName || 'Valued Client',
+          email: sale.client?.user?.email || '',
+          phone: sale.client?.user?.phone || '',
+        },
+        property: {
+          name: sale.property?.title || property.title,
+          type: propType,
+          address: sale.property?.address || property.address || '',
+        },
+        description: `Purchase of ${plots} ${unitWord} of ${propType} lying and situate at ${sale.property?.title || property.title}${(sale.property?.address || property.address) ? `, ${sale.property?.address || property.address}` : ''}.`,
+        items: [
+          {
+            description: `Property Sale: ${sale.property?.title || property.title}`,
+            quantity: plots,
+            unitPrice: plots > 0 ? contractValue / plots : contractValue,
+            amount: contractValue,
+          },
+        ],
+        subtotal: contractValue,
+        total: contractValue,
+        status: sale.status === 'COMPLETED' ? 'completed'
+          : sale.status === 'CANCELLED' ? 'cancelled'
+          : sale.status === 'PENDING' ? 'pending'
+          : 'paid',
+        ...(isInstallment ? {
+          paymentHistory: (sale.payments || []).map((p: any) => ({
+            number: p.paymentNumber || 0,
+            amount: Number(p.amount) || 0,
+            date: p.paymentDate ? new Date(p.paymentDate).toISOString().split('T')[0] : '',
+            method: p.paymentMethod || '',
+            reference: p.reference || '',
+            commission: Number(p.commissionAmount) || 0,
+            tax: Number(p.taxAmount) || 0,
+          })),
+          totalPaid: Number(sale.totalPaid) || 0,
+          remainingBalance: Number(sale.remainingBalance) || 0,
+        } : {}),
+      };
+      setSelectedReceipt(receiptData);
+      setReceiptModalOpen(true);
+      return;
+    }
+
+    // Fallback: no matching sale record — minimal receipt from property data only.
     const receiptData: ReceiptData = {
       receiptNumber: `PUR-${property.id.toString().padStart(6, '0')}`,
       type: 'sale',
       date: property.purchaseDate,
-      seller: {
-        name: property.seller,
-        email: property.sellerEmail,
-      },
-      buyer: {
-        name: 'Client Name', // Would come from auth context
-        email: 'client@email.com',
-      },
+      seller: { name: companyName, address: branding.address || '' },
       property: {
         name: property.title,
         type: property.type,
@@ -110,7 +202,7 @@ export default function ClientPropertiesPage() {
       total: property.purchasePrice,
       status: 'paid',
       notes: property.type === 'Land' && property.sqm
-        ? `Size: ${property.sqm.toLocaleString()} sqm | Price per plot: ${formatCurrency(property.purchasePrice / property.sqm)}`
+        ? `Size: ${property.sqm.toLocaleString()} sqm`
         : property.bedrooms
         ? `${property.bedrooms} Bedrooms, ${property.bathrooms} Bathrooms`
         : undefined,
@@ -304,6 +396,7 @@ export default function ClientPropertiesPage() {
         open={receiptModalOpen}
         onClose={() => setReceiptModalOpen(false)}
         data={selectedReceipt}
+        branding={branding}
       />
     </div>
   );

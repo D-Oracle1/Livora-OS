@@ -147,7 +147,15 @@ export default function SalesPage() {
           ? (Number(s.totalPaid) || 0)
           : (Number(s.salePrice) || 0),
         commission: Number(s.commissionAmount) || 0,
-        plotsSold: Number(s.unitsSold) || 1,
+        // Prefer the stored unit count; for land, fall back to plots derived
+        // from areaSold (plot = 465 sqm) so sales saved before unitsSold was
+        // captured don't read a multi-plot purchase as a single plot.
+        plotsSold: (() => {
+          const units = Number(s.unitsSold) || 1;
+          const isLand = String(s.property?.type || 'LAND').toUpperCase() === 'LAND';
+          const derived = isLand && Number(s.areaSold) > 0 ? Math.max(1, Math.round(Number(s.areaSold) / 465)) : 1;
+          return units > 1 ? units : Math.max(units, derived);
+        })(),
         sqmSold: Number(s.areaSold) || 0,
         pricePerSqm: 0,
         paymentMethod: s.paymentPlan || 'FULL',
@@ -367,17 +375,20 @@ export default function SalesPage() {
       },
       description: (() => { const qty = sale.plotsSold > 0 ? sale.plotsSold : 1; const isLand = (sale.propertyType || 'Land') === 'Land'; const unit = isLand ? (qty === 1 ? 'plot' : 'plots') : (qty === 1 ? 'unit' : 'units'); return `Purchase of ${qty} ${unit} of ${sale.propertyType || 'Land'} lying and situate at ${sale.property}${sale.propertyAddress ? `, ${sale.propertyAddress}` : ''}.`; })(),
       realtorName: sale.realtor !== 'Company' ? sale.realtor : undefined,
+      // The receipt always reflects the FULL purchase: total plots and full
+      // contract value. Whether it is a part or full payment is revealed by the
+      // payment-history breakdown (totalPaid / remaining balance) below.
       items: [
         {
           description: `Property Sale: ${sale.property}`,
           quantity: sale.plotsSold > 0 ? sale.plotsSold : 1,
-          unitPrice: sale.plotsSold > 0 ? sale.amount / sale.plotsSold : sale.amount,
-          amount: sale.amount,
+          unitPrice: sale.plotsSold > 0 ? sale.contractValue / sale.plotsSold : sale.contractValue,
+          amount: sale.contractValue,
         },
       ],
-      subtotal: sale.amount,
+      subtotal: sale.contractValue,
       fees: [],
-      total: sale.amount,
+      total: sale.contractValue,
       status: sale.status === 'COMPLETED' ? 'completed' : sale.status === 'CANCELLED' ? 'cancelled' : 'pending',
       notes: sale.notes || undefined,
       ...(sale.paymentPlan === 'INSTALLMENT' ? {
