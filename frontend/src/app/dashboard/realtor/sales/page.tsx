@@ -115,7 +115,11 @@ export default function RealtorSalesPage() {
         buyer: `${s.client?.user?.firstName || ''} ${s.client?.user?.lastName || ''}`.trim() || 'Unknown',
         buyerEmail: s.client?.user?.email || '',
         buyerPhone: s.client?.user?.phone || '',
-        amount: Number(s.salePrice) || 0,
+        // Full contract value. Derive from the live payment-tracking fields so the
+        // receipt always reconciles (Total = Total Paid + Remaining Balance); fall
+        // back to salePrice only when there is no payment data. salePrice can be
+        // stale/inconsistent on older records.
+        amount: ((Number(s.totalPaid) || 0) + (Number(s.remainingBalance) || 0)) || Number(s.salePrice) || 0,
         commission: Number(s.commissionAmount) || 0,
         // Prefer the stored unit count; for land, fall back to plots derived
         // from areaSold (plot = 465 sqm) so sales saved before unitsSold was

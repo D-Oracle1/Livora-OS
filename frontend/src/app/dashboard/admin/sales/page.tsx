@@ -141,8 +141,11 @@ export default function SalesPage() {
         realtor: s.realtorId ? (`${s.realtor?.user?.firstName || ''} ${s.realtor?.user?.lastName || ''}`.trim() || 'Unknown') : 'Company',
         realtorEmail: s.realtor?.user?.email || '',
         realtorTier: s.realtorId ? (s.realtor?.loyaltyTier || 'BRONZE') : '',
-        // Contract value is the full sale price regardless of how much has been paid
-        contractValue: Number(s.salePrice) || (Number(s.totalPaid) + Number(s.remainingBalance)) || 0,
+        // Contract value is the full sale price regardless of how much has been paid.
+        // Derive it from the live payment-tracking fields so the receipt always
+        // reconciles (Total = Total Paid + Remaining Balance); fall back to salePrice
+        // only when no payment data exists. salePrice can be stale on older records.
+        contractValue: ((Number(s.totalPaid) || 0) + (Number(s.remainingBalance) || 0)) || Number(s.salePrice) || 0,
         amount: s.paymentPlan === 'INSTALLMENT'
           ? (Number(s.totalPaid) || 0)
           : (Number(s.salePrice) || 0),
@@ -179,7 +182,7 @@ export default function SalesPage() {
         paymentsMade: (() => {
           const fromArray = (s.payments || []).length;
           if (fromArray > 0) return fromArray;
-          const cv = Number(s.salePrice) || (Number(s.totalPaid) + Number(s.remainingBalance)) || 0;
+          const cv = ((Number(s.totalPaid) || 0) + (Number(s.remainingBalance) || 0)) || Number(s.salePrice) || 0;
           const ni = s.numberOfInstallments || 1;
           const installmentAmt = cv / ni;
           return installmentAmt > 0 ? Math.round(Number(s.totalPaid) / installmentAmt) : 0;

@@ -124,8 +124,11 @@ export default function ClientPropertiesPage() {
           : 1;
         return units > 1 ? units : Math.max(units, derived);
       })();
-      const contractValue = Number(sale.salePrice)
-        || (Number(sale.totalPaid) + Number(sale.remainingBalance))
+      // Full contract value must reconcile with the payment breakdown
+      // (Total = Total Paid + Remaining Balance). Trust the live payment-tracking
+      // fields over salePrice, which can be stale/inconsistent on older records.
+      const contractValue = ((Number(sale.totalPaid) || 0) + (Number(sale.remainingBalance) || 0))
+        || Number(sale.salePrice)
         || property.purchasePrice || 0;
       const propType = sale.property?.type || property.type || 'Land';
       const isLand = String(propType).toUpperCase() === 'LAND';
