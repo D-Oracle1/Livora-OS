@@ -1,0 +1,59 @@
+{
+  "createdAt": "2026-07-20T10:38:49.793Z",
+  "tenant": "easyland",
+  "note": "Pre-change unitsSold values. Restore with --revert <this file> --apply",
+  "rows": [
+    {
+      "id": "a4caef24-c2c8-4006-84cd-2507ebd9ec39",
+      "unitsSold": 1
+    },
+    {
+      "id": "ecaf38d5-320e-46b3-9da8-5fc51e0963e3",
+      "unitsSold": 1
+    },
+    {
+      "id": "ea735d44-4de5-4183-93d6-6501fcfd6234",
+      "unitsSold": 1
+    },
+    {
+      "id": "483454bb-3334-4923-a468-e742cb7266fe",
+      "unitsSold": 1
+    },
+    {
+      "id": "599a2112-dd67-43ea-a619-fcdff70fb697",
+      "unitsSold": 1
+    },
+    {
+      "id": "bb90cea3-5ccd-48db-96cf-056883aa72eb",
+      "unitsSold": 1
+    },
+    {
+      "id": "0ca401dd-a02c-46c1-9759-235129cebcf3",
+      "unitsSold": 1
+    },
+    {
+      "id": "174f6b9a-36e4-4434-9dd6-d00831c91a41",
+      "unitsSold": 1
+    },
+    {
+      "id": "20cac390-b6ea-4fa4-8979-a5bd2429d3e0",
+      "unitsSold": 1
+    },
+    {
+      "id": "31d101b6-bb0f-485d-ae8a-092b0fe1a45e",
+      "unitsSold": 1
+    },
+    {
+      "id": "4e17c581-3c3c-44d2-b9ec-6b875e11686b",
+      "unitsSold": 1
+    },
+    {
+      "id": "5eb19ba1-062d-45f3-adbf-ea5bdc32c849",
+      "unitsSold": 1
+    },
+    {
+      "id": "7dfc49db-c757-4d3c-966e-e53f47f91c68",
+      "unitsSold": 1
+    }
+  ]
+}
